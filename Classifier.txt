@@ -1,0 +1,318 @@
+// ====================================================================
+// CLASSIFIER - Classificazione email semplificata (Allineato a CF)
+// ✅ Filtra SOLO acknowledgment ultra-semplici (≤3 parole)
+// ✅ Filtra SOLO greeting standalone 
+// ✅ Tutto il resto → Gemini decide
+// ====================================================================
+
+/**
+ * EmailClassifier - Aligned with CF nlp_classifier.py
+ * 
+ * PHILOSOPHY:
+ * - Filter ONLY ultra-simple acknowledgments (≤3 words)
+ * - Filter ONLY standalone greetings
+ * - EVERYTHING ELSE goes to Gemini for intelligent analysis
+ * - Zero false negatives: when in doubt, let Gemini decide
+ * 
+ * ✅ NEW: Sub-intent detection for emotional nuances
+ */
+class EmailClassifier {
+  constructor() {
+    console.log('🧠 Initializing EmailClassifier (CF-aligned)...');
+    
+    // Greeting-only patterns (standalone greetings with no content)
+    this.greetingOnlyPatterns = [
+      /^(buongiorno|buonasera|salve|ciao)\.?\s*$/i,
+      /^cordiali\s+saluti\.?\s*$/i,
+      /^distinti\s+saluti\.?\s*$/i
+    ];
+
+    // Categories for hints to Gemini
+    this.categories = {
+      'appointment': [
+        'appuntamento', 'fissare', 'prenotare', 'quando posso',
+        'disponibilità', 'orario', 'incontro', 'prenotazione',
+        'appointment', 'schedule', 'book', 'booking', 'availability'
+      ],
+      'information': [
+        'informazioni', 'chiedere', 'sapere', 'vorrei sapere',
+        'come faccio', 'dove', 'cosa serve', 'requisiti',
+        'information', 'ask', 'know', 'how to', 'where', 'requirements'
+      ],
+      'sacrament': [
+        'battesimo', 'comunione', 'cresima', 'matrimonio',
+        'sacramento', 'confessione', 'prima comunione',
+        'baptism', 'communion', 'confirmation', 'marriage', 'sacrament'
+      ],
+      'collaboration': [
+        'collaborare', 'volontario', 'aiutare', 'proposta',
+        'progetto', 'iniziativa', 'gruppo', 'offrire',
+        'collaborate', 'volunteer', 'help', 'proposal', 'project'
+      ],
+      'complaint': [
+        'lamentela', 'problema', 'disservizio', 'insoddisfatto',
+        'reclamo', 'complaint', 'problem', 'issue', 'dissatisfied'
+      ]
+    };
+    
+    // Sub-intent keywords for emotional nuances
+    this.subIntentKeywords = {
+      'emotional_distress': [
+        'deluso', 'delusa', 'delusione', 'arrabbiato', 'arrabbiata',
+        'insoddisfatto', 'insoddisfatta', 'frustrato', 'frustrata',
+        'scandalizzato', 'indignato', 'amareggiato', 'dispiaciuto',
+        'non va bene', 'inaccettabile', 'vergogna', 'pessimo',
+        'disappointed', 'angry', 'frustrated', 'upset', 'unacceptable'
+      ],
+      'gratitude': [
+        'ringrazio', 'grato', 'grata', 'riconoscente',
+        'gentilissimo', 'gentilissima', 'prezioso aiuto',
+        'grateful', 'thankful', 'appreciate'
+      ],
+      'bereavement': [
+        'lutto', 'defunto', 'defunta', 'morto', 'morta', 'decesso',
+        'scomparso', 'scomparsa', 'funerale', 'esequie',
+        'deceased', 'passed away', 'funeral', 'bereavement'
+      ],
+      'confusion': [
+        'non capisco', 'confuso', 'confusa', 'non mi è chiaro',
+        'potrebbe spiegare', 'non ho capito',
+        'confused', 'unclear', "don't understand"
+      ]
+    };
+    
+    console.log('✓ EmailClassifier initialized (CF-aligned)');
+    console.log(`   Philosophy: Filter only obvious cases, delegate rest to Gemini`);
+  }
+  
+  /**
+   * Classify email - minimal filtering
+   * ✅ ALIGNED: Same approach as CF classify_email
+   */
+  classifyEmail(subject, body, isReply = false) {
+    console.log(`   🔍 Classifying: '${subject.substring(0, 50)}...'`);
+    
+    // Extract main content
+    const mainContent = this._extractMainContent(body);
+    console.log(`      Main content: ${mainContent.length} chars`);
+    
+    // FILTER 1: Ultra-simple acknowledgment
+    if (this._isUltraSimpleAcknowledgment(mainContent)) {
+      console.log('      ✗ Ultra-simple acknowledgment (≤3 words, no question)');
+      return {
+        shouldReply: false,
+        reason: 'ultra_simple_acknowledgment',
+        category: null,
+        subIntents: {},
+        confidence: 1.0
+      };
+    }
+    
+    // FILTER 2: Greeting only
+    if (this._isGreetingOnly(mainContent)) {
+      console.log('      ✗ Greeting only (standalone)');
+      return {
+        shouldReply: false,
+        reason: 'greeting_only',
+        category: null,
+        subIntents: {},
+        confidence: 0.95
+      };
+    }
+    
+    // EVERYTHING ELSE: Pass to Gemini
+    const fullText = `${subject} ${mainContent}`;
+    const category = this._categorizeContent(fullText);
+    const subIntents = this._detectSubIntents(fullText);
+    
+    console.log('      ✓ Passing to Gemini for intelligent analysis');
+    if (category) {
+      console.log(`      → Category hint: ${category}`);
+    }
+    if (Object.keys(subIntents).length > 0) {
+      console.log(`      → Sub-intents: ${Object.keys(subIntents).join(', ')}`);
+    }
+    
+    return {
+      shouldReply: true,
+      reason: 'needs_ai_analysis',
+      category: category,
+      subIntents: subIntents,
+      confidence: category ? 0.85 : 0.75
+    };
+  }
+  
+  // ========================================================================
+  // HELPER METHODS
+  // ========================================================================
+  
+  /**
+   * Extract main content, removing quotes and signatures
+   */
+  _extractMainContent(body) {
+    const quoteMarkers = [
+      /^>.*$/m,
+      /^On .* wrote:.*$/m,
+      /^Il giorno .* ha scritto:.*$/m,
+      /^-{3,}.*Original Message.*$/m
+    ];
+    
+    const lines = body.split('\n');
+    const cleanLines = [];
+    
+    for (const line of lines) {
+      const stripped = line.trim();
+      
+      // Keep empty lines for paragraph separation
+      if (stripped === '') {
+        cleanLines.push(line);
+        continue;
+      }
+      
+      // Skip standalone greetings at start
+      if (/^(salve|buongiorno|buonasera|ciao)[\s,!.]*$/i.test(stripped)) {
+        continue;
+      }
+      
+      // Stop at quote markers
+      let isQuote = false;
+      for (const marker of quoteMarkers) {
+        if (marker.test(stripped)) {
+          isQuote = true;
+          break;
+        }
+      }
+      if (isQuote) break;
+      
+      cleanLines.push(line);
+    }
+    
+    let content = cleanLines.join('\n').trim();
+    
+    // Remove signatures
+    const signatureMarkers = [
+      /cordiali saluti/i,
+      /distinti saluti/i,
+      /in fede/i,
+      /best regards/i,
+      /sincerely/i,
+      /sent from my iphone/i,
+      /inviato da/i
+    ];
+    
+    for (const marker of signatureMarkers) {
+      const match = content.search(marker);
+      if (match !== -1) {
+        content = content.substring(0, match).trim();
+        break;
+      }
+    }
+    
+    return content;
+  }
+  
+  /**
+   * Check if ultra-simple acknowledgment (≤3 words, no question)
+   * ✅ ALIGNED: Same logic as CF _is_ultra_simple_acknowledgment
+   */
+  _isUltraSimpleAcknowledgment(text) {
+    if (!text || text.trim().length === 0) return false;
+    
+    // Normalize
+    let normalized = text.toLowerCase().trim();
+    normalized = normalized.replace(/[^\w\sàèéìòù?!]/g, '');
+    normalized = normalized.replace(/\s+/g, ' ');
+    
+    // If contains question mark, NOT a simple ack
+    if (text.includes('?')) return false;
+    
+    // Count words
+    const wordCount = normalized.split(' ').filter(w => w.length > 0).length;
+    
+    // STRICT: max 3 words
+    if (wordCount > 3) return false;
+    
+    // Must contain thank/received word
+    const thankWords = ['grazie', 'ringrazio', 'ricevuto', 'ok', 'perfetto'];
+    const hasThanks = thankWords.some(word => normalized.includes(word));
+    
+    return hasThanks && wordCount <= 3;
+  }
+  
+  /**
+   * Check if greeting only
+   */
+  _isGreetingOnly(text) {
+    let normalized = text.toLowerCase().trim();
+    normalized = normalized.replace(/[^\w\sàèéìòù]/g, '');
+    
+    return this.greetingOnlyPatterns.some(pattern => pattern.test(normalized));
+  }
+  
+  /**
+   * Categorize content (hint for Gemini)
+   */
+  _categorizeContent(text) {
+    const textLower = text.toLowerCase();
+    const categoryScores = {};
+    
+    for (const category in this.categories) {
+      const keywords = this.categories[category];
+      const score = keywords.filter(kw => textLower.includes(kw)).length;
+      if (score > 0) {
+        categoryScores[category] = score;
+      }
+    }
+    
+    if (Object.keys(categoryScores).length === 0) return null;
+    
+    // Return highest scoring category
+    let maxCategory = null;
+    let maxScore = 0;
+    for (const cat in categoryScores) {
+      if (categoryScores[cat] > maxScore) {
+        maxScore = categoryScores[cat];
+        maxCategory = cat;
+      }
+    }
+    return maxCategory;
+  }
+  
+  /**
+   * Detect emotional sub-intents
+   * ✅ ALIGNED: Same as CF _detect_sub_intents
+   */
+  _detectSubIntents(text) {
+    const textLower = text.toLowerCase();
+    const detected = {};
+    
+    for (const intentName in this.subIntentKeywords) {
+      const keywords = this.subIntentKeywords[intentName];
+      for (const keyword of keywords) {
+        if (textLower.includes(keyword)) {
+          detected[intentName] = true;
+          break;
+        }
+      }
+    }
+    
+    return detected;
+  }
+  
+  /**
+   * Get classifier statistics
+   */
+  getStats() {
+    return {
+      categories: Object.keys(this.categories).length,
+      subIntents: Object.keys(this.subIntentKeywords).length,
+      greetingPatterns: this.greetingOnlyPatterns.length,
+      philosophy: 'minimal_filtering_gemini_decides'
+    };
+  }
+}
+
+// Factory function
+function createEmailClassifier() {
+  return new EmailClassifier();
+}

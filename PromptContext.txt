@@ -1,0 +1,103 @@
+// ====================================================================
+// PROMPT CONTEXT
+// Calcola profilo e concern runtime (FASE 2–3)
+// ====================================================================
+
+class PromptContext {
+  constructor(input) {
+    this.input = input;
+    this.concerns = this._computeConcerns();
+    this.profile = this._computeProfile();
+    this.meta = this._buildMeta();
+  }
+
+  // --------------------------------------------------
+  // CONCERNS
+  // --------------------------------------------------
+
+  _computeConcerns() {
+    const i = this.input;
+
+    return {
+      language_safety:
+        i.email.detectedLanguage !== 'it' ||
+        i.classification.confidence < 0.8,
+
+      hallucination_risk:
+        i.knowledgeBase.length > 800 ||
+        i.temporal.mentionsDates ||
+        i.temporal.mentionsTimes,
+
+      formatting_risk:
+        i.temporal.mentionsTimes ||
+        ['information', 'sacrament'].includes(i.classification.category),
+
+      temporal_risk:
+        i.temporal.mentionsDates ||
+        i.knowledgeBase.containsDates,
+
+      discernment_risk:
+        i.requestType.needsDiscernment ||
+        i.territory.addressFound,
+
+      emotional_sensitivity:
+        i.requestType.type === 'pastoral' ||
+        i.classification.subIntents.emotional_distress ||
+        i.classification.subIntents.bereavement,
+
+      repetition_risk:
+        i.memory.exists ||
+        i.conversation.messageCount > 1,
+
+      identity_consistency:
+        !i.email.isReply ||
+        i.requestType.type !== 'technical',
+
+      response_scope_control:
+        i.email.isReply ||
+        i.classification.confidence < 0.7
+    };
+  }
+
+  // --------------------------------------------------
+  // PROFILE
+  // --------------------------------------------------
+
+  _computeProfile() {
+    const c = this.concerns;
+
+    if (c.discernment_risk || c.emotional_sensitivity) {
+      return 'heavy';
+    }
+
+    if (
+      c.hallucination_risk ||
+      c.formatting_risk ||
+      c.temporal_risk
+    ) {
+      return 'standard';
+    }
+
+    return 'lite';
+  }
+
+  // --------------------------------------------------
+  // META (debug / audit)
+  // --------------------------------------------------
+
+  _buildMeta() {
+    const active = Object.entries(this.concerns)
+      .filter(([_, v]) => v)
+      .map(([k]) => k);
+
+    return {
+      profile: this.profile,
+      activeConcerns: active
+    };
+  }
+}
+
+// Factory
+function createPromptContext(input) {
+  return new PromptContext(input);
+}
