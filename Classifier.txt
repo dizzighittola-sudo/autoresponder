@@ -1,24 +1,24 @@
 // ====================================================================
-// CLASSIFIER - Classificazione email semplificata (Allineato a CF)
+// CLASSIFIER - Classificazione email semplificata
 // ✅ Filtra SOLO acknowledgment ultra-semplici (≤3 parole)
 // ✅ Filtra SOLO greeting standalone 
 // ✅ Tutto il resto → Gemini decide
 // ====================================================================
 
 /**
- * EmailClassifier - Aligned with CF nlp_classifier.py
+ * EmailClassifier - Classificatore email
  * 
- * PHILOSOPHY:
- * - Filter ONLY ultra-simple acknowledgments (≤3 words)
- * - Filter ONLY standalone greetings
- * - EVERYTHING ELSE goes to Gemini for intelligent analysis
- * - Zero false negatives: when in doubt, let Gemini decide
+ * FILOSOFIA:
+ * - Filtra SOLO acknowledgment ultra-semplici (≤3 parole)
+ * - Filtra SOLO saluti standalone
+ * - TUTTO IL RESTO va a Gemini per analisi intelligente
+ * - Zero falsi negativi: in caso di dubbio, Gemini decide
  * 
- * ✅ NEW: Sub-intent detection for emotional nuances
+ * ✅ Rilevamento sub-intent per sfumature emotive
  */
 class EmailClassifier {
   constructor() {
-    console.log('🧠 Initializing EmailClassifier (CF-aligned)...');
+    console.log('🧠 Inizializzazione EmailClassifier...');
     
     // Greeting-only patterns (standalone greetings with no content)
     this.greetingOnlyPatterns = [
@@ -81,13 +81,12 @@ class EmailClassifier {
       ]
     };
     
-    console.log('✓ EmailClassifier initialized (CF-aligned)');
-    console.log(`   Philosophy: Filter only obvious cases, delegate rest to Gemini`);
+    console.log('✓ EmailClassifier inizializzato');
+    console.log(`   Filosofia: Filtra solo casi ovvi, delega il resto a Gemini`);
   }
   
   /**
-   * Classify email - minimal filtering
-   * ✅ ALIGNED: Same approach as CF classify_email
+   * Classifica email - filtro minimale
    */
   classifyEmail(subject, body, isReply = false) {
     console.log(`   🔍 Classifying: '${subject.substring(0, 50)}...'`);
@@ -212,8 +211,7 @@ class EmailClassifier {
   }
   
   /**
-   * Check if ultra-simple acknowledgment (≤3 words, no question)
-   * ✅ ALIGNED: Same logic as CF _is_ultra_simple_acknowledgment
+   * Controlla se acknowledgment ultra-semplice (≤3 parole, nessuna domanda)
    */
   _isUltraSimpleAcknowledgment(text) {
     if (!text || text.trim().length === 0) return false;
@@ -279,8 +277,7 @@ class EmailClassifier {
   }
   
   /**
-   * Detect emotional sub-intents
-   * ✅ ALIGNED: Same as CF _detect_sub_intents
+   * Rileva sub-intent emotivi
    */
   _detectSubIntents(text) {
     const textLower = text.toLowerCase();

@@ -1,22 +1,22 @@
 // ====================================================================
-// GEMINI SERVICE - Servizio API Gemini (Allineato a CF)
+// GEMINI SERVICE - Servizio API Gemini
 // ✅ RETRY con exponential backoff
 // ✅ Language detection centralizzata
 // ✅ Quick check per decidere se rispondere
 // ====================================================================
 
 /**
- * GeminiService - Aligned with CF version
+ * GeminiService - Servizio interazione con API Gemini
  * 
  * KEY FEATURES:
- * ✅ Retry with exponential backoff (3 attempts)
- * ✅ Centralized language detection
- * ✅ Quick check for should_respond + language
- * ✅ Adaptive greeting by time and language
+ * ✅ Retry con exponential backoff (3 tentativi)
+ * ✅ Rilevamento lingua centralizzato
+ * ✅ Quick check per should_respond + lingua
+ * ✅ Saluto adattivo per ora e lingua
  */
 class GeminiService {
   constructor() {
-    console.log('🤖 Initializing GeminiService (CF-aligned)...');
+    console.log('🤖 Inizializzazione GeminiService...');
     
     // Get config
     this.apiKey = typeof CONFIG !== 'undefined' ? CONFIG.GEMINI_API_KEY : 
@@ -28,21 +28,20 @@ class GeminiService {
       throw new Error('GEMINI_API_KEY non configurata correttamente');
     }
     
-    // Retry configuration (aligned with CF)
+    // Configurazione retry
     this.maxRetries = 3;
-    this.retryDelay = 5000; // ms (5 seconds - increased for rate limit handling)
+    this.retryDelay = 5000; // ms (5 secondi - aumentato per rate limit)
     this.backoffFactor = 2;
     
-    console.log(`✓ GeminiService initialized with model: ${this.modelName}`);
+    console.log(`✓ GeminiService inizializzato con modello: ${this.modelName}`);
   }
   
   // ========================================================================
-  // RETRY WRAPPER (Aligned with CF decorator)
+  // RETRY WRAPPER
   // ========================================================================
   
   /**
-   * Execute function with retry and exponential backoff
-   * ✅ ALIGNED: Same logic as CF @retry_on_failure decorator
+   * Esegue funzione con retry ed exponential backoff
    */
   _withRetry(fn, context = 'API call') {
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
@@ -73,13 +72,12 @@ class GeminiService {
   }
   
   // ========================================================================
-  // LANGUAGE DETECTION (Centralized - aligned with CF)
+  // RILEVAMENTO LINGUA (Centralizzato)
   // ========================================================================
   
   /**
-   * Detect email language with enhanced detection
-   * ✅ CENTRALIZED: This is the ONLY place for language detection
-   * ✅ ALIGNED: Same keywords and logic as CF _detect_email_language
+   * Rileva lingua email con detection avanzata
+   * ✅ CENTRALIZZATO: Unico punto per rilevamento lingua
    */
   detectEmailLanguage(emailContent, emailSubject) {
     const text = `${emailSubject} ${emailContent}`.toLowerCase();
@@ -96,7 +94,7 @@ class GeminiService {
       console.log('   Found Spanish-specific character (ñ)');
     }
     
-    // ✅ ALIGNED: Same keywords as CF
+    // Parole chiave per rilevamento
     const englishUniqueKeywords = [
       'the', 'would', 'could', 'should', 'might',
       'we are', 'you are', 'they are', 'i am', "i'm", "we're", "you're",
@@ -187,7 +185,7 @@ class GeminiService {
       }
     }
     
-    // Confidence threshold logic (aligned with CF)
+    // Logica soglia confidenza
     if (spanishCharScore > 0 && scores['es'] >= scores['it']) {
       console.log(`   ✓ Detected: SPANISH (score: ${scores['es']}, includes special chars)`);
       return 'es';
@@ -208,7 +206,7 @@ class GeminiService {
   }
   
   // ========================================================================
-  // ADAPTIVE GREETING (Aligned with CF)
+  // SALUTO ADATTIVO
   // ========================================================================
   
   /**
@@ -446,8 +444,7 @@ class GeminiService {
   // ========================================================================
   
   /**
-   * Lightweight Gemini call to decide if email needs response AND detect language
-   * ✅ ALIGNED: Same as CF should_respond_to_email
+   * Chiamata rapida Gemini per decidere se email richiede risposta E rilevare lingua
    */
   shouldRespondToEmail(emailContent, emailSubject) {
     const prompt = `Analizza questa email.
@@ -553,8 +550,7 @@ Output JSON atteso:
   // ========================================================================
   
   /**
-   * Generate AI response with retry
-   * ✅ ALIGNED: Uses PromptEngine, retry logic from CF
+   * Genera risposta AI con retry
    */
   generateResponse(prompt) {
     return this._withRetry(() => {

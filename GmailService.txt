@@ -1,27 +1,27 @@
 // ====================================================================
-// GMAIL SERVICE - Gestione operazioni Gmail (Allineato a CF)
-// ✅ Reply-To header support
+// GMAIL SERVICE - Gestione operazioni Gmail
+// ✅ Supporto header Reply-To
 // ✅ Label cache per evitare chiamate ripetute
-// ✅ Conversation history builder
+// ✅ Costruttore cronologia conversazione
 // ====================================================================
 
 /**
- * GmailService - Aligned with CF gmail_service.py
+ * GmailService - Servizio gestione Gmail
  * 
- * KEY FEATURES:
- * ✅ Label cache for performance
- * ✅ Reply-To header support for web forms
- * ✅ Conversation history builder
- * ✅ Quote/signature removal
+ * FUNZIONALITÀ PRINCIPALI:
+ * ✅ Label cache per performance
+ * ✅ Supporto header Reply-To per form web
+ * ✅ Costruttore cronologia conversazione
+ * ✅ Rimozione citazioni/firme
  */
 class GmailService {
   constructor() {
-    console.log('📧 Initializing GmailService (CF-aligned)...');
+    console.log('📧 Inizializzazione GmailService...');
     
-    // Label cache to avoid repeated API calls
+    // Cache etichette per evitare chiamate API ripetute
     this._labelCache = {};
     
-    console.log('✓ GmailService initialized with label cache');
+    console.log('✓ GmailService inizializzato con cache etichette');
   }
   
   // ========================================================================
@@ -29,8 +29,7 @@ class GmailService {
   // ========================================================================
   
   /**
-   * Get or create a Gmail label with caching
-   * ✅ ALIGNED: Label cache from CF get_or_create_label
+   * Ottiene o crea un'etichetta Gmail con caching
    */
   getOrCreateLabel(labelName) {
     // Check cache first
@@ -79,8 +78,7 @@ class GmailService {
   // ========================================================================
   
   /**
-   * Extract message details with Reply-To support
-   * ✅ ALIGNED: Reply-To handling from CF extract_message_details
+   * Estrae dettagli messaggio con supporto Reply-To
    */
   extractMessageDetails(message) {
     const subject = message.getSubject();
@@ -89,7 +87,7 @@ class GmailService {
     const body = message.getPlainBody() || this._htmlToPlainText(message.getBody());
     const messageId = message.getId();
     
-    // ✅ NEW: Get Reply-To header
+    // Ottieni header Reply-To
     const replyTo = message.getReplyTo();
     
     // Use Reply-To if present and valid
@@ -180,10 +178,14 @@ class GmailService {
   // ========================================================================
   
   /**
-   * Build conversation history from thread messages
-   * ✅ ALIGNED: Same logic as CF build_conversation_history
+   * Costruisce cronologia conversazione da messaggi thread
    */
   buildConversationHistory(messages, maxMessages = 10, ourEmail = '') {
+    // Fallback: get our email if not provided
+    if (!ourEmail) {
+      ourEmail = Session.getActiveUser().getEmail();
+    }
+    
     // Limit number of messages
     if (messages.length > maxMessages) {
       console.warn(`⚠️ Thread with ${messages.length} messages, limiting to last ${maxMessages}`);
@@ -215,8 +217,7 @@ class GmailService {
   // ========================================================================
   
   /**
-   * Extract main reply content, removing quoted text
-   * ✅ ALIGNED: Same logic as CF extract_main_reply
+   * Estrae contenuto principale risposta, rimuovendo testo citato
    */
   extractMainReply(content) {
     const markers = [
@@ -286,10 +287,21 @@ class GmailService {
   /**
    * Send reply as HTML (for formatted responses)
    * ✅ Applies formatting safeguards (legacy feature)
+   * ✅ Applies custom replacements from Sostituzioni sheet
    */
   sendHtmlReply(thread, responseText, messageDetails) {
+    // 0. Apply Custom Replacements (from Sostituzioni sheet)
+    let finalResponse = responseText;
+    if (typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.replacements) {
+      const replacementCount = Object.keys(GLOBAL_CACHE.replacements).length;
+      if (replacementCount > 0) {
+        finalResponse = this.applyReplacements(finalResponse, GLOBAL_CACHE.replacements);
+        console.log(`   ✓ Applied ${replacementCount} replacement rules`);
+      }
+    }
+    
     // 1. Apply Formatting Safeguards (Legacy restoration)
-    let finalResponse = this.fixPunctuation(responseText);
+    finalResponse = this.fixPunctuation(finalResponse);
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
     // 2. Convert to HTML
@@ -357,6 +369,23 @@ class GmailService {
       }
     }
     return text;
+  }
+
+  /**
+   * Applies custom text replacements from the Sostituzioni sheet
+   * @param {string} text - Text to apply replacements to
+   * @param {Object} replacements - Map of {badText: goodText}
+   */
+  applyReplacements(text, replacements) {
+    if (!text || !replacements) return text;
+    
+    let result = text;
+    for (const [bad, good] of Object.entries(replacements)) {
+      // Case insensitive global replace
+      const regex = new RegExp(bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      result = result.replace(regex, good);
+    }
+    return result;
   }
 
   // ========================================================================

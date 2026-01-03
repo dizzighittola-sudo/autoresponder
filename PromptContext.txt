@@ -55,7 +55,11 @@ class PromptContext {
 
       response_scope_control:
         i.email.isReply ||
-        i.classification.confidence < 0.7
+        i.classification.confidence < 0.7,
+
+      // 🧠 Controllo saluto per continuità conversazionale
+      salutation_control:
+        i.salutationMode && i.salutationMode !== 'full'
     };
   }
 

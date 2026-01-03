@@ -1,11 +1,11 @@
 // ====================================================================
 // MEMORY SERVICE - Memoria conversazionale per GAS
-// ✅ Usa Google Sheet come storage (alternativa a Firestore)
-// ✅ Stessa struttura dati di CF
+// ✅ Usa Google Sheet come storage
+// ✅ Stessa struttura dati di versione Python
 // ====================================================================
 
 /**
- * MemoryService - GAS version using Google Sheets
+ * MemoryService - Versione GAS usando Google Sheets
  * 
  * STORAGE: Google Sheet "ConversationMemory" con colonne:
  * A: threadId
@@ -75,8 +75,7 @@ class MemoryService {
   }
   
   /**
-   * Get memory for a thread
-   * ✅ ALIGNED: Same as CF get_memory
+   * Ottiene memoria per un thread
    */
   getMemory(threadId) {
     if (!this._initialized || !threadId) {
@@ -114,8 +113,7 @@ class MemoryService {
   }
   
   /**
-   * Update memory for a thread (merge with existing)
-   * ✅ ALIGNED: Same as CF update_memory
+   * Aggiorna memoria per un thread (merge con esistente)
    */
   updateMemory(threadId, newData) {
     if (!this._initialized || !threadId) {
@@ -155,8 +153,7 @@ class MemoryService {
   }
   
   /**
-   * Add topics to provided info list
-   * ✅ ALIGNED: Same as CF add_provided_info_topics
+   * Aggiunge topic alla lista info fornite
    */
   addProvidedInfoTopics(threadId, topics) {
     if (!this._initialized || !threadId || !topics || topics.length === 0) {

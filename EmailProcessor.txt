@@ -1,22 +1,22 @@
 // ====================================================================
-// EMAIL PROCESSOR - Orchestratore Pipeline (Allineato a CF)
-// ✅ Clear pipeline: Filter → Classify → Generate → Validate
-// ✅ Modular architecture with dependency injection
+// EMAIL PROCESSOR - Orchestratore Pipeline
+// ✅ Pipeline chiara: Filtra → Classifica → Genera → Valida
+// ✅ Architettura modulare con dependency injection
 // ====================================================================
 
 /**
- * EmailProcessor - Aligned with CF email_processor.py
+ * EmailProcessor - Orchestratore elaborazione email
  * 
  * PIPELINE:
- * 1. FILTER: Should we process this email?
- * 2. CLASSIFY: What type of request is it?
- * 3. GENERATE: Create AI response
- * 4. VALIDATE: Check response quality
- * 5. SEND: Reply to email
+ * 1. FILTRA: Dobbiamo processare questa email?
+ * 2. CLASSIFICA: Che tipo di richiesta è?
+ * 3. GENERA: Crea risposta AI
+ * 4. VALIDA: Controlla qualità risposta
+ * 5. INVIA: Rispondi all'email
  */
 class EmailProcessor {
   constructor(options = {}) {
-    console.log('📬 Initializing EmailProcessor (CF-aligned)...');
+    console.log('📬 Inizializzazione EmailProcessor...');
     
     // Inject dependencies or create defaults
     this.geminiService = options.geminiService || new GeminiService();
@@ -45,7 +45,7 @@ class EmailProcessor {
   
   /**
    * Process a single email thread
-   * ✅ ALIGNED: Same pipeline as CF process_thread
+   * Processa un singolo thread email
    */
   processThread(thread, knowledgeBase, doctrineBase = '') {
     const result = {
@@ -193,7 +193,8 @@ Dettaglio: ${v.reason}
       if (messages.length > 1) {
         conversationHistory = this.gmailService.buildConversationHistory(
           messages.slice(0, -1), // All except last
-          10 // Max messages
+          10, // Max messages
+          myEmail // Our email for marking our messages
         );
       }
       
@@ -273,13 +274,15 @@ const promptContext = createPromptContext({
   temporal: {
     mentionsDates: /\b(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|\d{1,2}\/\d{1,2})\b/i.test(messageDetails.body),
     mentionsTimes: /\d{1,2}[:.]\d{2}/.test(messageDetails.body)
-  }
+  },
+
+  // 🧠 Modalità saluto per continuità conversazionale
+  salutationMode: salutationMode
 });
 console.log('🧠 PromptContext:', JSON.stringify(promptContext.meta));
 
-// NEW CALL
+// 🎯 Passa profilo e concern per filtering dinamico template
 const prompt = this.promptEngine.buildPrompt({
-  ...promptContext,
   emailContent: messageDetails.body,
   emailSubject: messageDetails.subject,
   knowledgeBase: enrichedKnowledgeBase,
@@ -293,7 +296,11 @@ const prompt = this.promptEngine.buildPrompt({
   salutation: greeting,
   closing: closing,
   category: classification.category,
-  subIntents: classification.subIntents || {}
+  subIntents: classification.subIntents || {},
+  // 🎯 Parametri focusing dinamico da PromptContext
+  promptProfile: promptContext.profile,
+  activeConcerns: promptContext.concerns,
+  salutationMode: salutationMode
 });
       
       // Add request type hint
@@ -384,7 +391,7 @@ const prompt = this.promptEngine.buildPrompt({
   
   /**
    * Process all unread emails
-   * ✅ ALIGNED: Same as CF process_unread_emails
+   * Processa tutte le email non lette
    */
   processUnreadEmails(knowledgeBase, doctrineBase = '') {
     console.log('\n' + '='.repeat(70));
@@ -583,8 +590,13 @@ function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdate
       return 'none_or_continuity';
     }
 
-    // 2b️⃣ Conversazione ripresa dopo pausa
-    return 'soft';
+    // 2b️⃣ Conversazione ripresa dopo pausa (48h - 4 giorni)
+    if (hoursSinceLast <= 96) {
+      return 'soft';
+    }
+
+    // 2c️⃣ Troppo tempo passato (> 4 giorni) → tratta come nuovo contatto
+    return 'full';
   }
 
   // Fallback di sicurezza

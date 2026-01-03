@@ -1,10 +1,10 @@
 // ====================================================================
-// REQUEST TYPE CLASSIFIER - Classificazione Technical/Pastoral/Mixed
-// Porting completo da CF request_classifier.py
+// REQUEST TYPE CLASSIFIER - Classificazione Tecnica/Pastorale/Mista
+// Versione completa con indicatori ponderati
 // ====================================================================
 
 /**
- * RequestTypeClassifier - Aligned with CF version
+ * RequestTypeClassifier - Classificatore tipo richieste
  * 
  * Classifica le richieste in:
  * - TECHNICAL: domande procedurali ("si può", "quanti", "quando")
@@ -18,7 +18,7 @@
  */
 class RequestTypeClassifier {
   constructor() {
-    console.log('📊 Initializing RequestTypeClassifier (CF-aligned)...');
+    console.log('📊 Inizializzazione RequestTypeClassifier...');
     
     // ========================================================================
     // INDICATORI TECNICI
@@ -133,7 +133,6 @@ class RequestTypeClassifier {
   
   /**
    * Classifica la richiesta email
-   * ✅ ALIGNED: Same logic as CF classify()
    */
   classify(subject, body) {
     const text = `${subject} ${body}`.toLowerCase();
@@ -185,8 +184,7 @@ class RequestTypeClassifier {
   }
   
   /**
-   * Calculate weighted score for a set of indicators
-   * ✅ ALIGNED: Same as CF _calculate_score
+   * Calcola punteggio ponderato per set di indicatori
    */
   _calculateScore(text, indicators) {
     let total = 0;

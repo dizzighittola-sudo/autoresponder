@@ -1,28 +1,28 @@
 // ====================================================================
-// RESPONSE VALIDATOR - Validazione risposte AI (Allineato a CF v2.1)
-// Estratto da script.txt e allineato con response_validator.py CF
+// RESPONSE VALIDATOR - Validazione risposte AI
+// Controlla qualità e sicurezza delle risposte generate
 // ====================================================================
 
 /**
- * Response Validator - Aligned with CF version
+ * ResponseValidator - Validatore risposte AI
  * 
- * WHAT WE CHECK (Critical):
- * ✅ Length (too short/long = bad UX)
- * ✅ Language consistency (critical for multilingual)
- * ✅ Forbidden phrases (hallucination indicators)
- * ✅ Placeholders (incomplete response)
- * ✅ Required signature (brand identity)
- * ✅ Hallucinated data (emails, phones, times not in KB)
- * ✅ Capital after comma (grammar error)
+ * CONTROLLI CRITICI:
+ * ✅ Lunghezza (troppo corta/lunga = UX negativa)
+ * ✅ Consistenza lingua (critico per multilingua)
+ * ✅ Frasi vietate (indicatori allucinazione)
+ * ✅ Placeholder (risposta incompleta)
+ * ✅ Firma obbligatoria (identità brand)
+ * ✅ Dati allucinati (email, telefoni, orari non in KB)
+ * ✅ Maiuscola dopo virgola (errore grammaticale)
  * 
- * ALIGNED WITH CF:
- * ✅ Smart placeholder detection (ellipsis vs placeholder)
- * ✅ Phone validation with 8+ digit threshold
- * ✅ Time normalization (9.30 → 09:30)
+ * FUNZIONALITÀ:
+ * ✅ Rilevamento placeholder intelligente (ellissi vs placeholder)
+ * ✅ Validazione telefono con soglia 8+ cifre
+ * ✅ Normalizzazione orari (9.30 → 09:30)
  */
 class ResponseValidator {
   constructor() {
-    console.log('🔍 Initializing ResponseValidator (CF-aligned v2.1)...');
+    console.log('🔍 Inizializzazione ResponseValidator...');
     
     // Get config - fallback to defaults if CONFIG not defined
     const strictMode = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_STRICT_MODE : false;
@@ -32,13 +32,12 @@ class ResponseValidator {
     this.MIN_VALID_SCORE = strictMode ? 0.8 : minScore;
     this.STRICT_MODE_SCORE = 0.8;
     
-    // Length thresholds (aligned with CF)
+    // Soglie lunghezza
     this.MIN_LENGTH_CHARS = 25;
     this.OPTIMAL_MIN_LENGTH = 100;
     this.WARNING_MAX_LENGTH = 3000;
     
-    // Forbidden phrases (hallucination/uncertainty indicators)
-    // ✅ ALIGNED: Same list as CF
+    // Frasi vietate (indicatori di incertezza/allucinazione)
     this.forbiddenPhrases = [
       'non ho abbastanza informazioni',
       'non posso rispondere',
@@ -61,19 +60,19 @@ class ResponseValidator {
       'es': ['gracias', 'saludos', 'estimado', 'parroquia', 'misa', 'iglesia', 'querría']
     };
     
-    // Placeholders - ✅ ALIGNED: Same as CF
+    // Placeholder
     this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
     
     // Signature pattern (case-insensitive)
     this.signaturePattern = /segreteria\s+parrocchia\s+sant[''']?eugenio/i;
     
-    console.log('✓ ResponseValidator initialized (CF-aligned v2.1)');
-    console.log(`   Min valid score: ${this.MIN_VALID_SCORE}`);
+    console.log('✓ ResponseValidator inizializzato');
+    console.log(`   Soglia minima validità: ${this.MIN_VALID_SCORE}`);
   }
   
   /**
-   * Validate response comprehensively
-   * ✅ ALIGNED: Same 7 checks as CF
+   * Valida risposta in modo completo
+   * ✅ 7 controlli di sicurezza
    */
   validateResponse(response, detectedLanguage, knowledgeBase, emailContent, emailSubject) {
     const errors = [];
@@ -166,8 +165,7 @@ class ResponseValidator {
   // ========================================================================
   
   /**
-   * Check 1: Length validation
-   * ✅ ALIGNED: Same thresholds as CF
+   * Check 1: Validazione lunghezza
    */
   _checkLength(response) {
     const errors = [];
@@ -191,8 +189,7 @@ class ResponseValidator {
   }
   
   /**
-   * Check 2: Language consistency
-   * ✅ ALIGNED: Same logic as CF
+   * Check 2: Consistenza lingua
    */
   _checkLanguage(response, expectedLanguage) {
     const errors = [];
@@ -247,8 +244,7 @@ class ResponseValidator {
   }
   
   /**
-   * Check 3: Required signature
-   * ✅ ALIGNED: Non-blocking warning (same as CF)
+   * Check 3: Firma obbligatoria (warning non bloccante)
    */
   _checkSignature(response) {
     const errors = [];
@@ -264,8 +260,8 @@ class ResponseValidator {
   }
   
   /**
-   * Check 4: Forbidden content and placeholders
-   * ✅ ALIGNED: Smart placeholder detection from CF
+   * Check 4: Contenuto vietato e placeholder
+   * ✅ Rilevamento placeholder intelligente
    */
   _checkForbiddenContent(response) {
     const errors = [];
@@ -273,17 +269,17 @@ class ResponseValidator {
     
     const responseLower = response.toLowerCase();
     
-    // Check forbidden phrases (uncertainty indicators)
+    // Controlla frasi vietate (indicatori incertezza)
     const foundForbidden = this.forbiddenPhrases.filter(
       phrase => responseLower.includes(phrase)
     );
     
     if (foundForbidden.length > 0) {
-      errors.push(`Contains uncertainty phrases: ${foundForbidden.slice(0, 2).join(', ')}`);
+      errors.push(`Contiene frasi di incertezza: ${foundForbidden.slice(0, 2).join(', ')}`);
       score *= 0.50;
     }
     
-    // ✅ ALIGNED: Smart placeholder detection from CF
+    // Rilevamento placeholder intelligente
     const foundPlaceholders = [];
     for (const p of this.placeholders) {
       // For '...', check if it's used as placeholder (not ellipsis in text)
@@ -312,8 +308,8 @@ class ResponseValidator {
   }
   
   /**
-   * Check 5: Hallucinations (invented data not in KB)
-   * ✅ ALIGNED: Phone 8+ digits, time normalization from CF
+   * Check 5: Allucinazioni (dati inventati non in KB)
+   * ✅ Telefono 8+ cifre, normalizzazione orari
    */
   _checkHallucinations(response, knowledgeBase) {
     const errors = [];
@@ -321,7 +317,7 @@ class ResponseValidator {
     let score = 1.0;
     const hallucinations = {};
     
-    // ✅ ALIGNED: Time normalization helper from CF
+    // Helper normalizzazione orari
     const normalizeTime = (t) => {
       t = t.replace('.', ':');
       const parts = t.split(':');
@@ -339,7 +335,7 @@ class ResponseValidator {
       return t;
     };
     
-    // ✅ ALIGNED: Phone normalization helper from CF
+    // Helper normalizzazione telefono
     const normalizePhone = (p) => p.replace(/\D/g, '');
     
     // === Check 1: Times ===
@@ -374,12 +370,12 @@ class ResponseValidator {
     }
     
     // === Check 3: Phone Numbers ===
-    // ✅ ALIGNED: Pattern and 8+ digit threshold from CF
+    // Pattern telefono e soglia 8+ cifre
     const phonePattern = /\b(?:0\d|3\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
     const responsePhonesRaw = response.match(phonePattern) || [];
     const kbPhonesRaw = knowledgeBase.match(phonePattern) || [];
     
-    // ✅ ALIGNED: 8+ digits minimum to avoid false positives (CF fix)
+    // 8+ cifre minimo per evitare falsi positivi
     const responsePhones = new Set(
       responsePhonesRaw.map(normalizePhone).filter(p => p.length >= 8)
     );
@@ -398,9 +394,9 @@ class ResponseValidator {
   }
   
   /**
-   * Check 6: Capital after comma
-   * ✅ ALIGNED: Same forbidden caps list as CF (for Italian)
-   * ⚠️ FIX: Apply strict rules only for Italian - English has different capitalization rules
+   * Check 6: Maiuscola dopo virgola
+   * ✅ Lista maiuscole vietate (per italiano)
+   * ⚠️ Regole strict solo per italiano - inglese ha regole diverse
    */
   _checkCapitalAfterComma(response, expectedLanguage = 'it') {
     const errors = [];
@@ -514,7 +510,7 @@ class ResponseValidator {
       forbiddenPhrasesCount: this.forbiddenPhrases.length,
       supportedLanguages: Object.keys(this.languageMarkers),
       placeholdersCount: this.placeholders.length,
-      version: '2.1 (CF-aligned)'
+      version: '2.1'
     };
   }
 }

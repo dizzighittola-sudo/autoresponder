@@ -1,6 +1,6 @@
 // ====================================================================
-// MAIN.GS - Entry Point Pulito (Gennaio 2026)
-// ✅ Usa solo moduli CF-aligned
+// MAIN.GS - Entry Point Pulito
+// ✅ Gestione moduli e configurazione
 // ✅ Nessun codice legacy
 // ====================================================================
 
@@ -31,6 +31,7 @@ const CONFIG = {
   // === Knowledge Base ===
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
   KB_SHEET_NAME: 'Istruzioni',
+  REPLACEMENTS_SHEET_NAME: 'Sostituzioni',
   MEMORY_SHEET_NAME: 'ConversationMemory',
   
   // === Modalità ===
@@ -65,6 +66,7 @@ var GLOBAL_CACHE = {
   doctrineBase: '',
   ignoreDomains: CONFIG.IGNORE_DOMAINS,
   ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
+  replacements: {},
   loaded: false
 };
 
@@ -91,6 +93,23 @@ function loadResources() {
       console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
+    }
+    
+    // Load Replacements (Sostituzioni)
+    try {
+      const replSheet = spreadsheet.getSheetByName(CONFIG.REPLACEMENTS_SHEET_NAME);
+      if (replSheet) {
+        const replData = replSheet.getDataRange().getValues();
+        for (let i = 1; i < replData.length; i++) {
+          const [badText, goodText] = replData[i];
+          if (badText && goodText) {
+            GLOBAL_CACHE.replacements[String(badText).trim()] = String(goodText).trim();
+          }
+        }
+        console.log(`✓ Replacements loaded: ${Object.keys(GLOBAL_CACHE.replacements).length}`);
+      }
+    } catch (replError) {
+      console.warn(`⚠️ Could not load replacements: ${replError.message}`);
     }
     
     GLOBAL_CACHE.loaded = true;

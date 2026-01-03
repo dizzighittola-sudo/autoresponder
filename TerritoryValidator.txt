@@ -68,7 +68,7 @@ class TerritoryValidator {
       /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
       
       // Pattern 2: "abito in via Rossi 10", "abito a via Bianchi 3", "abito alle Belle Arti 10"
-      // ✅ ALIGNED: Added "abito alle" from CF version
+      // Aggiunto "abito alle" per maggiore copertura
       /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
     ];
     

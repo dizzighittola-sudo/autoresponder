@@ -1,11 +1,11 @@
 // ====================================================================
-// PROMPT ENGINE - Generazione prompt modulare COMPLETO (CF-aligned)
-// ✅ 18 template classes come in CF
-// ✅ TUTTI gli esempi e regole preservati
+// PROMPT ENGINE - Generazione prompt modulare COMPLETO
+// ✅ 18 classi template per composizione prompt
+// ✅ Supporta filtering dinamico basato su profilo
 // ====================================================================
 
 /**
- * PromptEngine - FULL VERSION aligned with CF prompt_engine.py (802 lines)
+ * PromptEngine - VERSIONE COMPLETA con filtering dinamico
  * 
  * PRESERVES ALL:
  * ✅ CriticalErrorsTemplate
@@ -29,13 +29,52 @@
  */
 class PromptEngine {
   constructor() {
-    console.log('🎨 Initializing PromptEngine FULL (CF-aligned)...');
-    console.log('✓ PromptEngine initialized with all 18 templates');
+    console.log('🎨 Inizializzazione PromptEngine con focusing dinamico...');
+    
+    // 🎯 Configurazione filtering template
+    this.LITE_SKIP_TEMPLATES = [
+      'ExamplesTemplate',
+      'FormattingGuidelinesTemplate',
+      'HumanToneGuidelinesTemplate',
+      'SpecialCasesTemplate'
+    ];
+    
+    this.STANDARD_SKIP_TEMPLATES = [
+      'ExamplesTemplate'
+    ];
+    
+    console.log('✓ PromptEngine inizializzato con 18 template + focusing dinamico');
   }
   
   /**
-   * Build complete prompt from context
-   * ✅ FULL VERSION: Same structure and content as CF build_prompt
+   * 🎯 Determina se un template deve essere incluso in base a profilo e concern
+   */
+  _shouldIncludeTemplate(templateName, promptProfile, activeConcerns = {}) {
+    if (promptProfile === 'heavy') {
+      return true; // Profilo heavy include tutto
+    }
+    
+    if (promptProfile === 'lite') {
+      if (this.LITE_SKIP_TEMPLATES.includes(templateName)) {
+        return false;
+      }
+    }
+    
+    if (promptProfile === 'standard') {
+      if (this.STANDARD_SKIP_TEMPLATES.includes(templateName)) {
+        // Salta esempi a meno che formatting_risk non sia attivo
+        if (!activeConcerns.formatting_risk) {
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Costruisce il prompt completo dal contesto
+   * ✅ Supporta filtering dinamico template basato su profilo
    */
   buildPrompt(options) {
     const {
@@ -52,79 +91,97 @@ class PromptEngine {
       salutation = 'Buongiorno.',
       closing = 'Cordiali saluti,',
       subIntents = {},
-      memoryContext = {}
+      memoryContext = {},
+      // 🎯 Parametri per focusing dinamico
+      promptProfile = 'heavy',
+      activeConcerns = {},
+      salutationMode = 'full'
     } = options;
     
     const sections = [];
+    let skippedCount = 0;
     
-    // 1. CRITICAL ERRORS (FIRST - reinforcement)
+    // Helper per aggiungere template condizionalmente
+    const addTemplate = (templateName, content) => {
+      if (this._shouldIncludeTemplate(templateName, promptProfile, activeConcerns)) {
+        if (content) sections.push(content);
+      } else {
+        skippedCount++;
+      }
+    };
+    
+    // 1. ERRORI CRITICI (PRIMO - rinforzo) - SEMPRE INCLUSO
     sections.push(this._renderCriticalErrors());
     
-    // 2. SYSTEM ROLE
+    // 2. RUOLO SISTEMA - SEMPRE INCLUSO
     sections.push(this._renderSystemRole());
     
-    // 3. LANGUAGE INSTRUCTION
+    // 3. ISTRUZIONI LINGUA - SEMPRE INCLUSO
     sections.push(this._renderLanguageInstruction(detectedLanguage));
     
-    // 4. MEMORY CONTEXT
+    // 3.5. CONTINUITÀ CONVERSAZIONALE (per controllo saluti follow-up)
+    const continuitySection = this._renderConversationContinuity(salutationMode);
+    if (continuitySection) sections.push(continuitySection);
+    
+    // 4. CONTESTO MEMORIA - SEMPRE INCLUSO
     const memorySection = this._renderMemoryContext(memoryContext);
     if (memorySection) sections.push(memorySection);
     
-    // 5. KNOWLEDGE BASE
+    // 5. KNOWLEDGE BASE - SEMPRE INCLUSO
     sections.push(this._renderKnowledgeBase(knowledgeBase));
     
-    // 6. TERRITORY VERIFICATION
+    // 6. VERIFICA TERRITORIO
     sections.push(this._renderTerritoryVerification());
     
-    // 7. SEASONAL CONTEXT
+    // 7. CONTESTO STAGIONALE
     sections.push(this._renderSeasonalContext(currentSeason));
     
-    // 7b. TEMPORAL AWARENESS (NEW)
+    // 7b. CONSAPEVOLEZZA TEMPORALE
     sections.push(this._renderTemporalAwareness(currentDate));
     
-    // 8. CATEGORY HINT
+    // 8. SUGGERIMENTO CATEGORIA
     const categoryHint = this._renderCategoryHint(category);
     if (categoryHint) sections.push(categoryHint);
     
-    // 9. FORMATTING GUIDELINES (FULL)
-    sections.push(this._renderFormattingGuidelines());
+    // 9. LINEE GUIDA FORMATTAZIONE - 🎯 FILTRABILE
+    addTemplate('FormattingGuidelinesTemplate', this._renderFormattingGuidelines());
     
-    // 10. RESPONSE STRUCTURE (based on category/sub-intents)
+    // 10. STRUTTURA RISPOSTA - SEMPRE INCLUSO
     const structureHint = this._renderResponseStructure(category, subIntents);
     if (structureHint) sections.push(structureHint);
     
-    // 11. CONVERSATION HISTORY
+    // 11. CRONOLOGIA CONVERSAZIONE - SEMPRE INCLUSO
     if (conversationHistory) {
       sections.push(this._renderConversationHistory(conversationHistory));
     }
     
-    // 12. EMAIL CONTENT
+    // 12. CONTENUTO EMAIL - SEMPRE INCLUSO
     sections.push(this._renderEmailContent(emailContent, emailSubject, senderName, senderEmail, detectedLanguage));
     
-    // 13. NO REPLY RULES
+    // 13. REGOLE NO REPLY - SEMPRE INCLUSO
     sections.push(this._renderNoReplyRules());
     
-    // 14. HUMAN TONE GUIDELINES (FULL)
-    sections.push(this._renderHumanToneGuidelines());
+    // 14. LINEE GUIDA TONO UMANO - 🎯 FILTRABILE
+    addTemplate('HumanToneGuidelinesTemplate', this._renderHumanToneGuidelines());
     
-    // 15. EXAMPLES (FULL - with link formatting)
-    const examples = this._renderExamples(category);
-    if (examples) sections.push(examples);
+    // 15. ESEMPI - 🎯 FILTRABILE
+    addTemplate('ExamplesTemplate', this._renderExamples(category));
     
-    // 16. RESPONSE GUIDELINES
+    // 16. LINEE GUIDA RISPOSTA - SEMPRE INCLUSO
     sections.push(this._renderResponseGuidelines(detectedLanguage, currentSeason, salutation, closing));
     
-    // 17. SPECIAL CASES
-    sections.push(this._renderSpecialCases());
+    // 17. CASI SPECIALI - 🎯 FILTRABILE
+    addTemplate('SpecialCasesTemplate', this._renderSpecialCases());
     
-    // 18. FINAL CHECKLIST (LAST - reinforcement)
+    // 18. CHECKLIST FINALE (ULTIMO - rinforzo) - SEMPRE INCLUSO
     sections.push(this._renderFinalChecklist());
     
-    // Compose final prompt
+    // Componi prompt finale
     let prompt = sections.join('\n\n');
     prompt += '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
     
-    console.log(`📝 Prompt size: ${prompt.length} chars (~${Math.round(prompt.length / 4)} tokens)`);
+    // 🎯 Log migliorato con info profilo
+    console.log(`📝 Prompt: ${prompt.length} chars (~${Math.round(prompt.length / 4)} tokens) | profile=${promptProfile} | skipped=${skippedCount}`);
     
     return prompt;
   }
@@ -201,6 +258,15 @@ o richiede discernimento pastorale.
 • Istituzionale (usa "restiamo", "siamo lieti") ma umano
 • Empatico verso le esigenze delle persone
 
+🧠 CONSAPEVOLEZZA DEL CONTESTO:
+La persona ti sta già scrivendo via email. Sei già in contatto con lei.
+Quindi:
+• Evita di dire "contattare la segreteria" - la sta già contattando!
+• Evita di dare l'indirizzo email della parrocchia - ci ha già scritto!
+• Se serve un contatto ulteriore, suggerisci di telefonare o venire in segreteria
+• Frasi corrette: "può chiamarci al...", "può venire a trovarci", "risponda a questa email"
+• Frasi da evitare: "può scriverci a info@...", "contatti la segreteria via email"
+
 ⚠️ IMPORTANTE:
 - Se l'interlocutore usa varianti ortografiche (es. "peregrinaggio" invece di "pellegrinaggio"), 
   cerca l'informazione nella knowledge base usando termini simili
@@ -256,7 +322,29 @@ Esto es OBLIGATORIO. El remitente habla español y no entenderá italiano.
 ═══════════════════════════════════════════════════════════════════════════`
     };
     
-    return instructions[lang] || instructions['it'];
+    // Se la lingua NON è it/en/es, genera istruzione generica
+    if (!instructions[lang]) {
+      return `═══════════════════════════════════════════════════════════════════════════
+🚨🚨🚨 CRITICAL LANGUAGE REQUIREMENT 🚨🚨🚨
+═══════════════════════════════════════════════════════════════════════════
+
+The incoming email is written in language code: "${lang.toUpperCase()}"
+
+YOU MUST:
+✅ Write your ENTIRE response in the SAME LANGUAGE as the incoming email
+✅ Use appropriate greetings and closings for that language
+✅ Translate any Italian information into the sender's language
+
+YOU MUST NOT:
+❌ Use Italian words (no "Buongiorno", "Cordiali saluti", etc.)
+❌ Mix languages
+❌ Respond in Italian when the sender wrote in another language
+
+This is MANDATORY. The sender may not understand Italian.
+═══════════════════════════════════════════════════════════════════════════`;
+    }
+    
+    return instructions[lang];
   }
   
   // ========================================================================
@@ -285,6 +373,65 @@ Esto es OBLIGATORIO. El remitente habla español y no entenderá italiano.
 ═══════════════════════════════════════════════════════════════════════════
 ${sections.join('\n')}
 ═══════════════════════════════════════════════════════════════════════════`;
+  }
+  
+  // ========================================================================
+  // TEMPLATE 4.5: CONTINUITÀ CONVERSAZIONALE
+  // ========================================================================
+  
+  _renderConversationContinuity(salutationMode) {
+    if (!salutationMode || salutationMode === 'full') {
+      return null; // Primo contatto: nessuna istruzione speciale
+    }
+    
+    if (salutationMode === 'none_or_continuity') {
+      return `═══════════════════════════════════════════════════════════════════════════
+🧠 CONTINUITÀ CONVERSAZIONALE - REGOLA VINCOLANTE
+═══════════════════════════════════════════════════════════════════════════
+
+📌 MODALITÀ SALUTO: FOLLOW-UP RECENTE (conversazione in corso)
+
+La conversazione è già avviata. Questa NON è la prima interazione.
+
+REGOLE OBBLIGATORIE:
+✅ NON usare saluti rituali completi (Buongiorno, Buon Natale, ecc.)
+✅ NON ripetere saluti festivi già usati nel thread
+✅ Inizia DIRETTAMENTE dal contenuto OPPURE usa una frase di continuità
+
+FRASI DI CONTINUITÀ CORRETTE:
+• "Grazie per il messaggio."
+• "Certo, ecco le informazioni richieste."
+• "Volentieri, vediamo insieme."
+• "In merito a quanto ci chiede..."
+
+⚠️ DIVIETO: Ripetere lo stesso saluto è percepito come MECCANICO e non umano.
+
+═══════════════════════════════════════════════════════════════════════════`;
+    }
+    
+    if (salutationMode === 'soft') {
+      return `═══════════════════════════════════════════════════════════════════════════
+🧠 CONTINUITÀ CONVERSAZIONALE - REGOLA VINCOLANTE
+═══════════════════════════════════════════════════════════════════════════
+
+📌 MODALITÀ SALUTO: RIPRESA CONVERSAZIONE (dopo una pausa)
+
+La conversazione riprende dopo un po' di tempo.
+
+REGOLE:
+✅ Usa un saluto SOFT, non il rituale standard
+✅ NON usare "Buongiorno/Buonasera" come se fosse il primo contatto
+✅ NON ripetere saluti festivi già usati
+
+SALUTI SOFT CORRETTI:
+• "Ci fa piacere risentirla."
+• "Grazie per averci ricontattato."
+• "Bentornato/a."
+
+═══════════════════════════════════════════════════════════════════════════`;
+    }
+    
+    return null;
   }
   
   // ========================================================================
