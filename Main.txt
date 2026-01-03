@@ -31,6 +31,9 @@ const CONFIG = {
   // === Knowledge Base ===
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
   KB_SHEET_NAME: 'Istruzioni',
+  AI_CORE_LITE_SHEET: 'AI_CORE_LITE',
+  AI_CORE_SHEET: 'AI_CORE',
+  DOCTRINE_SHEET: 'Dottrina',
   REPLACEMENTS_SHEET_NAME: 'Sostituzioni',
   MEMORY_SHEET_NAME: 'ConversationMemory',
   
@@ -63,6 +66,8 @@ const LANGUAGE_MARKERS = {
 
 var GLOBAL_CACHE = {
   knowledgeBase: '',
+  aiCoreLite: '',
+  aiCore: '',
   doctrineBase: '',
   ignoreDomains: CONFIG.IGNORE_DOMAINS,
   ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
@@ -85,7 +90,7 @@ function loadResources() {
   try {
     const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     
-    // Load Knowledge Base
+    // Load Knowledge Base (Istruzioni)
     const kbSheet = spreadsheet.getSheetByName(CONFIG.KB_SHEET_NAME);
     if (kbSheet) {
       const kbData = kbSheet.getDataRange().getValues();
@@ -93,6 +98,36 @@ function loadResources() {
       console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
+    }
+    
+    // Load AI_CORE_LITE (principi pastorali base)
+    const liteSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_LITE_SHEET);
+    if (liteSheet) {
+      const liteData = liteSheet.getDataRange().getValues();
+      GLOBAL_CACHE.aiCoreLite = liteData.map(row => row.join(' | ')).join('\n');
+      console.log(`✓ AI_CORE_LITE loaded: ${GLOBAL_CACHE.aiCoreLite.length} chars`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_LITE_SHEET}' not found`);
+    }
+    
+    // Load AI_CORE (principi pastorali estesi per discernimento)
+    const coreSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_SHEET);
+    if (coreSheet) {
+      const coreData = coreSheet.getDataRange().getValues();
+      GLOBAL_CACHE.aiCore = coreData.map(row => row.join(' | ')).join('\n');
+      console.log(`✓ AI_CORE loaded: ${GLOBAL_CACHE.aiCore.length} chars`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_SHEET}' not found`);
+    }
+    
+    // Load Dottrina (base dottrinale completa)
+    const doctrineSheet = spreadsheet.getSheetByName(CONFIG.DOCTRINE_SHEET);
+    if (doctrineSheet) {
+      const doctrineData = doctrineSheet.getDataRange().getValues();
+      GLOBAL_CACHE.doctrineBase = doctrineData.map(row => row.join(' | ')).join('\n');
+      console.log(`✓ Doctrine Base loaded: ${GLOBAL_CACHE.doctrineBase.length} chars`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.DOCTRINE_SHEET}' not found`);
     }
     
     // Load Replacements (Sostituzioni)
@@ -113,7 +148,7 @@ function loadResources() {
     }
     
     GLOBAL_CACHE.loaded = true;
-    console.log('✓ Resources loaded successfully');
+    console.log('✓ All resources loaded successfully');
     
   } catch (error) {
     console.error(`❌ Error loading resources: ${error.message}`);

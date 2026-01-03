@@ -187,6 +187,53 @@ Dettaglio: ${v.reason}
       }
       
       // ═══════════════════════════════════════════════════════════════
+      // STEP 5.5: CONDITIONAL KB ENRICHMENT (Based on Request Type Flags)
+      // ═══════════════════════════════════════════════════════════════
+      // Logica: per domande TECNICHE (orari, documenti) → solo Istruzioni
+      //         per domande PASTORALI/DOTTRINALI → caricamento graduato
+      
+      const needsPastoralSupport = requestType.needsDiscernment || requestType.needsDoctrine;
+      
+      // AI_CORE_LITE: solo se c'è componente pastorale o dottrinale
+      if (needsPastoralSupport && typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.aiCoreLite) {
+        const liteSection = `
+════════════════════════════════════════════════════════════════════════
+📋 PRINCIPI PASTORALI FONDAMENTALI (AI_CORE_LITE)
+════════════════════════════════════════════════════════════════════════
+${GLOBAL_CACHE.aiCoreLite}
+════════════════════════════════════════════════════════════════════════
+`;
+        enrichedKnowledgeBase = liteSection + '\n\n' + enrichedKnowledgeBase;
+        console.log('   ✓ AI_CORE_LITE injected (pastoral/doctrinal question)');
+      }
+      
+      // AI_CORE esteso: solo se needsDiscernment = true (accompagnamento personale)
+      if (requestType.needsDiscernment && typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.aiCore) {
+        const coreSection = `
+════════════════════════════════════════════════════════════════════════
+🧭 PRINCIPI PASTORALI ESTESI (AI_CORE) - Accompagnamento Personale
+════════════════════════════════════════════════════════════════════════
+${GLOBAL_CACHE.aiCore}
+════════════════════════════════════════════════════════════════════════
+`;
+        enrichedKnowledgeBase = coreSection + '\n\n' + enrichedKnowledgeBase;
+        console.log('   ✓ AI_CORE injected (needsDiscernment=true)');
+      }
+      
+      // Dottrina: solo se needsDoctrine = true (spiegazione dottrinale esplicita)
+      if (requestType.needsDoctrine && typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.doctrineBase) {
+        const doctrineSection = `
+════════════════════════════════════════════════════════════════════════
+📖 BASE DOTTRINALE (Dottrina) - Spiegazione Dottrinale
+════════════════════════════════════════════════════════════════════════
+${GLOBAL_CACHE.doctrineBase}
+════════════════════════════════════════════════════════════════════════
+`;
+        enrichedKnowledgeBase = doctrineSection + '\n\n' + enrichedKnowledgeBase;
+        console.log('   ✓ Doctrine Base injected (needsDoctrine=true)');
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
       // STEP 6: BUILD CONVERSATION HISTORY
       // ═══════════════════════════════════════════════════════════════
       let conversationHistory = '';
