@@ -12,9 +12,10 @@
  * - MIXED: entrambi gli aspetti
  * 
  * Logica di attivazione KB:
- * - AI-Core Lite: SEMPRE (tono, limiti, tipo risposta)
- * - AI-Core: Solo quando needs_discernment = true
- * - Dottrina: Solo quando needs_doctrine = true
+ * - AI-Core Lite: Solo quando needsDiscernment || needsDoctrine (tono, limiti)
+ * - AI-Core: Solo quando needsDiscernment = true
+ * - Dottrina: Solo quando needsDoctrine = true
+ * (Per richieste puramente tecniche, nessuna KB viene caricata)
  */
 class RequestTypeClassifier {
   constructor() {
