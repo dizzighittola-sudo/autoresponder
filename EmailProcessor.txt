@@ -364,6 +364,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       if (!response) {
         console.error('   ❌ Failed to generate response');
         this._addErrorLabel(thread);
+        this._markAsProcessed(thread); // Prevent infinite reprocessing
         result.status = 'error';
         result.error = 'Generation failed';
         return result;
@@ -392,6 +393,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         if (!validation.isValid) {
           console.warn(`   ❌ Validation FAILED (score: ${validation.score.toFixed(2)})`);
           this._addValidationErrorLabel(thread);
+          this._markAsProcessed(thread); // Prevent infinite reprocessing
           result.status = 'validation_failed';
           result.validationFailed = true;
           return result;
