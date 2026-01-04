@@ -622,7 +622,6 @@ function testHybridFlow() {
   if (quickCheck.classification) {
      const engine = new PromptEngine();
      const directives = engine._renderDynamicDirectives(
-       quickCheck.classification.category, 
        quickCheck.classification.topic
      );
      console.log('📚 Dynamic Directives (Smart RAG):');

@@ -145,7 +145,7 @@ class PromptEngine {
     if (categoryHint) sections.push(categoryHint);
 
     // 8b. DIRETTIVE DINAMICHE (Smart RAG) - ✅ NUOVO
-    const dynamicDirectives = this._renderDynamicDirectives(category, topic);
+    const dynamicDirectives = this._renderDynamicDirectives(topic);
     if (dynamicDirectives) sections.push(dynamicDirectives);
     
     // 9. LINEE GUIDA FORMATTAZIONE - 🎯 FILTRABILE
@@ -546,20 +546,18 @@ ${hints[category]}`;
    * Usa GLOBAL_CACHE.doctrineStructured (caricato da foglio Google Sheets)
    * ✅ FIX: Defensive programming su tutti i campi del foglio
    */
-  _renderDynamicDirectives(category, topic) {
+  _renderDynamicDirectives(topic) {
     // Guard clauses
     if (typeof GLOBAL_CACHE === 'undefined') return null;
     if (!GLOBAL_CACHE.doctrineStructured || GLOBAL_CACHE.doctrineStructured.length === 0) return null;
-    if (!category && !topic) return null;
+    if (!topic) return null;
     
     const relevantRows = GLOBAL_CACHE.doctrineStructured.filter(row => {
       // Normalizzazione stringhe per confronto con fallback sicuro
-      const rowCat = String(row['Categoria'] || '').toLowerCase();
       const rowTopic = String(row['Sotto-tema'] || '').toLowerCase();
       const rowTags = String(row['Indicazioni operative AI'] || '').toLowerCase();
       
       const targetTopic = String(topic || '').toLowerCase();
-      const targetCat = String(category || '').toLowerCase();
       
       // Match Logica: se c'è topic, cerca in Sotto-tema o tags
       if (targetTopic && (rowTopic.includes(targetTopic) || rowTags.includes(targetTopic))) {
