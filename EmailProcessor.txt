@@ -370,8 +370,8 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         return result;
       }
       
-      // Check for NO_REPLY marker
-      if (response.trim() === 'NO_REPLY' || response.includes('NO_REPLY')) {
+      // Check for NO_REPLY marker (exact match only to avoid false positives)
+      if (response.trim() === 'NO_REPLY') {
         console.log('   ⊘ AI returned NO_REPLY');
         this._markAsProcessed(thread);
         result.status = 'filtered';

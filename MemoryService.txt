@@ -154,6 +154,7 @@ class MemoryService {
   
   /**
    * Aggiunge topic alla lista info fornite
+   * ✅ FIX: Non incrementa messageCount (evita doppio incremento)
    */
    addProvidedInfoTopics(threadId, topics) {
      if (!this._initialized || !threadId || !topics || topics.length === 0) {
@@ -165,11 +166,22 @@ class MemoryService {
       const lock = LockService.getScriptLock();
       lock.waitLock(5000); // wait up to 5 seconds
       try {
-        const existingMemory = this.getMemory(threadId);
-        const existingTopics = existingMemory.providedInfo || [];
-        const mergedTopics = [...new Set([...existingTopics, ...topics])];
-        this.updateMemory(threadId, { providedInfo: mergedTopics });
-        console.log(`🧠 Memory: Added provided topics ${JSON.stringify(topics)}`);
+        const existingRow = this._findRowByThreadId(threadId);
+        if (existingRow) {
+          // Merge topics without incrementing messageCount
+          const existingData = this._rowToObject(existingRow.values);
+          const existingTopics = existingData.providedInfo || [];
+          const mergedTopics = [...new Set([...existingTopics, ...topics])];
+          
+          // Update only providedInfo, preserve messageCount
+          existingData.providedInfo = mergedTopics;
+          existingData.lastUpdated = new Date().toISOString();
+          // ✅ Do NOT increment messageCount here
+          
+          this._updateRow(existingRow.rowIndex, existingData);
+          this._invalidateCache(`memory_${threadId}`);
+          console.log(`🧠 Memory: Added provided topics ${JSON.stringify(topics)}`);
+        }
       } finally {
         lock.releaseLock();
       }

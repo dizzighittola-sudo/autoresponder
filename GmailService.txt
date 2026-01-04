@@ -457,7 +457,12 @@ function createGmailService() {
 function markdownToHtml(text) {
   if (!text) return '';
 
-  let html = text;
+  // ✅ FIX: Sanitize HTML to prevent injection attacks
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
   // Proteggi eventuali code blocks
   const codeBlocks = [];
