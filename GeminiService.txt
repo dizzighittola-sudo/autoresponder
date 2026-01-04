@@ -474,19 +474,23 @@ Oggetto: ${emailSubject}
 Testo: ${emailContent.substring(0, 800)}
 
 Compiti:
-1. Decidi se richiede risposta (reply_needed: true/false)
-2. Rileva la lingua (language: codice iso 2 lettere es. 'it', 'en', 'es', 'de')
-3. Motivo sintetico (reason)
-
-Criteri per reply_needed:
-- FALSE se è solo ringraziamento/conferma ricevuta/saluto generico
-- FALSE se è solo acknowledgment ("ok", "perfetto", "grazie")
-- TRUE se contiene domande, richieste, dubbi, richiesta conferma azione
+1. Decidi se richiede risposta (reply_needed).
+2. Rileva la lingua (language).
+3. Classifica la richiesta (category) in una di queste:
+   - "TECHNICAL": orari, documenti, procedure, info pratiche
+   - "PASTORAL": richieste di aiuto, sfogo, situazioni personali, lutto, richiesta colloqui personali
+   - "DOCTRINAL": dubbi di fede, domande teologiche, "perché la chiesa..."
+   - "MIXED": mix di tecnica e pastorale (es. cerco info ma sono arrabbiato/triste)
+4. Estrai l'argomento principale (topic) es. "Battesimo", "Messa", "Orari", "Lutto".
+5. Fornisci un breve ragionamento (reason).
 
 Output JSON atteso:
 {
   "reply_needed": boolean,
-  "language": "string",
+  "language": "it" | "en" | "es",
+  "category": "TECHNICAL" | "PASTORAL" | "DOCTRINAL" | "MIXED",
+  "topic": "string",
+  "confidence": number (0.0-1.0),
   "reason": "string"
 }`;
 
@@ -553,7 +557,12 @@ Output JSON atteso:
           return {
             shouldRespond: data.reply_needed === true,
             language: (data.language || fallbackLang).toLowerCase(),
-            reason: data.reason || 'quick_check'
+            reason: data.reason || 'quick_check',
+            classification: {
+              category: data.category || 'TECHNICAL',
+              topic: data.topic || '',
+              confidence: data.confidence || 0.8
+            }
           };
 
         } catch (parseError) {

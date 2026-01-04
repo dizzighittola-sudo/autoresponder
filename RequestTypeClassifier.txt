@@ -134,11 +134,12 @@ class RequestTypeClassifier {
   
   /**
    * Classifica la richiesta email
+   * ✅ Supporta override da classificazione Gemini (Hybrid approach)
    */
-  classify(subject, body) {
+  classify(subject, body, externalHint = null) {
     const text = `${subject} ${body}`.toLowerCase();
     
-    // Calculate scores
+    // Calculate scores (Regex-based backup/validation)
     const technicalResult = this._calculateScore(text, this.TECHNICAL_INDICATORS);
     const pastoralResult = this._calculateScore(text, this.PASTORAL_INDICATORS);
     const doctrineResult = this._calculateScore(text, this.DOCTRINE_INDICATORS);
@@ -147,24 +148,38 @@ class RequestTypeClassifier {
     const pastoralScore = pastoralResult.score;
     const doctrineScore = doctrineResult.score;
     
-    // Determine type
-    let requestType;
-    if (pastoralScore >= 3 && pastoralScore > technicalScore) {
-      requestType = 'pastoral';
-    } else if (technicalScore >= 2 && pastoralScore <= 1) {
-      requestType = 'technical';
-    } else if (pastoralScore >= 2 && technicalScore >= 2) {
-      requestType = 'mixed';
+    // Determine type (Hybrid Logic)
+    let requestType = 'technical';
+    let source = 'regex';
+    
+    if (externalHint && externalHint.category && externalHint.confidence >= 0.7) {
+      // ✅ Use Gemini Classification if available and confident
+      requestType = externalHint.category.toLowerCase();
+      source = 'gemini';
+      console.log(`   🤖 Hybrid Classifier: Using Gemini result (${requestType.toUpperCase()}, conf=${externalHint.confidence})`);
     } else {
-      requestType = 'technical'; // Default for low-signal requests
+      // ⚠️ Fallback to Regex
+      if (pastoralScore >= 3 && pastoralScore > technicalScore) {
+        requestType = 'pastoral';
+      } else if (technicalScore >= 2 && pastoralScore <= 1) {
+        requestType = 'technical';
+      } else if (pastoralScore >= 2 && technicalScore >= 2) {
+        requestType = 'mixed';
+      } else if (doctrineScore >= 3) {
+        requestType = 'doctrinal'; 
+      } else {
+        requestType = 'technical'; // Default
+      }
+      source = 'regex';
     }
     
-    // Determine activation flags
-    const needsDiscernment = pastoralScore >= 2 || requestType === 'pastoral' || requestType === 'mixed';
-    const needsDoctrine = doctrineScore >= 2;
+    // Determine activation flags (Sync with request type)
+    const needsDiscernment = requestType === 'pastoral' || requestType === 'mixed';
+    const needsDoctrine = requestType === 'doctrinal' || (doctrineScore >= 2 && requestType !== 'technical');
     
     const result = {
       type: requestType,
+      source: source,
       technicalScore: technicalScore,
       pastoralScore: pastoralScore,
       doctrineScore: doctrineScore,
@@ -177,8 +192,10 @@ class RequestTypeClassifier {
       ]
     };
     
-    console.log(`   📊 Request classification: ${requestType.toUpperCase()}`);
-    console.log(`      Tech=${technicalScore}, Pastor=${pastoralScore}, Doctr=${doctrineScore}`);
+    console.log(`   📊 Request classification: ${requestType.toUpperCase()} (Source: ${source})`);
+    if (source === 'regex') {
+      console.log(`      Tech=${technicalScore}, Pastor=${pastoralScore}, Doctr=${doctrineScore}`);
+    }
     console.log(`      Discernment=${needsDiscernment}, Doctrine=${needsDoctrine}`);
     
     return result;

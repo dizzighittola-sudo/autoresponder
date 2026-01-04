@@ -148,7 +148,8 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       const requestType = this.requestClassifier.classify(
         messageDetails.subject,
-        messageDetails.body
+        messageDetails.body,
+        quickCheck.classification // ✅ Pass Hybrid Hint from Gemini
       );
       
       // ═══════════════════════════════════════════════════════════════
@@ -329,26 +330,27 @@ const promptContext = createPromptContext({
 console.log('🧠 PromptContext:', JSON.stringify(promptContext.meta));
 
 // 🎯 Passa profilo e concern per filtering dinamico template
-const prompt = this.promptEngine.buildPrompt({
-  emailContent: messageDetails.body,
-  emailSubject: messageDetails.subject,
-  knowledgeBase: enrichedKnowledgeBase,
-  senderName: messageDetails.senderName,
-  senderEmail: messageDetails.senderEmail,
-  conversationHistory: conversationHistory,
-  memoryContext: memoryContext,
-  detectedLanguage: detectedLanguage,
-  currentSeason: this._getCurrentSeason(),
-  currentDate: new Date().toISOString().split('T')[0],
-  salutation: greeting,
-  closing: closing,
-  category: classification.category,
-  subIntents: classification.subIntents || {},
-  // 🎯 Parametri focusing dinamico da PromptContext
-  promptProfile: promptContext.profile,
-  activeConcerns: promptContext.concerns,
-  salutationMode: salutationMode
-});
+const promptOptions = {
+        emailContent: messageDetails.body,
+        emailSubject: messageDetails.subject,
+        knowledgeBase: enrichedKnowledgeBase, // Use enrichedKnowledgeBase
+        senderName: messageDetails.senderName, // Use messageDetails.senderName
+        senderEmail: messageDetails.senderEmail, // Use messageDetails.senderEmail
+        conversationHistory: conversationHistory,
+        category: classification.category, // Use classification.category
+        topic: quickCheck.classification ? quickCheck.classification.topic : '', // ✅ Pass Topic
+        detectedLanguage: detectedLanguage,
+        currentSeason: this._getCurrentSeason(),
+        currentDate: new Date().toISOString().split('T')[0],
+        salutation: greeting, // Use greeting
+        closing: closing, // Use closing
+        subIntents: classification.subIntents || {}, // Use classification.subIntents
+        memoryContext: memoryContext, // Use memoryContext
+        promptProfile: promptContext.profile, // Use promptContext.profile
+        activeConcerns: promptContext.concerns, // Use promptContext.concerns
+        salutationMode: salutationMode
+      };
+const prompt = this.promptEngine.buildPrompt(promptOptions);
       
       // Add request type hint
       const typeHint = this.requestClassifier.getRequestTypeHint(requestType.type);

@@ -66,9 +66,13 @@ const LANGUAGE_MARKERS = {
 
 var GLOBAL_CACHE = {
   knowledgeBase: '',
+  knowledgeStructured: [], // ✅ Smart Parsing
   aiCoreLite: '',
+  aiCoreLiteStructured: [], // ✅ Smart Parsing
   aiCore: '',
+  aiCoreStructured: [], // ✅ Smart Parsing
   doctrineBase: '',
+  doctrineStructured: [], // ✅ Smart Parsing
   ignoreDomains: CONFIG.IGNORE_DOMAINS,
   ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
   replacements: {},
@@ -95,7 +99,8 @@ function loadResources() {
     if (kbSheet) {
       const kbData = kbSheet.getDataRange().getValues();
       GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
-      console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars`);
+      GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData); // ✅ Structured
+      console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
     }
@@ -105,6 +110,7 @@ function loadResources() {
     if (liteSheet) {
       const liteData = liteSheet.getDataRange().getValues();
       GLOBAL_CACHE.aiCoreLite = liteData.map(row => row.join(' | ')).join('\n');
+      GLOBAL_CACHE.aiCoreLiteStructured = _parseSheetToStructured(liteData); // ✅ Structured
       console.log(`✓ AI_CORE_LITE loaded: ${GLOBAL_CACHE.aiCoreLite.length} chars`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_LITE_SHEET}' not found`);
@@ -115,6 +121,7 @@ function loadResources() {
     if (coreSheet) {
       const coreData = coreSheet.getDataRange().getValues();
       GLOBAL_CACHE.aiCore = coreData.map(row => row.join(' | ')).join('\n');
+      GLOBAL_CACHE.aiCoreStructured = _parseSheetToStructured(coreData); // ✅ Structured
       console.log(`✓ AI_CORE loaded: ${GLOBAL_CACHE.aiCore.length} chars`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_SHEET}' not found`);
@@ -125,7 +132,8 @@ function loadResources() {
     if (doctrineSheet) {
       const doctrineData = doctrineSheet.getDataRange().getValues();
       GLOBAL_CACHE.doctrineBase = doctrineData.map(row => row.join(' | ')).join('\n');
-      console.log(`✓ Doctrine Base loaded: ${GLOBAL_CACHE.doctrineBase.length} chars`);
+      GLOBAL_CACHE.doctrineStructured = _parseSheetToStructured(doctrineData); // ✅ Structured
+      console.log(`✓ Doctrine Base loaded: ${GLOBAL_CACHE.doctrineBase.length} chars (${GLOBAL_CACHE.doctrineStructured.length} rows)`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.DOCTRINE_SHEET}' not found`);
     }
@@ -589,6 +597,35 @@ function cleanupMemory() {
 /**
  * Status check completo
  */
+/**
+ * TEST: Verifica flusso ibrido (Gemini + Smart RAG)
+ */
+function testHybridFlow() {
+  loadResources();
+  console.log('🧪 TESTING HYBRID FLOW...');
+  
+  const testSubject = "Richiesta Battesimo";
+  const testBody = "Vorremmo battezzare nostro figlio, ma siamo divorziati. È possibile? Come funziona?";
+  
+  console.log(`📧 Subject: ${testSubject}`);
+  console.log(`📝 Body: ${testBody}`);
+  
+  const gemini = new GeminiService();
+  const quickCheck = gemini.shouldRespondToEmail(testBody, testSubject);
+  
+  console.log('🤖 Gemini Classification:', JSON.stringify(quickCheck, null, 2));
+  
+  if (quickCheck.classification) {
+     const engine = new PromptEngine();
+     const directives = engine._renderDynamicDirectives(
+       quickCheck.classification.category, 
+       quickCheck.classification.topic
+     );
+     console.log('📚 Dynamic Directives (Smart RAG):');
+     console.log(directives || 'NONE');
+  }
+}
+
 function healthCheck() {
   console.log('\n' + '═'.repeat(50));
   console.log('🏥 HEALTH CHECK');
@@ -612,6 +649,7 @@ function healthCheck() {
   // Knowledge Base
   loadResources();
   console.log(`Knowledge Base: ${GLOBAL_CACHE.knowledgeBase ? '✓ OK' : '❌ FAIL'} (${GLOBAL_CACHE.knowledgeBase?.length || 0} chars)`);
+  console.log(`Structured Doctrine: ${GLOBAL_CACHE.doctrineStructured?.length > 0 ? '✓ OK' : '❌ FAIL'} (${GLOBAL_CACHE.doctrineStructured?.length || 0} entries)`);
   
   console.log('═'.repeat(50));
   
@@ -655,4 +693,23 @@ function removeTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(trigger => ScriptApp.deleteTrigger(trigger));
   console.log(`✓ Rimossi ${triggers.length} trigger`);
+}
+
+/**
+ * Helper: Parse 2D array from Sheet into Array of Objects
+ * Assumes first row is Header
+ */
+function _parseSheetToStructured(data) {
+  if (!data || data.length < 2) return [];
+  const headers = data[0].map(h => String(h).trim());
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j]] = row[j];
+    }
+    rows.push(obj);
+  }
+  return rows;
 }

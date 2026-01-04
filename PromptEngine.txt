@@ -85,6 +85,7 @@ class PromptEngine {
       senderEmail,
       conversationHistory = '',
       category = null,
+      topic = '', // ✅ Topic for smart retrieval
       detectedLanguage = 'it',
       currentSeason = 'invernale',
       currentDate = new Date().toISOString().split('T')[0], // YYYY-MM-DD
@@ -142,6 +143,10 @@ class PromptEngine {
     // 8. SUGGERIMENTO CATEGORIA
     const categoryHint = this._renderCategoryHint(category);
     if (categoryHint) sections.push(categoryHint);
+
+    // 8b. DIRETTIVE DINAMICHE (Smart RAG) - ✅ NUOVO
+    const dynamicDirectives = this._renderDynamicDirectives(category, topic);
+    if (dynamicDirectives) sections.push(dynamicDirectives);
     
     // 9. LINEE GUIDA FORMATTAZIONE - 🎯 FILTRABILE
     addTemplate('FormattingGuidelinesTemplate', this._renderFormattingGuidelines());
@@ -440,7 +445,9 @@ SALUTI SOFT CORRETTI:
   
   _renderKnowledgeBase(knowledgeBase) {
     return `**INFORMAZIONI DI RIFERIMENTO:**
+<knowledge_base>
 ${knowledgeBase}
+</knowledge_base>
 
 **REGOLA FONDAMENTALE:** Usa SOLO informazioni presenti sopra. NON inventare.`;
   }
@@ -676,9 +683,9 @@ Esempio NON formattato (corretto così):
   _renderConversationHistory(conversationHistory) {
     return `**CRONOLOGIA CONVERSAZIONE:**
 Messaggi precedenti per contesto. Non ripetere info già fornite.
-"""
+<conversation_history>
 ${conversationHistory}
-"""`;
+</conversation_history>`;
   }
   
   // ========================================================================
@@ -692,9 +699,9 @@ Oggetto: ${emailSubject}
 Lingua: ${detectedLanguage.toUpperCase()}
 
 Contenuto:
-"""
+<user_email>
 ${emailContent}
-"""`;
+</user_email>`;
   }
   
   // ========================================================================
@@ -1011,6 +1018,58 @@ Prima di generare la risposta, verifica mentalmente:
 ═══════════════════════════════════════════════════════════════════════════`;
   }
   
+  // ========================================================================
+  // TEMPLATE 19: DYNAMIC DIRECTIVES (Smart RAG)
+  // ========================================================================
+  
+  /**
+   * Seleziona direttive specifiche basate su Category e Topic
+   * Usa GLOBAL_CACHE.doctrineStructured
+   */
+  _renderDynamicDirectives(category, topic) {
+    if (!GLOBAL_CACHE.doctrineStructured || GLOBAL_CACHE.doctrineStructured.length === 0) return null;
+    if (!category && !topic) return null;
+    
+    const relevantRows = GLOBAL_CACHE.doctrineStructured.filter(row => {
+      // Normalizzazione stringhe per confronto
+      const rowCat = String(row['Categoria'] || '').toLowerCase();
+      const rowTopic = String(row['Sotto-tema'] || '').toLowerCase();
+      const rowTags = String(row['Indicazioni operative AI'] || '').toLowerCase();
+      
+      const targetTopic = String(topic || '').toLowerCase();
+      const targetCat = String(category || '').toLowerCase();
+      
+      // Match Logica:
+      // 1. Se c'è un topic preciso, cerca nel Sotto-tema o nei tag
+      if (targetTopic && (rowTopic.includes(targetTopic) || rowTags.includes(targetTopic))) {
+        return true;
+      }
+      
+      return false; 
+    });
+    
+    if (relevantRows.length === 0) return null;
+    
+    // Limita a max 3 risultati
+    const topRows = relevantRows.slice(0, 3);
+    
+    const directives = topRows.map(row => {
+      return `📌 **${row['Sotto-tema'].toUpperCase()}**:
+• Tono: ${row['Tono consigliato']}
+• Fai: ${row['Criterio pastorale']}
+• Evita: ${row['Limiti da non superare']}
+• Note: ${row['Indicazioni operative AI']}`;
+    }).join('\n\n');
+    
+    return `═══════════════════════════════════════════════════════════════════════════
+🎯 DIRETTIVE SPECIFICHE PER QUESTO CASO (DA DOTTRINA)
+═══════════════════════════════════════════════════════════════════════════
+
+${directives}
+
+═══════════════════════════════════════════════════════════════════════════`;
+  }
+
   /**
    * Estimate tokens from text
    */
