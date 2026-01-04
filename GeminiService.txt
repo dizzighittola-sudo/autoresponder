@@ -78,6 +78,7 @@ class GeminiService {
   /**
    * Rileva lingua email con detection avanzata
    * ✅ CENTRALIZZATO: Unico punto per rilevamento lingua
+   * ✅ AGGIORNATO: Migliorata logica di scoring e aggiunta lingua tedesca
    */
   detectEmailLanguage(emailContent, emailSubject) {
     const text = `${emailSubject} ${emailContent}`.toLowerCase();
@@ -93,6 +94,8 @@ class GeminiService {
       spanishCharScore += 3;
       console.log('   Found Spanish-specific character (ñ)');
     }
+    
+
     
     // Parole chiave per rilevamento
     const englishUniqueKeywords = [
@@ -145,6 +148,8 @@ class GeminiService {
       'progetto', 'informazione', 'informazioni', 'vorrei', 'gradirei'
     ];
     
+
+    
     // Count matches with word boundaries
     const countMatches = (keywords, txt, weight = 1) => {
       let count = 0;
@@ -186,23 +191,26 @@ class GeminiService {
     }
     
     // Logica soglia confidenza
-    if (spanishCharScore > 0 && scores['es'] >= scores['it']) {
+    // Logica soglia confidenza
+    if (spanishCharScore > 0 && scores['es'] >= scores['it'] && scores['es'] >= scores['en'] && scores['es'] >= scores['de']) {
       console.log(`   ✓ Detected: SPANISH (score: ${scores['es']}, includes special chars)`);
-      return 'es';
+      return { lang: 'es', confidence: scores['es'] };
     }
+    
+
     
     if (scores['en'] >= 2 && scores['en'] >= scores['it'] && scores['en'] >= scores['es']) {
       console.log(`   ✓ Detected: ENGLISH (score: ${scores['en']})`);
-      return 'en';
+      return { lang: 'en', confidence: scores['en'] };
     }
     
     if (maxScore < 2) {
       console.log('   Low confidence, defaulting to Italian');
-      return 'it';
+      return { lang: 'it', confidence: maxScore };
     }
     
     console.log(`   ✓ Detected: ${detectedLang.toUpperCase()} (score: ${maxScore})`);
-    return detectedLang;
+    return { lang: detectedLang, confidence: maxScore };
   }
   
   // ========================================================================
@@ -292,6 +300,7 @@ class GeminiService {
     if (m === 1 && d === 1) {
       if (language === 'en') return 'Happy New Year!';
       if (language === 'es') return '¡Feliz Año Nuevo!';
+      if (language === 'de') return 'Frohes neues Jahr!';
       return 'Buon Capodanno!';
     }
     
@@ -299,6 +308,7 @@ class GeminiService {
     if (m === 1 && d === 6) {
       if (language === 'en') return 'Happy Epiphany!';
       if (language === 'es') return '¡Feliz Epifanía!';
+      if (language === 'de') return 'Frohes Dreikönigsfest!';
       return 'Buona Epifania!';
     }
     
@@ -306,6 +316,7 @@ class GeminiService {
     if (m === 8 && d === 15) {
       if (language === 'en') return 'Happy Assumption Day!';
       if (language === 'es') return '¡Feliz día de la Asunción!';
+      if (language === 'de') return 'Frohes Mariä Himmelfahrt!';
       return 'Buona festa!';
     }
     
@@ -313,6 +324,7 @@ class GeminiService {
     if (m === 11 && d === 1) {
       if (language === 'en') return 'Happy All Saints Day!';
       if (language === 'es') return '¡Feliz día de Todos los Santos!';
+      if (language === 'de') return 'Frohes Allerheiligen!';
       return 'Buona festa di Ognissanti!';
     }
     
@@ -320,6 +332,7 @@ class GeminiService {
     if (m === 12 && d === 8) {
       if (language === 'en') return 'Happy Feast of the Immaculate Conception!';
       if (language === 'es') return '¡Feliz día de la Inmaculada!';
+      if (language === 'de') return 'Frohes Fest der Unbefleckten Empfängnis!';
       return 'Buona Immacolata!';
     }
     
@@ -327,6 +340,7 @@ class GeminiService {
     if (m === 12 && d === 25) {
       if (language === 'en') return 'Merry Christmas!';
       if (language === 'es') return '¡Feliz Navidad!';
+      if (language === 'de') return 'Frohe Weihnachten!';
       return 'Buon Natale!';
     }
     
@@ -340,6 +354,7 @@ class GeminiService {
     if (this._isBetweenInclusive(dateObj, pasquaStart, pasquaEnd)) {
       if (language === 'en') return 'Happy Easter!';
       if (language === 'es') return '¡Feliz Pascua!';
+      if (language === 'de') return 'Frohe Ostern!';
       return 'Buona Pasqua!';
     }
     
@@ -348,6 +363,7 @@ class GeminiService {
     if (this._isSameDate(dateObj, pentecoste)) {
       if (language === 'en') return 'Happy Pentecost!';
       if (language === 'es') return '¡Feliz Pentecostés!';
+      if (language === 'de') return 'Frohes Pfingsten!';
       return 'Buona Pentecoste!';
     }
     
@@ -356,6 +372,7 @@ class GeminiService {
     if (this._isSameDate(dateObj, corpusDominiIT)) {
       if (language === 'en') return 'Happy Corpus Christi!';
       if (language === 'es') return '¡Feliz Corpus Christi!';
+      if (language === 'de') return 'Frohes Fronleichnam!';
       return 'Buona festa!';
     }
     
@@ -364,6 +381,7 @@ class GeminiService {
     if (sacraFamiglia && this._isSameDate(dateObj, sacraFamiglia)) {
       if (language === 'en') return 'Happy Feast of the Holy Family!';
       if (language === 'es') return '¡Feliz Fiesta de la Sagrada Familia!';
+      if (language === 'de') return 'Frohes Fest der Heiligen Familie!';
       return 'Buona Festa della Sacra Famiglia.';
     }
     
@@ -445,6 +463,7 @@ class GeminiService {
   
   /**
    * Chiamata rapida Gemini per decidere se email richiede risposta E rilevare lingua
+   * ✅ AGGIORNATO: Migliorata gestione errori e fallback
    */
   shouldRespondToEmail(emailContent, emailSubject) {
     const prompt = `Analizza questa email.
@@ -456,7 +475,7 @@ Testo: ${emailContent.substring(0, 800)}
 
 Compiti:
 1. Decidi se richiede risposta (reply_needed: true/false)
-2. Rileva la lingua (language: codice iso 2 lettere es. 'it', 'en', 'es', 'fr')
+2. Rileva la lingua (language: codice iso 2 lettere es. 'it', 'en', 'es', 'de')
 3. Motivo sintetico (reason)
 
 Criteri per reply_needed:
@@ -471,8 +490,18 @@ Output JSON atteso:
   "reason": "string"
 }`;
 
-    // ✅ FIX: Use local keyword detection as fallback instead of hardcoded 'it'
-    const fallbackLang = this.detectEmailLanguage(emailContent, emailSubject);
+    // ✅ FIX: Use local keyword detection as fallback + Confidence Check
+    const detection = this.detectEmailLanguage(emailContent, emailSubject);
+    const fallbackLang = detection.lang;
+    const confidence = detection.confidence;
+    const CONFIDENCE_THRESHOLD = 4; // Soglia per saltare Gemini (es. 4 matches)
+
+    // Se la confidenza è alta, saltiamo Gemini
+    if (confidence >= CONFIDENCE_THRESHOLD) {
+      console.log(`🔎 Confidenza locale alta (${confidence} >= ${CONFIDENCE_THRESHOLD}), skip quick‑check.`);
+      return { shouldRespond: true, language: fallbackLang, reason: 'local_confidence_high' };
+    }
+
     const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
     
     try {
@@ -486,7 +515,7 @@ Output JSON atteso:
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0,
-              maxOutputTokens: 300  // Increased from 200 to ensure complete JSON
+              maxOutputTokens: 1024  // Increased to avoid truncation
             }
           }),
           muteHttpExceptions: true
@@ -497,7 +526,7 @@ Output JSON atteso:
           throw new Error(`rate limit or service unavailable: ${responseCode}`);
         }
         if (responseCode !== 200) {
-          throw new Error(`API error: ${responseCode}`);
+          throw new Error(`API error: ${responseCode} - ${response.getContentText()}`);
         }
         
         return JSON.parse(response.getContentText());
