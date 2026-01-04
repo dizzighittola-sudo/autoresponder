@@ -62,14 +62,13 @@ class TerritoryValidator {
   }
   
   extractAddressFromText(text) {
-    // Pattern per rilevare indirizzi - MODIFICATO per estrarre TUTTI gli indirizzi
+    // Pattern per rilevare indirizzi - FIX Bug 6: Added apostrophe to pattern
     const patterns = [
-      // Pattern 1: "via Rossi 10", "viale Belle Arti n. 5"
-      /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
+      // Pattern 1: "via Rossi 10", "viale Belle Arti n. 5", "via dell'Angelo 3"
+      /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
       
       // Pattern 2: "abito in via Rossi 10", "abito a via Bianchi 3", "abito alle Belle Arti 10"
-      // Aggiunto "abito alle" per maggiore copertura
-      /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ]+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
+      /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
     ];
     
     const addresses = [];

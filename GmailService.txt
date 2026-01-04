@@ -329,24 +329,29 @@ class GmailService {
   // ========================================================================
 
   /**
-   * Fixes common punctuation errors
-   * e.g., "Buongiorno, Siamo" -> "Buongiorno, siamo"
+   * Corregge errori comuni di punteggiatura
+   * Es. "Buongiorno, Siamo" -> "Buongiorno, siamo"
+   * 
+   * COMPORTAMENTO INTENZIONALE:
+   * - Corregge SOLO parole con prima lettera maiuscola + resto minuscolo (es. "Siamo")
+   * - NON modifica acronimi/sigle tutto maiuscolo (es. "DON", "SPQR", "CEI")
+   *   perché la regex cattura solo [A-Z][a-z]*, non [A-Z]+
+   * - Eccezioni esplicite per titoli: Don, Padre, Suor, Monsignor, Papa, Signore, Signora
    */
   fixPunctuation(text) {
     if (!text) return text;
     
-    // Regex to find "Word, Capital" and lowercase the capital
-    // Exceptions can be added if needed, but usually after comma we want lowercase 
-    // unless it's a proper noun (which is hard to detect without NLP, but "Siamo", "La", "Vi" are common errors).
+    // Parole che DEVONO rimanere maiuscole dopo virgola (titoli, nomi propri)
+    const exceptions = ['Don', 'Padre', 'Suor', 'Monsignor', 'Papa', 'Signore', 'Signora'];
     
-    // safe list of words that SHOULD be capitalized after comma (Proper nouns, Titles)
-    // For now, we apply a specific fix for the common "Greeting, We..." pattern logic if generalized is too risky.
-    // Legacy logic was likely simple. Let's fix common Italian errors.
-    
-    return text.replace(/(Buongiorno|Buonasera|Salve|Ciao)[,\.]\s+(Siamo|La|Vi|Il|I|Le)\b/g, (match, p1, p2) => {
-      // Keep p1 (Greeting) as is
-      // Lowercase p2 (The following word)
-      return `${p1}, ${p2.toLowerCase()}`;
+    // Fix generico: minuscola dopo virgola (escluse eccezioni e acronimi tutto-maiuscolo)
+    return text.replace(/,\s+([A-ZÀÈÉÌÒÙ])([a-zàèéìòù]*)/g, (match, firstLetter, rest) => {
+      const word = firstLetter + rest;
+      // Mantieni se è un'eccezione
+      if (exceptions.includes(word)) {
+        return match;
+      }
+      return `, ${firstLetter.toLowerCase()}${rest}`;
     });
   }
 

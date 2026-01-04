@@ -84,11 +84,13 @@ var GLOBAL_CACHE = {
 // ====================================================================
 
 function loadResources() {
-  if (GLOBAL_CACHE.loaded) {
-    console.log('📦 Resources already loaded (cached)');
+  // FIX Bug 4: Prevent race condition with loading flag
+  if (GLOBAL_CACHE.loading || GLOBAL_CACHE.loaded) {
+    console.log('📦 Resources already loaded or loading (cached)');
     return;
   }
   
+  GLOBAL_CACHE.loading = true;
   console.log('📦 Loading resources...');
   
   try {
@@ -156,9 +158,11 @@ function loadResources() {
     }
     
     GLOBAL_CACHE.loaded = true;
+    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset loading flag
     console.log('✓ All resources loaded successfully');
     
   } catch (error) {
+    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset loading flag on error
     console.error(`❌ Error loading resources: ${error.message}`);
   }
 }
@@ -707,7 +711,8 @@ function _parseSheetToStructured(data) {
     const row = data[i];
     const obj = {};
     for (let j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
+      // FIX Bug 1: Fallback for undefined/null cell values
+      obj[headers[j]] = row[j] !== undefined && row[j] !== null ? row[j] : '';
     }
     rows.push(obj);
   }
