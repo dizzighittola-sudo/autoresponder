@@ -192,7 +192,7 @@ class GeminiService {
     
     // Logica soglia confidenza
     // Logica soglia confidenza
-    if (spanishCharScore > 0 && scores['es'] >= scores['it'] && scores['es'] >= scores['en'] && scores['es'] >= scores['de']) {
+    if (spanishCharScore > 0 && scores['es'] >= scores['it'] && scores['es'] >= scores['en']) {
       console.log(`   ✓ Detected: SPANISH (score: ${scores['es']}, includes special chars)`);
       return { lang: 'es', confidence: scores['es'] };
     }
@@ -500,10 +500,11 @@ Output JSON atteso:
     const confidence = detection.confidence;
     const CONFIDENCE_THRESHOLD = 4; // Soglia per saltare Gemini (es. 4 matches)
 
-    // Se la confidenza è alta, saltiamo Gemini
+    // Se la confidenza è alta, usiamo la lingua rilevata come fallback forte,
+    // MA NON saltiamo il check di Gemini su `shouldRespond`.
+    // Il bypass causava risposte indesiderate a semplici "Grazie".
     if (confidence >= CONFIDENCE_THRESHOLD) {
-      console.log(`🔎 Confidenza locale alta (${confidence} >= ${CONFIDENCE_THRESHOLD}), skip quick‑check.`);
-      return { shouldRespond: true, language: fallbackLang, reason: 'local_confidence_high' };
+      console.log(`🔎 Confidenza lingua locale alta (${confidence}), ma eseguo comunque Gemini per decisioning.`);
     }
 
     const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
