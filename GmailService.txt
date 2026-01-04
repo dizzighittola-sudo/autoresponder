@@ -18,10 +18,11 @@ class GmailService {
   constructor() {
     console.log('📧 Inizializzazione GmailService...');
     
-    // Cache etichette per evitare chiamate API ripetute
-    this._labelCache = {};
-    
-    console.log('✓ GmailService inizializzato con cache etichette');
+    // Cache etichette per evitare chiamate API ripetute con TTL
+    this._labelCache = new Map(); // Map<labelName, {label: GmailLabel, ts: number}>
+    this._cacheTTL = 60 * 60 * 1000; // 1 hour TTL for cached labels
+
+    console.log('✓ GmailService inizializzato con cache etichette (TTL 1h)');
   }
   
   // ========================================================================
@@ -32,26 +33,31 @@ class GmailService {
    * Ottiene o crea un'etichetta Gmail con caching
    */
   getOrCreateLabel(labelName) {
-    // Check cache first
-    if (this._labelCache[labelName]) {
+    // Check cache first with TTL validation
+    const cachedEntry = this._labelCache.get(labelName);
+    const now = Date.now();
+    if (cachedEntry && (now - cachedEntry.ts) < this._cacheTTL) {
       console.log(`📦 Label '${labelName}' found in cache`);
-      return this._labelCache[labelName];
+      return cachedEntry.label;
+    } else if (cachedEntry) {
+      // Stale entry, remove
+      this._labelCache.delete(labelName);
     }
-    
-    // Check if label exists
+
+    // Check if label exists in Gmail
     const labels = GmailApp.getUserLabels();
     for (const label of labels) {
       if (label.getName() === labelName) {
-        // Cache and return
-        this._labelCache[labelName] = label;
+        // Cache with timestamp and return
+        this._labelCache.set(labelName, { label: label, ts: now });
         console.log(`✓ Label '${labelName}' found`);
         return label;
       }
     }
-    
+
     // Create new label
     const newLabel = GmailApp.createLabel(labelName);
-    this._labelCache[labelName] = newLabel;
+    this._labelCache.set(labelName, { label: newLabel, ts: now });
     console.log(`✓ Created new label: ${labelName}`);
     return newLabel;
   }
@@ -60,7 +66,7 @@ class GmailService {
    * Clear the label cache
    */
   clearLabelCache() {
-    this._labelCache = {};
+    this._labelCache.clear();
     console.log('🗑️ Label cache cleared');
   }
   

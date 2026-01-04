@@ -185,8 +185,17 @@ class PromptEngine {
     let prompt = sections.join('\n\n');
     prompt += '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
     
+    // FIX Bug 8: Token estimation and truncation warning
+    const estimatedTokens = Math.round(prompt.length / 4);
+    const MAX_SAFE_TOKENS = 100000; // Leave buffer for response (Gemini 128k context)
+    
+    if (estimatedTokens > MAX_SAFE_TOKENS) {
+      console.warn(`⚠️ Prompt exceeds safe limit: ~${estimatedTokens} tokens (max: ${MAX_SAFE_TOKENS})`);
+      console.warn('   Consider reducing KB size or increasing selectivity');
+    }
+    
     // 🎯 Log migliorato con info profilo
-    console.log(`📝 Prompt: ${prompt.length} chars (~${Math.round(prompt.length / 4)} tokens) | profile=${promptProfile} | skipped=${skippedCount}`);
+    console.log(`📝 Prompt: ${prompt.length} chars (~${estimatedTokens} tokens) | profile=${promptProfile} | skipped=${skippedCount}`);
     
     return prompt;
   }

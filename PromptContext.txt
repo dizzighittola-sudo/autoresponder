@@ -20,8 +20,8 @@ class PromptContext {
 
     return {
       language_safety:
-        i.email.detectedLanguage !== 'it' ||
-        i.classification.confidence < 0.8,
+        i.email?.detectedLanguage !== 'it' ||
+        (i.classification?.confidence ?? 1) < 0.8,
 
       hallucination_risk:
         i.knowledgeBase.length > 800 ||

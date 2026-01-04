@@ -632,7 +632,14 @@ function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdate
       return 'none_or_continuity';
     }
 
-    const hoursSinceLast = (now.getTime() - new Date(lastUpdated).getTime()) / (1000 * 60 * 60);
+    const parsedLastUpdated = new Date(lastUpdated);
+    const hoursSinceLast = (now.getTime() - parsedLastUpdated.getTime()) / (1000 * 60 * 60);
+
+    // FIX Bug 7: If timestamp is invalid (NaN), treat as recent follow-up
+    if (isNaN(hoursSinceLast)) {
+      console.warn('⚠️ computeSalutationMode: Invalid lastUpdated timestamp, defaulting to none_or_continuity');
+      return 'none_or_continuity';
+    }
 
     // 2a️⃣ Follow-up ravvicinato (entro 48h)
     if (hoursSinceLast <= 48) {

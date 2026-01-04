@@ -318,8 +318,9 @@ class ResponseValidator {
     const hallucinations = {};
     
     // Helper normalizzazione orari
+    // FIX: Only replace dots between digits (time patterns), not in URLs
     const normalizeTime = (t) => {
-      t = t.replace('.', ':');
+      t = t.replace(/(\d)\.(\d)/g, '$1:$2');
       const parts = t.split(':');
       if (parts.length === 2) {
         try {

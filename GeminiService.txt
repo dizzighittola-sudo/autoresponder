@@ -48,11 +48,12 @@ class GeminiService {
       try {
         return fn();
       } catch (error) {
-        const isRetryable = error.message && (
-          error.message.includes('timeout') ||
-          error.message.includes('503') ||
-          error.message.includes('429') ||
-          error.message.includes('rate limit')
+        const msg = error && error.message ? error.message : '';
+        const isRetryable = msg && (
+          msg.includes('timeout') ||
+          msg.includes('503') ||
+          msg.includes('429') ||
+          msg.includes('rate limit')
         );
         
         if (isRetryable && attempt < this.maxRetries - 1) {
@@ -85,13 +86,14 @@ class GeminiService {
     const originalText = `${emailSubject} ${emailContent}`;
     
     // Spanish-specific character detection (highly distinctive)
+    // FIX Bug 5: Reduced weight to avoid false positives with Spanish names in Italian emails
     let spanishCharScore = 0;
     if (originalText.includes('¿') || originalText.includes('¡')) {
-      spanishCharScore = 5;
+      spanishCharScore = 3; // Reduced from 5 to avoid collision
       console.log('   Found Spanish-specific punctuation (¿ or ¡)');
     }
     if (text.includes('ñ')) {
-      spanishCharScore += 3;
+      spanishCharScore += 2; // Reduced from 3 to avoid collision with Spanish names
       console.log('   Found Spanish-specific character (ñ)');
     }
     
@@ -500,11 +502,10 @@ Output JSON atteso:
     const confidence = detection.confidence;
     const CONFIDENCE_THRESHOLD = 4; // Soglia per saltare Gemini (es. 4 matches)
 
-    // Se la confidenza è alta, usiamo la lingua rilevata come fallback forte,
-    // MA NON saltiamo il check di Gemini su `shouldRespond`.
-    // Il bypass causava risposte indesiderate a semplici "Grazie".
+    // Se la confidenza è alta, saltiamo Gemini
     if (confidence >= CONFIDENCE_THRESHOLD) {
-      console.log(`🔎 Confidenza lingua locale alta (${confidence}), ma eseguo comunque Gemini per decisioning.`);
+      console.log(`🔎 Confidenza locale alta (${confidence} >= ${CONFIDENCE_THRESHOLD}), skip quick‑check.`);
+      return { shouldRespond: true, language: fallbackLang, reason: 'local_confidence_high' };
     }
 
     const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
