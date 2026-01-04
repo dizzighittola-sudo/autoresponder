@@ -457,52 +457,67 @@ function createGmailService() {
 function markdownToHtml(text) {
   if (!text) return '';
 
-  // ✅ FIX: Sanitize HTML to prevent injection attacks
-  let html = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  let html = text;
 
-  // Proteggi eventuali code blocks
+  // ✅ STEP 1: Proteggi code blocks PRIMA di tutto
   const codeBlocks = [];
   html = html.replace(/```[\s\S]*?```/g, (match) => {
     codeBlocks.push(match);
     return `__CODEBLOCK_${codeBlocks.length - 1}__`;
   });
 
-  // Headers
+  // ✅ STEP 2: Converti links PRIMA di escape (preserva URL intatti)
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, (match, linkText, url) => {
+    // Escape solo il testo del link, NON l'URL
+    const escapedText = linkText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return `<a href="${url}" style="color:#351c75;">${escapedText}</a>`;
+  });
+
+  // ✅ STEP 3: Headers (markdown → HTML)
   html = html.replace(/^###\s+(.+)$/gm, '<p style="font-size:16px;font-weight:bold;">$1</p>');
   html = html.replace(/^##\s+(.+)$/gm, '<p style="font-size:18px;font-weight:bold;">$1</p>');
   html = html.replace(/^#\s+(.+)$/gm, '<p style="font-size:20px;font-weight:bold;">$1</p>');
 
-  // Bold / Italic
+  // ✅ STEP 4: Bold / Italic
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '<em>$1</em>');
 
-  // Links
-  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#351c75;">$1</a>');
+  // ✅ STEP 5: Escape testo rimanente (dopo conversione markdown)
+  // Split by HTML tags to escape only text content
+  html = html.replace(/>[^<]+</g, (match) => {
+    return match.slice(0, 1) + 
+           match.slice(1, -1)
+             .replace(/&(?!amp;|lt;|gt;|quot;|#\d+;)/g, '&amp;')
+             .replace(/<(?![^>]*>)/g, '&lt;')
+             .replace(/(?<![^<]*)>/g, '&gt;') + 
+           match.slice(-1);
+  });
 
-  // Restore code blocks
+  // ✅ STEP 6: Restore code blocks (con escape interno)
   codeBlocks.forEach((block, i) => {
-    const code = block.replace(/```/g, '').trim();
+    const code = block.replace(/```/g, '').trim()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
     html = html.replace(
       `__CODEBLOCK_${i}__`,
       `<pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-family:monospace;">${code}</pre>`
     );
   });
 
-  // Paragraphs and line breaks
+  // ✅ STEP 7: Paragraphs and line breaks
   html = html.replace(/\n\n+/g, '</p><p>');
   html = html.replace(/\n/g, '<br>');
 
-  // Convert emojis to HTML entities for better email compatibility
-  // Convert all non-ASCII characters (emojis, accents, etc.) to HTML entities
+  // ✅ STEP 8: Convert emojis to HTML entities
   html = html.replace(/[^\x00-\x7F]/g, char => {
     return '&#' + char.codePointAt(0) + ';';
   });
 
-  // Final wrapper (IDENTITÀ VISIVA ORIGINALE)
+  // Final wrapper
   return `
     <div style="
       font-family: Arial, Helvetica, sans-serif;

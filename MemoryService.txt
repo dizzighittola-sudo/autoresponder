@@ -120,7 +120,11 @@ class MemoryService {
       return;
     }
     
+    // ✅ FIX: Add lock to prevent race condition
+    const lock = LockService.getScriptLock();
     try {
+      lock.waitLock(5000);
+      
       const existingRow = this._findRowByThreadId(threadId);
       const now = new Date().toISOString();
       
@@ -149,6 +153,8 @@ class MemoryService {
       
     } catch (error) {
       console.error(`❌ Error updating memory: ${error.message}`);
+    } finally {
+      lock.releaseLock();
     }
   }
   
