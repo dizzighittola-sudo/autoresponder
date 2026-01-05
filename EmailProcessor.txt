@@ -242,11 +242,17 @@ ${GLOBAL_CACHE.doctrineBase}
       // ═══════════════════════════════════════════════════════════════
       let conversationHistory = '';
       if (messages.length > 1) {
-        conversationHistory = this.gmailService.buildConversationHistory(
-          messages.slice(0, -1), // All except last
-          10, // Max messages
-          myEmail // Our email for marking our messages
-        );
+        // Exclude the candidate message to avoid duplication in prompt
+        const candidateId = candidate.getId();
+        const historyMessages = messages.filter(m => m.getId() !== candidateId);
+        
+        if (historyMessages.length > 0) {
+          conversationHistory = this.gmailService.buildConversationHistory(
+            historyMessages,
+            10, // Max messages
+            myEmail // Our email for marking our messages
+          );
+        }
       }
       
       // ═══════════════════════════════════════════════════════════════
