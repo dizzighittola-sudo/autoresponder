@@ -129,7 +129,7 @@ class RequestTypeClassifier {
       { pattern: /\binsegnamento della chiesa\b/i, weight: 3 }
     ];
     
-    console.log('✓ RequestTypeClassifier initialized');
+    console.log('✓ RequestTypeClassifier inizializzato');
   }
   
   /**
@@ -144,7 +144,7 @@ class RequestTypeClassifier {
       ? fullText.substring(0, MAX_ANALYSIS_LENGTH).toLowerCase()
       : fullText.toLowerCase();
     
-    // Calculate scores (Regex-based backup/validation)
+    // Calcola punteggi (backup/validazione basata su Regex)
     const technicalResult = this._calculateScore(text, this.TECHNICAL_INDICATORS);
     const pastoralResult = this._calculateScore(text, this.PASTORAL_INDICATORS);
     const doctrineResult = this._calculateScore(text, this.DOCTRINE_INDICATORS);
@@ -153,17 +153,17 @@ class RequestTypeClassifier {
     const pastoralScore = pastoralResult.score;
     const doctrineScore = doctrineResult.score;
     
-    // Determine type (Hybrid Logic)
+    // Determina tipo (Logica Ibrida)
     let requestType = 'technical';
     let source = 'regex';
     
     if (externalHint && externalHint.category && externalHint.confidence >= 0.7) {
-      // ✅ Use Gemini Classification if available and confident
+      // ✅ Usa classificazione Gemini se disponibile e confidente
       requestType = externalHint.category.toLowerCase();
       source = 'gemini';
       console.log(`   🤖 Hybrid Classifier: Using Gemini result (${requestType.toUpperCase()}, conf=${externalHint.confidence})`);
     } else {
-      // ⚠️ Fallback to Regex
+      // ⚠️ Fallback a Regex
       if (pastoralScore >= 3 && pastoralScore > technicalScore) {
         requestType = 'pastoral';
       } else if (technicalScore >= 2 && pastoralScore <= 1) {
@@ -178,7 +178,7 @@ class RequestTypeClassifier {
       source = 'regex';
     }
     
-    // Determine activation flags (Sync with request type)
+    // Determina flag di attivazione (sincronizzati con tipo richiesta)
     const needsDiscernment = requestType === 'pastoral' || requestType === 'mixed';
     const needsDoctrine = requestType === 'doctrinal' || (doctrineScore >= 2 && requestType !== 'technical');
     
@@ -225,7 +225,7 @@ class RequestTypeClassifier {
   }
   
   /**
-   * Get request type hint for prompt injection
+   * Ottiene suggerimento tipo richiesta per iniezione nel prompt
    */
   getRequestTypeHint(requestType) {
     if (requestType === 'technical') {
@@ -268,12 +268,12 @@ Linee guida per la risposta:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }
     
-    // Default fallback
+    // Fallback predefinito
     return '';
   }
 }
 
-// Factory function
+// Funzione factory
 function createRequestTypeClassifier() {
   return new RequestTypeClassifier();
 }

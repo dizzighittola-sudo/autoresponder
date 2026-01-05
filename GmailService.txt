@@ -20,42 +20,42 @@ class GmailService {
     
     // Cache etichette per evitare chiamate API ripetute con TTL
     this._labelCache = new Map(); // Map<labelName, {label: GmailLabel, ts: number}>
-    this._cacheTTL = 60 * 60 * 1000; // 1 hour TTL for cached labels
+    this._cacheTTL = 60 * 60 * 1000; // TTL 1 ora per etichette in cache
 
     console.log('✓ GmailService inizializzato con cache etichette (TTL 1h)');
   }
   
   // ========================================================================
-  // LABEL MANAGEMENT (with cache)
+  // GESTIONE ETICHETTE (con cache)
   // ========================================================================
   
   /**
    * Ottiene o crea un'etichetta Gmail con caching
    */
   getOrCreateLabel(labelName) {
-    // Check cache first with TTL validation
+    // Verifica prima la cache con validazione TTL
     const cachedEntry = this._labelCache.get(labelName);
     const now = Date.now();
     if (cachedEntry && (now - cachedEntry.ts) < this._cacheTTL) {
       console.log(`📦 Label '${labelName}' found in cache`);
       return cachedEntry.label;
     } else if (cachedEntry) {
-      // Stale entry, remove
+      // Voce scaduta, rimuovi
       this._labelCache.delete(labelName);
     }
 
-    // Check if label exists in Gmail
+    // Verifica se l'etichetta esiste in Gmail
     const labels = GmailApp.getUserLabels();
     for (const label of labels) {
       if (label.getName() === labelName) {
-        // Cache with timestamp and return
+        // Memorizza in cache con timestamp e ritorna
         this._labelCache.set(labelName, { label: label, ts: now });
         console.log(`✓ Label '${labelName}' found`);
         return label;
       }
     }
 
-    // Create new label
+    // Crea nuova etichetta
     const newLabel = GmailApp.createLabel(labelName);
     this._labelCache.set(labelName, { label: newLabel, ts: now });
     console.log(`✓ Created new label: ${labelName}`);
@@ -63,7 +63,7 @@ class GmailService {
   }
   
   /**
-   * Clear the label cache
+   * Svuota la cache delle etichette
    */
   clearLabelCache() {
     this._labelCache.clear();
@@ -71,7 +71,7 @@ class GmailService {
   }
   
   /**
-   * Add label to thread
+   * Aggiunge etichetta a un thread
    */
   addLabelToThread(thread, labelName) {
     const label = this.getOrCreateLabel(labelName);
@@ -80,7 +80,7 @@ class GmailService {
   }
   
   // ========================================================================
-  // MESSAGE EXTRACTION (with Reply-To support)
+  // ESTRAZIONE MESSAGGI (con supporto Reply-To)
   // ========================================================================
   
   /**
@@ -96,7 +96,7 @@ class GmailService {
     // Ottieni header Reply-To
     const replyTo = message.getReplyTo();
     
-    // Use Reply-To if present and valid
+    // Usa Reply-To se presente e valido
     let effectiveSender;
     let hasReplyTo = false;
     
@@ -108,7 +108,7 @@ class GmailService {
       effectiveSender = sender;
     }
     
-    // Extract name and email
+    // Estrai nome ed email
     const senderName = this._extractSenderName(effectiveSender);
     const senderEmail = this._extractEmailAddress(effectiveSender);
     
@@ -126,7 +126,7 @@ class GmailService {
   }
   
   /**
-   * Extract sender name from From field
+   * Estrae il nome del mittente dal campo From
    */
   _extractSenderName(fromField) {
     const match = fromField.match(/^"?(.+?)"?\s*</);
@@ -134,7 +134,7 @@ class GmailService {
       return match[1].trim();
     }
     
-    // Use email prefix as fallback
+    // Usa prefisso email come fallback
     const email = this._extractEmailAddress(fromField);
     if (email) {
       return email.split('@')[0];
@@ -144,7 +144,7 @@ class GmailService {
   }
   
   /**
-   * Extract email address from From field
+   * Estrae indirizzo email dal campo From
    */
   _extractEmailAddress(fromField) {
     const match = fromField.match(/<(.+?)>/);
@@ -152,7 +152,7 @@ class GmailService {
       return match[1];
     }
     
-    // If no brackets, check if whole field is email
+    // Se non ci sono parentesi angolari, verifica se l'intero campo è un email
     if (fromField.includes('@')) {
       return fromField.trim();
     }
@@ -161,38 +161,38 @@ class GmailService {
   }
   
   /**
-   * Convert HTML to plain text
+   * Converte HTML in testo semplice
    */
   _htmlToPlainText(html) {
     if (!html) return '';
     
-    // Remove HTML tags
+    // Rimuovi tag HTML
     let text = html.replace(/<[^>]+>/g, ' ');
-    // Decode HTML entities
+    // Decodifica entità HTML
     text = text.replace(/&nbsp;/g, ' ')
                .replace(/&amp;/g, '&')
                .replace(/&lt;/g, '<')
                .replace(/&gt;/g, '>');
-    // Clean up whitespace
+    // Pulisci spazi bianchi
     text = text.replace(/\s+/g, ' ').trim();
     
     return text;
   }
   
   // ========================================================================
-  // CONVERSATION HISTORY
+  // CRONOLOGIA CONVERSAZIONE
   // ========================================================================
   
   /**
    * Costruisce cronologia conversazione da messaggi thread
    */
   buildConversationHistory(messages, maxMessages = 10, ourEmail = '') {
-    // Fallback: get our email if not provided
+    // Fallback: ottieni nostra email se non fornita
     if (!ourEmail) {
       ourEmail = Session.getActiveUser().getEmail();
     }
     
-    // Limit number of messages
+    // Limita numero di messaggi
     if (messages.length > maxMessages) {
       console.warn(`⚠️ Thread with ${messages.length} messages, limiting to last ${maxMessages}`);
       messages = messages.slice(-maxMessages);
@@ -206,7 +206,7 @@ class GmailService {
       
       const prefix = isOurs ? 'Segreteria' : `Utente (${details.senderName})`;
       
-      // Truncate very long messages
+      // Tronca messaggi molto lunghi
       let body = details.body;
       if (body.length > 2000) {
         body = body.substring(0, 2000) + '\n[... messaggio troncato ...]';
@@ -219,7 +219,7 @@ class GmailService {
   }
   
   // ========================================================================
-  // QUOTE/SIGNATURE REMOVAL
+  // RIMOZIONE CITAZIONI/FIRME
   // ========================================================================
   
   /**
@@ -243,7 +243,7 @@ class GmailService {
       }
     }
     
-    // Remove signatures
+    // Rimuovi firme
     const sigMarkers = [
       /cordiali saluti/i,
       /distinti saluti/i,
@@ -266,19 +266,19 @@ class GmailService {
   }
   
   // ========================================================================
-  // SEND REPLY
+  // INVIO RISPOSTA
   // ========================================================================
   
   /**
-   * Send reply to a thread
-   * ✅ Uses sender_email which includes Reply-To when present
+   * Invia risposta a un thread
+   * ✅ Usa sender_email che include Reply-To quando presente
    */
   sendReply(thread, replyText, messageDetails) {
-    // Get the GmailThread object if it's an ID
+    // Ottieni oggetto GmailThread se è un ID
     const gmailThread = typeof thread === 'string' ? 
                         GmailApp.getThreadById(thread) : thread;
     
-    // Reply to thread (Gmail handles threading automatically)
+    // Rispondi al thread (Gmail gestisce il threading automaticamente)
     gmailThread.reply(replyText);
     
     console.log(`✓ Reply sent to ${messageDetails.senderEmail}`);
@@ -291,12 +291,12 @@ class GmailService {
   }
   
   /**
-   * Send reply as HTML (for formatted responses)
-   * ✅ Applies formatting safeguards (legacy feature)
-   * ✅ Applies custom replacements from Sostituzioni sheet
+   * Invia risposta come HTML (per risposte formattate)
+   * ✅ Applica safeguard di formattazione (funzionalità legacy)
+   * ✅ Applica sostituzioni personalizzate dal foglio Sostituzioni
    */
   sendHtmlReply(thread, responseText, messageDetails) {
-    // 0. Apply Custom Replacements (from Sostituzioni sheet)
+    // 0. Applica Sostituzioni Personalizzate (dal foglio Sostituzioni)
     let finalResponse = responseText;
     if (typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.replacements) {
       const replacementCount = Object.keys(GLOBAL_CACHE.replacements).length;
@@ -306,11 +306,11 @@ class GmailService {
       }
     }
     
-    // 1. Apply Formatting Safeguards (Legacy restoration)
+    // 1. Applica Safeguard di Formattazione (Ripristino legacy)
     finalResponse = this.fixPunctuation(finalResponse);
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
-    // 2. Convert to HTML
+    // 2. Converti in HTML
     const htmlBody = markdownToHtml(finalResponse);
 
     const gmailThread = typeof thread === 'string'
@@ -325,7 +325,7 @@ class GmailService {
   }
 
   // ========================================================================
-  // FORMATTING SAFEGUARDS (Legacy Features)
+  // SAFEGUARD DI FORMATTAZIONE (Funzionalità Legacy)
   // ========================================================================
 
   /**
@@ -356,24 +356,24 @@ class GmailService {
   }
 
   /**
-   * Ensures there is a blank line after the greeting
+   * Assicura che ci sia una riga vuota dopo il saluto
    */
   ensureGreetingLineBreak(text) {
     if (!text) return text;
 
-    // Pattern: Greeting line (start of string, some words, maybe comma/exclamation, newline)
-    // Followed by immediate text without empty line.
+    // Pattern: Riga saluto (inizio stringa, alcune parole, virgola/esclamativo, a capo)
+    // Seguito da testo immediato senza riga vuota.
     
     // E.g. ^Buongiorno, \nSiamo... -> ^Buongiorno, \n\nSiamo...
     
     const lines = text.split('\n');
     if (lines.length > 1) {
       const firstLine = lines[0].trim();
-      // Check if it looks like a greeting
+      // Verifica se sembra un saluto
       if (/^(Buongiorno|Buonasera|Salve|Gentile|Egregio|Ciao)/i.test(firstLine)) {
-        // Check if second line is NOT empty
+        // Verifica se la seconda riga NON è vuota
         if (lines[1].trim() !== '') {
-            // Insert empty line
+            // Inserisci riga vuota
             lines.splice(1, 0, '');
             return lines.join('\n');
         }
@@ -392,7 +392,7 @@ class GmailService {
     
     let result = text;
     for (const [bad, good] of Object.entries(replacements)) {
-      // Case insensitive global replace
+      // Sostituzione globale case insensitive
       const regex = new RegExp(bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
       result = result.replace(regex, good);
     }
@@ -400,11 +400,11 @@ class GmailService {
   }
 
   // ========================================================================
-  // HEALTH CHECK
+  // VERIFICA STATO
   // ========================================================================
   
   /**
-   * Test Gmail access
+   * Testa accesso Gmail
    */
   testConnection() {
     const results = {
@@ -415,21 +415,21 @@ class GmailService {
     };
     
     try {
-      // Test listing threads
+      // Testa listing thread
       const threads = GmailApp.search('is:unread', 0, 1);
       results.connectionOk = true;
       results.canListMessages = true;
       
-      // Test label creation
+      // Testa creazione etichette
       try {
         const testLabel = this.getOrCreateLabel('_TEST_LABEL_');
         results.canCreateLabels = true;
         
-        // Cleanup
+        // Pulizia
         try {
           testLabel.deleteLabel();
         } catch (e) {
-          // Non-critical
+          // Non critico
         }
       } catch (e) {
         results.errors.push(`Cannot create labels: ${e.message}`);
@@ -444,7 +444,7 @@ class GmailService {
   }
 }
 
-// Factory function
+// Funzione factory
 function createGmailService() {
   return new GmailService();
 }
@@ -517,7 +517,7 @@ function markdownToHtml(text) {
     return '&#' + char.codePointAt(0) + ';';
   });
 
-  // Final wrapper
+  // Wrapper finale
   return `
     <div style="
       font-family: Arial, Helvetica, sans-serif;

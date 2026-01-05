@@ -22,19 +22,19 @@
  */
 class MemoryService {
   constructor() {
-    console.log('🧠 Initializing MemoryService (Sheet-based)...');
+    console.log('🧠 Inizializzazione MemoryService (basato su Sheet)...');
     
-    // Configuration
+    // Configurazione
     this.spreadsheetId = typeof CONFIG !== 'undefined' ? CONFIG.SPREADSHEET_ID : null;
     this.sheetName = typeof CONFIG !== 'undefined' ? 
                      (CONFIG.MEMORY_SHEET_NAME || 'ConversationMemory') : 
                      'ConversationMemory';
     
-    // Cache for performance (avoid repeated lookups)
+    // Cache per performance (evita lookup ripetuti)
     this._cache = {};
-    this._cacheExpiry = 5 * 60 * 1000; // 5 minutes
+    this._cacheExpiry = 5 * 60 * 1000; // 5 minuti
     
-    // Initialize sheet
+    // Inizializza foglio
     this._sheet = null;
     this._initialized = false;
     
@@ -46,7 +46,7 @@ class MemoryService {
   }
   
   /**
-   * Initialize or create the memory sheet
+   * Inizializza o crea il foglio memoria
    */
   _initializeSheet() {
     try {
@@ -54,7 +54,7 @@ class MemoryService {
       this._sheet = spreadsheet.getSheetByName(this.sheetName);
       
       if (!this._sheet) {
-        // Create new sheet with headers
+        // Crea nuovo foglio con intestazioni
         this._sheet = spreadsheet.insertSheet(this.sheetName);
         this._sheet.getRange('A1:G1').setValues([[
           'threadId', 'language', 'category', 'tone', 
@@ -82,7 +82,7 @@ class MemoryService {
       return {};
     }
     
-    // Check cache first
+    // Verifica prima la cache
     const cacheKey = `memory_${threadId}`;
     const cached = this._getFromCache(cacheKey);
     if (cached) {
@@ -91,14 +91,14 @@ class MemoryService {
     }
     
     try {
-      // Find row by threadId
+      // Trova riga per threadId
       const row = this._findRowByThreadId(threadId);
       
       if (row) {
         const data = this._rowToObject(row);
         console.log(`🧠 Memory hit for thread ${threadId} (Lang: ${data.language})`);
         
-        // Cache it
+        // Memorizza in cache
         this._setCache(cacheKey, data);
         return data;
       } else {
@@ -120,7 +120,7 @@ class MemoryService {
       return;
     }
     
-    // ✅ FIX: Add lock to prevent race condition
+    // ✅ FIX: Aggiunge lock per prevenire race condition
     const lock = LockService.getScriptLock();
     try {
       lock.waitLock(5000);
@@ -129,17 +129,17 @@ class MemoryService {
       const now = new Date().toISOString();
       
       if (existingRow) {
-        // Merge with existing data
+        // Unisci con dati esistenti
         const existingData = this._rowToObject(existingRow.values);
         const mergedData = Object.assign({}, existingData, newData);
         mergedData.lastUpdated = now;
         mergedData.messageCount = (existingData.messageCount || 0) + 1;
         
-        // Update row
+        // Aggiorna riga
         this._updateRow(existingRow.rowIndex, mergedData);
         console.log(`🧠 Memory updated for thread ${threadId}`);
       } else {
-        // Create new row
+        // Crea nuova riga
         newData.threadId = threadId;
         newData.lastUpdated = now;
         newData.messageCount = 1;
@@ -148,7 +148,7 @@ class MemoryService {
         console.log(`🧠 Memory created for thread ${threadId}`);
       }
       
-      // Invalidate cache
+      // Invalida cache
       this._invalidateCache(`memory_${threadId}`);
       
     } catch (error) {
@@ -168,21 +168,21 @@ class MemoryService {
      }
  
      try {
-      // Acquire script lock to avoid race conditions
+      // Acquisisce lock script per evitare race condition
       const lock = LockService.getScriptLock();
       lock.waitLock(5000); // wait up to 5 seconds
       try {
         const existingRow = this._findRowByThreadId(threadId);
         if (existingRow) {
-          // Merge topics without incrementing messageCount
+          // Unisci topic senza incrementare messageCount
           const existingData = this._rowToObject(existingRow.values);
           const existingTopics = existingData.providedInfo || [];
           const mergedTopics = [...new Set([...existingTopics, ...topics])];
           
-          // Update only providedInfo, preserve messageCount
+          // Aggiorna solo providedInfo, preserva messageCount
           existingData.providedInfo = mergedTopics;
           existingData.lastUpdated = new Date().toISOString();
-          // ✅ Do NOT increment messageCount here
+          // ✅ NON incrementare messageCount qui
           
           this._updateRow(existingRow.rowIndex, existingData);
           this._invalidateCache(`memory_${threadId}`);
@@ -197,34 +197,34 @@ class MemoryService {
    }
   
   /**
-   * Set language for a thread
+   * Imposta lingua per un thread
    */
   setLanguage(threadId, language) {
     this.updateMemory(threadId, { language: language });
   }
   
   /**
-   * Set category for a thread
+   * Imposta categoria per un thread
    */
   setCategory(threadId, category) {
     this.updateMemory(threadId, { category: category });
   }
   
   // ========================================================================
-  // PRIVATE HELPER METHODS
+  // METODI HELPER PRIVATI
   // ========================================================================
   
   /**
-   * Find row by threadId
-   * Returns { rowIndex, values } or null
+   * Trova riga per threadId
+   * Ritorna { rowIndex, values } o null
    */
   _findRowByThreadId(threadId) {
     const data = this._sheet.getDataRange().getValues();
     
-    for (let i = 1; i < data.length; i++) { // Skip header
+    for (let i = 1; i < data.length; i++) { // Salta intestazione
       if (data[i][0] === threadId) {
         return {
-          rowIndex: i + 1, // 1-indexed for Sheets
+          rowIndex: i + 1, // 1-indexed per Sheets
           values: data[i]
         };
       }
@@ -234,10 +234,10 @@ class MemoryService {
   }
   
   /**
-   * Convert row array to object
+   * Converte array riga in oggetto
    */
   _rowToObject(row) {
-    // Handle both array and object with .values
+    // Gestisce sia array che oggetto con .values
     const values = Array.isArray(row) ? row : row.values || row;
     
     let providedInfo = [];
@@ -261,7 +261,7 @@ class MemoryService {
   }
   
   /**
-   * Update existing row
+   * Aggiorna riga esistente
    */
   _updateRow(rowIndex, data) {
     const providedInfoJson = JSON.stringify(data.providedInfo || []);
@@ -278,7 +278,7 @@ class MemoryService {
   }
   
   /**
-   * Append new row
+   * Aggiunge nuova riga
    */
   _appendRow(data) {
     const providedInfoJson = JSON.stringify(data.providedInfo || []);
@@ -295,7 +295,7 @@ class MemoryService {
   }
   
   // ========================================================================
-  // CACHE METHODS
+  // METODI CACHE
   // ========================================================================
   
   _getFromCache(key) {
@@ -318,7 +318,7 @@ class MemoryService {
   }
   
   /**
-   * Clear all cache
+   * Svuota tutta la cache
    */
   clearCache() {
     this._cache = {};
@@ -326,11 +326,11 @@ class MemoryService {
   }
   
   // ========================================================================
-  // UTILITY METHODS
+  // METODI UTILITÀ
   // ========================================================================
   
   /**
-   * Clean old entries (older than N days)
+   * Pulisce voci vecchie (più vecchie di N giorni)
    */
   cleanOldEntries(daysOld = 30) {
     if (!this._initialized) return 0;
@@ -342,7 +342,7 @@ class MemoryService {
       
       let deletedCount = 0;
       
-      // Go backwards to avoid index shifting issues
+      // Vai all'indietro per evitare problemi di shifting indici
       for (let i = data.length - 1; i >= 1; i--) {
         const lastUpdated = new Date(data[i][5]);
         if (lastUpdated < cutoffDate) {
@@ -361,7 +361,7 @@ class MemoryService {
   }
   
   /**
-   * Get stats about memory usage
+   * Ottieni statistiche sull'uso della memoria
    */
   getStats() {
     if (!this._initialized) {
@@ -372,31 +372,31 @@ class MemoryService {
     return {
       initialized: true,
       sheetName: this.sheetName,
-      totalEntries: data.length - 1, // Exclude header
+      totalEntries: data.length - 1, // Escludi intestazione
       cacheSize: Object.keys(this._cache).length
     };
   }
   
   /**
-   * Check if service is healthy
+   * Verifica se il servizio è sano
    */
   isHealthy() {
     return this._initialized;
   }
 }
 
-// Factory function
+// Funzione factory
 function createMemoryService() {
   return new MemoryService();
 }
 
 // ====================================================================
-// CLEANUP TRIGGER FUNCTION
-// Run this periodically to clean old memory entries
+// FUNZIONE TRIGGER PULIZIA
+// Esegui periodicamente per pulire le voci di memoria vecchie
 // ====================================================================
 
 function cleanupOldMemory() {
   const memoryService = new MemoryService();
-  const deleted = memoryService.cleanOldEntries(30); // 30 days
-  console.log(`Memory cleanup complete: ${deleted} entries removed`);
+  const deleted = memoryService.cleanOldEntries(30); // 30 giorni
+  console.log(`Pulizia memoria completata: ${deleted} voci rimosse`);
 }

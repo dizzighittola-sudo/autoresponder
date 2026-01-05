@@ -101,7 +101,7 @@ class PromptContext {
   }
 }
 
-// Factory
+// Funzione Factory
 function createPromptContext(input) {
   return new PromptContext(input);
 }

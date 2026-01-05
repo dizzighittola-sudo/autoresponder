@@ -51,7 +51,7 @@ const CONFIG = {
 };
 
 // ====================================================================
-// LANGUAGE MARKERS (Shared constant)
+// MARCATORI LINGUA (Costante condivisa)
 // ====================================================================
 
 const LANGUAGE_MARKERS = {
@@ -61,7 +61,7 @@ const LANGUAGE_MARKERS = {
 };
 
 // ====================================================================
-// GLOBAL CACHE (populated by loadResources)
+// CACHE GLOBALE (popolata da loadResources)
 // ====================================================================
 
 var GLOBAL_CACHE = {
@@ -80,11 +80,11 @@ var GLOBAL_CACHE = {
 };
 
 // ====================================================================
-// RESOURCE LOADING
+// CARICAMENTO RISORSE
 // ====================================================================
 
 function loadResources() {
-  // FIX Bug 4: Prevent race condition with loading flag
+  // FIX Bug 4: Previene race condition con flag loading
   if (GLOBAL_CACHE.loading || GLOBAL_CACHE.loaded) {
     console.log('📦 Resources already loaded or loading (cached)');
     return;
@@ -96,7 +96,7 @@ function loadResources() {
   try {
     const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     
-    // Load Knowledge Base (Istruzioni)
+    // Carica Knowledge Base (Istruzioni)
     const kbSheet = spreadsheet.getSheetByName(CONFIG.KB_SHEET_NAME);
     if (kbSheet) {
       const kbData = kbSheet.getDataRange().getValues();
@@ -107,7 +107,7 @@ function loadResources() {
       console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
     }
     
-    // Load AI_CORE_LITE (principi pastorali base)
+    // Carica AI_CORE_LITE (principi pastorali base)
     const liteSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_LITE_SHEET);
     if (liteSheet) {
       const liteData = liteSheet.getDataRange().getValues();
@@ -118,7 +118,7 @@ function loadResources() {
       console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_LITE_SHEET}' not found`);
     }
     
-    // Load AI_CORE (principi pastorali estesi per discernimento)
+    // Carica AI_CORE (principi pastorali estesi per discernimento)
     const coreSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_SHEET);
     if (coreSheet) {
       const coreData = coreSheet.getDataRange().getValues();
@@ -129,7 +129,7 @@ function loadResources() {
       console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_SHEET}' not found`);
     }
     
-    // Load Dottrina (base dottrinale completa)
+    // Carica Dottrina (base dottrinale completa)
     const doctrineSheet = spreadsheet.getSheetByName(CONFIG.DOCTRINE_SHEET);
     if (doctrineSheet) {
       const doctrineData = doctrineSheet.getDataRange().getValues();
@@ -140,7 +140,7 @@ function loadResources() {
       console.warn(`⚠️ Sheet '${CONFIG.DOCTRINE_SHEET}' not found`);
     }
     
-    // Load Replacements (Sostituzioni)
+    // Carica Sostituzioni
     try {
       const replSheet = spreadsheet.getSheetByName(CONFIG.REPLACEMENTS_SHEET_NAME);
       if (replSheet) {
@@ -158,22 +158,22 @@ function loadResources() {
     }
     
     GLOBAL_CACHE.loaded = true;
-    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset loading flag
+    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset flag loading
     console.log('✓ All resources loaded successfully');
     
   } catch (error) {
-    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset loading flag on error
+    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset flag loading in caso di errore
     console.error(`❌ Error loading resources: ${error.message}`);
   }
 }
 
 // ====================================================================
-// SUSPENSION TIME CHECK
+// VERIFICA ORARIO SOSPENSIONE
 // ====================================================================
 
-// Days when the system MUST respond (Employees are OFF)
-// Format: [Month, Day]
-// 1 Jan, 6 Jan, 25 Apr, 1 May, 29 Jun, 15 Aug, 1 Nov, 8 Dec, 25 Dec, 26 Dec
+// Giorni in cui il sistema DEVE rispondere (Dipendenti in ferie)
+// Formato: [Mese, Giorno]
+// 1 Gen, 6 Gen, 25 Apr, 1 Mag, 29 Giu, 15 Ago, 1 Nov, 8 Dic, 25 Dic, 26 Dic
 const ALWAYS_OPERATING_DAYS = [
   [1, 1],    // Capodanno
   [1, 6],    // Epifania
@@ -196,7 +196,7 @@ const SUSPENSION_HOURS = {
 };
 
 /**
- * Calculates Easter Sunday for a given year (Western/Gregorian)
+ * Calcola la Domenica di Pasqua per un dato anno (Occidentale/Gregoriano)
  */
 function calculateEaster(year) {
   const a = year % 19;
@@ -217,8 +217,8 @@ function calculateEaster(year) {
 }
 
 /**
- * Checks if a date is within the Ferragosto vacation period
- * Rule: Fixed period from August 15th to August 31st (inclusive)
+ * Verifica se una data è nel periodo vacanze di Ferragosto
+ * Regola: Periodo fisso dal 15 al 31 Agosto (inclusi)
  */
 function isFerragostoFixedPeriod(date) {
   const month = date.getMonth() + 1; // 1-12
@@ -227,10 +227,10 @@ function isFerragostoFixedPeriod(date) {
 }
 
 /**
- * Checks if the system should be SUSPENDED (i.e. Employees are WORKING)
- * Returns TRUE if Suspended (Secretariat working)
- * Returns FALSE if Active (System responding, e.g., Holidays, Night, Weekend)
- * @param {Date} [checkDate] - Optional date to check (defaults to now)
+ * Verifica se il sistema dovrebbe essere SOSPESO (cioè Dipendenti LAVORANO)
+ * Ritorna TRUE se Sospeso (Segreteria lavora)
+ * Ritorna FALSE se Attivo (Sistema risponde, es. Feste, Notte, Weekend)
+ * @param {Date} [checkDate] - Data opzionale da verificare (default: ora)
  */
 function isInSuspensionTime(checkDate = new Date()) {
   const now = checkDate;
@@ -241,24 +241,24 @@ function isInSuspensionTime(checkDate = new Date()) {
   const hour = now.getHours();
 
   // ----------------------------------------------------------
-  // 1. CHECK "ALWAYS OPERATING" DAYS (Priority)
-  // If it's a holiday, the system MUST work (return false)
+  // 1. CONTROLLA GIORNI "SEMPRE OPERATIVI" (Priorità)
+  // Se è un giorno festivo, il sistema DEVE funzionare (ritorna false)
   // ----------------------------------------------------------
 
-  // A. Fixed Holidays
+  // A. Festività Fisse
   for (const [hMonth, hDay] of ALWAYS_OPERATING_DAYS) {
     if (month === hMonth && date === hDay) {
       console.log('📅 Giorno Festivo Fisso (Sistema Attivo)');
       return false; // Active
     }
   }
-  // Special active period: Dec 24 and Dec 31 from 14:00, full day Dec 25-26, Jan 1
+  // Periodo attivo speciale: 24 e 31 Dic dalle 14:00, giorni interi 25-26 Dic, 1 Gen
   if (month === 12 && ((date === 24 && hour >= 14) || date === 25 || date === 26 || (date === 31 && hour >= 14))) {
     console.log('📅 Periodo speciale attivo (Natale/Capodanno)');
     return false; // Active
   }
 
-  // B. Easter Mobile Dates
+  // B. Date Mobili Pasqua
   const easter = calculateEaster(year);
   
   // Pasquetta (Easter + 1 day)
@@ -269,7 +269,7 @@ function isInSuspensionTime(checkDate = new Date()) {
     return false;
   }
 
-  // Holy Saturday (Easter - 1 day)
+  // Sabato Santo (Pasqua - 1 giorno)
   const holySaturday = new Date(easter);
   holySaturday.setDate(easter.getDate() - 1);
   if (month === (holySaturday.getMonth() + 1) && date === holySaturday.getDate()) {
@@ -277,50 +277,50 @@ function isInSuspensionTime(checkDate = new Date()) {
     return false;
   }
 
-  // C. Ferragosto Period (Fixed: August 15-31)
+  // C. Periodo Ferragosto (Fisso: 15-31 Agosto)
   if (isFerragostoFixedPeriod(now)) {
     console.log('📅 Periodo Ferragosto (Sistema Attivo)');
     return false;
   }
 
   // ----------------------------------------------------------
-  // 2. CHECK REGULAR OFFICE HOURS
-  // If not a holiday, check if employees are working
+  // 2. CONTROLLA ORARI UFFICIO REGOLARI
+  // Se non è festivo, controlla se i dipendenti lavorano
   // ----------------------------------------------------------
   if (SUSPENSION_HOURS[day]) {
     for (const [startH, endH] of SUSPENSION_HOURS[day]) {
       if (hour >= startH && hour < endH) {
-        // We are within working hours, and it's NOT a holiday
-        return true; // SUSPENDED
+        // Siamo in orario lavorativo, e NON è un giorno festivo
+        return true; // SOSPESO
       }
     }
   }
 
-  // Default: Not in suspension hours -> Active
+  // Default: Non in orari sospensione -> Attivo
   return false;
 }
 
 // ====================================================================
-// SPECIAL MASS RULES (Legacy Feature Restore)
+// REGOLE MESSE SPECIALI (Ripristino Funzionalità Legacy)
 // ====================================================================
 
 /**
- * Returns a special rule string if today is a special feast day.
- * Rule: On special days (Easter Monday, 25 Apr, 1 May, 2 Jun, 26 Dec),
- * Mass is ONLY at 19:00 (unless it's Sunday).
+ * Ritorna una stringa con regola speciale se oggi è un giorno festivo speciale.
+ * Regola: Nei giorni speciali (Pasquetta, 25 Apr, 1 Mag, 2 Giu, 26 Dic),
+ * la Messa è SOLO alle 19:00 (a meno che non sia Domenica).
  */
 function getSpecialMassTimeRule(date = new Date()) {
   const month = date.getMonth() + 1; // 1-12
   const day = date.getDate();
   const weekDay = date.getDay(); // 0=Sun
   
-  // If it's Sunday, standard Sunday rules usually apply (unless override needed)
-  // Legacy logic implied: "tranne se cadono di domenica" -> if Sunday, standard rules apply.
+  // Se è Domenica, si applicano le regole standard domenicali (a meno di override)
+  // Logica legacy implicava: "tranne se cadono di domenica" -> se Domenica, regole standard.
   if (weekDay === 0) {
     return null; 
   }
 
-  // Special Fixed Days: 25 Apr, 1 May, 2 Jun, 26 Dec
+  // Giorni Fissi Speciali: 25 Apr, 1 Mag, 2 Giu, 26 Dic
   const specialFixed = [
     [4, 25], // Anniversario Liberazione
     [5, 1],  // Festa Lavoro
@@ -330,7 +330,7 @@ function getSpecialMassTimeRule(date = new Date()) {
 
   let isSpecial = false;
   
-  // Check Fixed
+  // Controlla Fissi
   for (const [m, d] of specialFixed) {
     if (month === m && day === d) {
       isSpecial = true;
@@ -338,7 +338,7 @@ function getSpecialMassTimeRule(date = new Date()) {
     }
   }
 
-  // Check Easter Monday (Pasquetta)
+  // Controlla Pasquetta
   if (!isSpecial) {
     const easter = calculateEaster(date.getFullYear());
     const pasquetta = new Date(easter);
@@ -370,8 +370,8 @@ Unico orario valido per OGGI: ore 19:00.
 }
 
 /**
- * Returns a string describing the Ferragosto vacation period.
- * Fixed period: August 15th to August 31st.
+ * Ritorna una stringa che descrive il periodo vacanze di Ferragosto.
+ * Periodo fisso: 15-31 Agosto.
  */
 function getFerragostoPeriodInfo(date = new Date()) {
   const year = date.getFullYear();
@@ -381,7 +381,7 @@ function getFerragostoPeriodInfo(date = new Date()) {
 
 
 // ====================================================================
-// CRITICAL CONFIG ASSERTION (fail-fast)
+// ASSERZIONE CONFIG CRITICA (fail-fast)
 // ====================================================================
 
 function assertCriticalConfig() {
@@ -395,7 +395,7 @@ function assertCriticalConfig() {
 }
 
 // ====================================================================
-// MAIN ENTRY POINT - For Trigger
+// ENTRY POINT PRINCIPALE - Per Trigger
 // ====================================================================
 
 /**
@@ -408,16 +408,16 @@ function main() {
   console.log('═'.repeat(70));
   console.log(`⏰ ${new Date().toLocaleString('it-IT')}`);
   
-  // Fail-fast on missing config
+  // Fail-fast su config mancante
   assertCriticalConfig();
   
-  // Check suspension
+  // Controlla sospensione
   if (isInSuspensionTime()) {
     console.log('⏸️ Servizio sospeso: orario di lavoro segreteria');
     return;
   }
   
-  // Load resources
+  // Carica risorse
   loadResources();
   
   if (!GLOBAL_CACHE.knowledgeBase) {
@@ -425,7 +425,7 @@ function main() {
     return;
   }
   
-  // Create and run processor
+  // Crea ed esegui processore
   try {
     const processor = new EmailProcessor();
     const stats = processor.processUnreadEmails(
@@ -442,7 +442,7 @@ function main() {
 }
 
 // ====================================================================
-// UTILITY FUNCTIONS
+// FUNZIONI UTILITÀ
 // ====================================================================
 
 /**
@@ -520,8 +520,8 @@ function testHolidayLogic() {
   console.log('---------------------------------------------------');
   testCases.forEach(tc => {
     const isSuspended = isInSuspensionTime(tc.d);
-    // expectSuspended: true = Sospeso (Employees working)
-    // expectSuspended: false = Attivo (Employees OFF)
+    // expectSuspended: true = Sospeso (Dipendenti lavorano)
+    // expectSuspended: false = Attivo (Dipendenti in ferie)
     
     const resultStr = isSuspended ? "⛔ SOSPESO (Lavoro)" : "✅ ATTIVO (Bot risponde)";
     const ok = isSuspended === tc.expectSuspended;
@@ -665,7 +665,7 @@ function healthCheck() {
 }
 
 // ====================================================================
-// TRIGGER MANAGEMENT
+// GESTIONE TRIGGER
 // ====================================================================
 
 /**
@@ -699,8 +699,8 @@ function removeTriggers() {
 }
 
 /**
- * Helper: Parse 2D array from Sheet into Array of Objects
- * Assumes first row is Header
+ * Helper: Converte array 2D da Sheet in Array di Oggetti
+ * Assume che la prima riga sia Header
  */
 function _parseSheetToStructured(data) {
   if (!data || data.length < 2) return [];
@@ -710,7 +710,7 @@ function _parseSheetToStructured(data) {
     const row = data[i];
     const obj = {};
     for (let j = 0; j < headers.length; j++) {
-      // FIX Bug 1: Fallback for undefined/null cell values
+      // FIX Bug 1: Fallback per valori cella undefined/null
       obj[headers[j]] = row[j] !== undefined && row[j] !== null ? row[j] : '';
     }
     rows.push(obj);

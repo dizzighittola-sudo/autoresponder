@@ -18,7 +18,7 @@ class GeminiService {
   constructor() {
     console.log('🤖 Inizializzazione GeminiService...');
     
-    // Get config
+    // Ottieni configurazione
     this.apiKey = typeof CONFIG !== 'undefined' ? CONFIG.GEMINI_API_KEY : 
                   PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
     this.modelName = typeof CONFIG !== 'undefined' ? CONFIG.MODEL_NAME : 'gemini-2.5-flash';
@@ -37,7 +37,7 @@ class GeminiService {
   }
   
   // ========================================================================
-  // RETRY WRAPPER
+  // WRAPPER RETRY
   // ========================================================================
   
   /**
@@ -65,7 +65,7 @@ class GeminiService {
           console.error(`❌ All ${this.maxRetries} ${context} attempts failed`);
           throw error;
         } else {
-          // Non-retryable error
+          // Errore non ritentabile
           throw error;
         }
       }
@@ -85,15 +85,15 @@ class GeminiService {
     const text = `${emailSubject} ${emailContent}`.toLowerCase();
     const originalText = `${emailSubject} ${emailContent}`;
     
-    // Spanish-specific character detection (highly distinctive)
-    // FIX Bug 5: Reduced weight to avoid false positives with Spanish names in Italian emails
+    // Rilevamento caratteri specifici spagnoli (altamente distintivi)
+    // FIX Bug 5: Peso ridotto per evitare falsi positivi con nomi spagnoli in email italiane
     let spanishCharScore = 0;
     if (originalText.includes('¿') || originalText.includes('¡')) {
-      spanishCharScore = 3; // Reduced from 5 to avoid collision
+      spanishCharScore = 3; // Ridotto da 5 per evitare collisioni
       console.log('   Found Spanish-specific punctuation (¿ or ¡)');
     }
     if (text.includes('ñ')) {
-      spanishCharScore += 2; // Reduced from 3 to avoid collision with Spanish names
+      spanishCharScore += 2; // Ridotto da 3 per evitare collisioni con nomi spagnoli
       console.log('   Found Spanish-specific character (ñ)');
     }
     
@@ -152,16 +152,16 @@ class GeminiService {
     
 
     
-    // Count matches with word boundaries
+    // Conta corrispondenze con limiti di parola
     const countMatches = (keywords, txt, weight = 1) => {
       let count = 0;
       for (const kw of keywords) {
         if (kw.startsWith(' ') || kw.endsWith(' ')) {
-          // Substring match for phrases with explicit spaces
+          // Match sottostringa per frasi con spazi espliciti
           const matches = (txt.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length;
           count += weight * matches;
         } else {
-          // Word boundary match
+          // Match con limiti di parola
           const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const pattern = new RegExp(`\\b${escaped}\\b`, 'gi');
           const matches = (txt.match(pattern) || []).length;
@@ -182,7 +182,7 @@ class GeminiService {
     
     console.log(`   Language scores: EN=${scores['en']}, ES=${scores['es']}, IT=${scores['it']}`);
     
-    // Determine detected language
+    // Determina lingua rilevata
     let detectedLang = 'it';
     let maxScore = 0;
     for (const lang in scores) {
@@ -220,22 +220,22 @@ class GeminiService {
   // ========================================================================
   
   /**
-   * Get greeting and closing adapted to language, time, AND special days
-   * ✅ RESTORED: Full version with liturgical calendar support
+   * Ottieni saluto e chiusura adattati a lingua, ora E giorni speciali
+   * ✅ RIPRISTINATO: Versione completa con supporto calendario liturgico
    */
   getAdaptiveGreeting(senderName, language = 'it') {
     const now = new Date();
     const hour = now.getHours();
-    const day = now.getDay(); // 0 = Sunday
+    const day = now.getDay(); // 0 = Domenica
     
     let greeting, closing;
     
-    // ✅ First check for special day greeting (new)
+    // ✅ Prima verifica saluto giorno speciale (nuovo)
     const specialGreeting = this._getSpecialDayGreeting(now, language);
     if (specialGreeting) {
       greeting = specialGreeting;
     } else {
-      // Fall back to standard time-based greeting
+      // Fallback a saluto standard basato sull'ora
       if (language === 'it') {
         if (day === 0) {
           greeting = 'Buona domenica.';
@@ -269,7 +269,7 @@ class GeminiService {
       }
     }
     
-    // Set closing based on language
+    // Imposta chiusura in base alla lingua
     if (language === 'it') {
       closing = 'Cordiali saluti,';
     } else if (language === 'en') {
@@ -284,21 +284,21 @@ class GeminiService {
   }
   
   // ========================================================================
-  // SPECIAL DAY GREETINGS (RESTORED)
+  // SALUTI GIORNI SPECIALI (RIPRISTINATO)
   // ========================================================================
   
   /**
-   * Get special greeting for liturgical feasts and holidays
-   * ✅ RESTORED: Full liturgical calendar support
+   * Ottieni saluto speciale per feste liturgiche e festività
+   * ✅ RIPRISTINATO: Supporto completo calendario liturgico
    */
   _getSpecialDayGreeting(dateObj, language = 'it') {
     const y = dateObj.getFullYear();
     const m = dateObj.getMonth() + 1;
     const d = dateObj.getDate();
     
-    // ===== FIXED HOLIDAYS =====
+    // ===== FESTIVITÀ FISSE =====
     
-    // New Year
+    // Capodanno
     if (m === 1 && d === 1) {
       if (language === 'en') return 'Happy New Year!';
       if (language === 'es') return '¡Feliz Año Nuevo!';
@@ -306,7 +306,7 @@ class GeminiService {
       return 'Buon Capodanno!';
     }
     
-    // Epiphany
+    // Epifania
     if (m === 1 && d === 6) {
       if (language === 'en') return 'Happy Epiphany!';
       if (language === 'es') return '¡Feliz Epifanía!';
@@ -314,7 +314,7 @@ class GeminiService {
       return 'Buona Epifania!';
     }
     
-    // Assumption (Aug 15)
+    // Assunzione (15 Agosto)
     if (m === 8 && d === 15) {
       if (language === 'en') return 'Happy Assumption Day!';
       if (language === 'es') return '¡Feliz día de la Asunción!';
@@ -322,7 +322,7 @@ class GeminiService {
       return 'Buona festa!';
     }
     
-    // All Saints (Nov 1)
+    // Tutti i Santi (1 Novembre)
     if (m === 11 && d === 1) {
       if (language === 'en') return 'Happy All Saints Day!';
       if (language === 'es') return '¡Feliz día de Todos los Santos!';
@@ -330,7 +330,7 @@ class GeminiService {
       return 'Buona festa di Ognissanti!';
     }
     
-    // Immaculate Conception (Dec 8)
+    // Immacolata Concezione (8 Dicembre)
     if (m === 12 && d === 8) {
       if (language === 'en') return 'Happy Feast of the Immaculate Conception!';
       if (language === 'es') return '¡Feliz día de la Inmaculada!';
@@ -338,7 +338,7 @@ class GeminiService {
       return 'Buona Immacolata!';
     }
     
-    // Christmas (Dec 25)
+    // Natale (25 Dicembre)
     if (m === 12 && d === 25) {
       if (language === 'en') return 'Merry Christmas!';
       if (language === 'es') return '¡Feliz Navidad!';
@@ -346,11 +346,11 @@ class GeminiService {
       return 'Buon Natale!';
     }
     
-    // ===== MOVEABLE FEASTS (Easter-based) =====
+    // ===== FESTE MOBILI (basate sulla Pasqua) =====
     
     const easter = this._getWesternEasterDate(y);
     
-    // Easter octave (Easter Sunday + 7 days)
+    // Ottava di Pasqua (Domenica di Pasqua + 7 giorni)
     const pasquaStart = easter;
     const pasquaEnd = this._addDays(easter, 7);
     if (this._isBetweenInclusive(dateObj, pasquaStart, pasquaEnd)) {
@@ -360,7 +360,7 @@ class GeminiService {
       return 'Buona Pasqua!';
     }
     
-    // Pentecost (Easter + 49 days)
+    // Pentecoste (Pasqua + 49 giorni)
     const pentecoste = this._addDays(easter, 49);
     if (this._isSameDate(dateObj, pentecoste)) {
       if (language === 'en') return 'Happy Pentecost!';
@@ -369,7 +369,7 @@ class GeminiService {
       return 'Buona Pentecoste!';
     }
     
-    // Corpus Domini (Easter + 63 days in Italy)
+    // Corpus Domini (Pasqua + 63 giorni in Italia)
     const corpusDominiIT = this._addDays(easter, 63);
     if (this._isSameDate(dateObj, corpusDominiIT)) {
       if (language === 'en') return 'Happy Corpus Christi!';
@@ -378,7 +378,7 @@ class GeminiService {
       return 'Buona festa!';
     }
     
-    // Holy Family Sunday (Sunday between Christmas and New Year, or Dec 30 if no Sunday)
+    // Domenica della Sacra Famiglia (domenica tra Natale e Capodanno, o 30 Dic se nessuna domenica)
     const sacraFamiglia = this._getHolyFamilySunday(y);
     if (sacraFamiglia && this._isSameDate(dateObj, sacraFamiglia)) {
       if (language === 'en') return 'Happy Feast of the Holy Family!';
@@ -387,15 +387,15 @@ class GeminiService {
       return 'Buona Festa della Sacra Famiglia.';
     }
     
-    return null; // No special day
+    return null; // Nessun giorno speciale
   }
   
   // ========================================================================
-  // DATE UTILITIES FOR LITURGICAL CALENDAR
+  // UTILITÀ DATE PER CALENDARIO LITURGICO
   // ========================================================================
   
   /**
-   * Calculate Western Easter date using Anonymous Gregorian algorithm
+   * Calcola la data della Pasqua occidentale usando l'algoritmo Gregoriano anonimo
    */
   _getWesternEasterDate(year) {
     const a = year % 19;
@@ -416,7 +416,7 @@ class GeminiService {
   }
   
   /**
-   * Add days to a date
+   * Aggiunge giorni a una data
    */
   _addDays(date, days) {
     const result = new Date(date);
@@ -425,7 +425,7 @@ class GeminiService {
   }
   
   /**
-   * Check if two dates are the same day
+   * Verifica se due date sono lo stesso giorno
    */
   _isSameDate(date1, date2) {
     return date1.getFullYear() === date2.getFullYear() &&
@@ -434,7 +434,7 @@ class GeminiService {
   }
   
   /**
-   * Check if date is between start and end (inclusive)
+   * Verifica se una data è compresa tra inizio e fine (inclusi)
    */
   _isBetweenInclusive(date, start, end) {
     const d = date.getTime();
@@ -444,23 +444,23 @@ class GeminiService {
   }
   
   /**
-   * Get Holy Family Sunday date
-   * (Sunday between Dec 25 and Jan 1, or Dec 30 if no Sunday)
+   * Ottieni la data della Domenica della Sacra Famiglia
+   * (Domenica tra 25 Dic e 1 Gen, o 30 Dic se nessuna domenica)
    */
   _getHolyFamilySunday(year) {
-    // Check days from Dec 26 to Dec 31
+    // Controlla i giorni dal 26 al 31 Dicembre
     for (let day = 26; day <= 31; day++) {
-      const date = new Date(year, 11, day); // Month 11 = December
-      if (date.getDay() === 0) { // Sunday
+      const date = new Date(year, 11, day); // Mese 11 = Dicembre
+      if (date.getDay() === 0) { // Domenica
         return date;
       }
     }
-    // If no Sunday found, use Dec 30
+    // Se nessuna domenica trovata, usa 30 Dicembre
     return new Date(year, 11, 30);
   }
   
   // ========================================================================
-  // QUICK CHECK (Should respond + Language detection)
+  // QUICK CHECK (Decisione risposta + Rilevamento lingua)
   // ========================================================================
   
   /**
@@ -477,7 +477,7 @@ Testo: ${emailContent.substring(0, 800)}
 
 Compiti:
 1. Decidi se richiede risposta (reply_needed).
-2. Rileva la lingua (language).
+2. Rileva la lingua dell'email (language) - usa codice ISO 639-1 (es: "it", "en", "es", "fr", "de", "pl", "tr", "pt", etc.).
 3. Classifica la richiesta (category) in una di queste:
    - "TECHNICAL": orari, documenti, procedure, info pratiche
    - "PASTORAL": richieste di aiuto, sfogo, situazioni personali, lutto, richiesta colloqui personali
@@ -489,16 +489,16 @@ Compiti:
 Output JSON atteso:
 {
   "reply_needed": boolean,
-  "language": "it" | "en" | "es",
+  "language": "string (codice ISO 639-1, es: it, en, es, fr, de, pl, tr...)",
   "category": "TECHNICAL" | "PASTORAL" | "DOCTRINAL" | "MIXED",
   "topic": "string",
   "confidence": number (0.0-1.0),
   "reason": "string"
 }`;
 
-    // ✅ FIX: Use local keyword detection as fallback for language only
-    // NOTE: High confidence ONLY skips language re-detection, NOT the shouldRespond decision
-    // Gemini must ALWAYS evaluate whether to respond (filters newsletters, thank-you's, etc.)
+    // ✅ FIX: Usa rilevamento locale keyword come fallback solo per la lingua
+    // NOTA: Alta confidenza salta SOLO ri-rilevamento lingua, NON la decisione shouldRespond
+    // Gemini deve SEMPRE valutare se rispondere (filtra newsletter, ringraziamenti, ecc.)
     const detection = this.detectEmailLanguage(emailContent, emailSubject);
     const fallbackLang = detection.lang;
 
@@ -515,7 +515,7 @@ Output JSON atteso:
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0,
-              maxOutputTokens: 1024  // Increased to avoid truncation
+              maxOutputTokens: 1024  // Aumentato per evitare troncamento
             }
           }),
           muteHttpExceptions: true
@@ -537,7 +537,7 @@ Output JSON atteso:
         return defaultResult;
       }
       
-      // Check for safety blocks or other issues
+      // Verifica blocchi di sicurezza o altri problemi
       const candidate = result.candidates[0];
       if (candidate.finishReason && candidate.finishReason !== 'STOP') {
         console.warn(`⚠️ Quick check: Unusual finishReason: ${candidate.finishReason}`);
@@ -580,7 +580,7 @@ Output JSON atteso:
   }
   
   // ========================================================================
-  // MAIN RESPONSE GENERATION (with retry)
+  // GENERAZIONE RISPOSTA PRINCIPALE (con retry)
   // ========================================================================
   
   /**
@@ -608,7 +608,7 @@ Output JSON atteso:
       
       const responseCode = response.getResponseCode();
       
-      // Handle retryable errors
+      // Gestisci errori ritentabili
       if (responseCode === 429 || responseCode === 503) {
         throw new Error(`rate limit or service unavailable: ${responseCode}`);
       }
@@ -640,14 +640,14 @@ Output JSON atteso:
   }
   
   // ========================================================================
-  // UTILITY METHODS
+  // METODI UTILITÀ
   // ========================================================================
   
-  // NOTE: isOnlyAcknowledgement() removed - use Classifier._isUltraSimpleAcknowledgment()
-  // NOTE: extractMainReply() removed - use GmailService.extractMainReply()
+  // NOTA: isOnlyAcknowledgement() rimossa - usare Classifier._isUltraSimpleAcknowledgment()
+  // NOTA: extractMainReply() rimossa - usare GmailService.extractMainReply()
   
   /**
-   * Test Gemini API connection
+   * Testa connessione API Gemini
    */
   testConnection() {
     const results = {
@@ -694,7 +694,7 @@ Output JSON atteso:
   }
 }
 
-// Factory function for compatibility
+// Funzione factory per compatibilità
 function createGeminiService() {
   return new GeminiService();
 }
@@ -706,13 +706,13 @@ function createGeminiService() {
 function parseGeminiJsonLenient(text) {
   if (!text) throw new Error('Empty response');
 
-  // 1. Rimuovi code block markdown
+  // 1. Rimuovi blocchi codice markdown
   let cleaned = text
     .replace(/```json/gi, '')
     .replace(/```/g, '')
     .trim();
 
-  // 2. Isola solo il contenuto tra { }
+  // 2. Isola solo il contenuto tra { e }
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (!match) {
     throw new Error('No JSON object found');
@@ -720,17 +720,17 @@ function parseGeminiJsonLenient(text) {
 
   cleaned = match[0];
 
-  // 3. Tentativo diretto
+  // 3. Tentativo parsing diretto
   try {
     return JSON.parse(cleaned);
   } catch (e) {
-    // continua
+    // Continua con normalizzazione
   }
 
   // 4. Normalizzazione JS-like → JSON (solo chiavi non quotate)
   // NON modificare i valori per evitare corruzioni di stringhe
   const normalized = cleaned
-    // Quote solo le chiavi non quotate (pattern sicuro)
+    // Quota solo le chiavi non quotate (pattern sicuro)
     .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
 
   return JSON.parse(normalized);

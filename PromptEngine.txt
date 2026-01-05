@@ -7,7 +7,7 @@
 /**
  * PromptEngine - VERSIONE COMPLETA con filtering dinamico
  * 
- * PRESERVES ALL:
+ * PRESERVA TUTTO:
  * ✅ CriticalErrorsTemplate
  * ✅ SystemRoleTemplate  
  * ✅ FormattingGuidelinesTemplate (completo)
@@ -85,7 +85,7 @@ class PromptEngine {
       senderEmail,
       conversationHistory = '',
       category = null,
-      topic = '', // ✅ Topic for smart retrieval
+      topic = '', // ✅ Topic per smart retrieval
       detectedLanguage = 'it',
       currentSeason = 'invernale',
       currentDate = new Date().toISOString().split('T')[0], // YYYY-MM-DD
@@ -201,7 +201,7 @@ class PromptEngine {
   }
   
   // ========================================================================
-  // TEMPLATE 1: CRITICAL ERRORS (shown FIRST and reinforced)
+  // TEMPLATE 1: ERRORI CRITICI (mostrati PRIMA e rinforzati)
   // ========================================================================
   
   _renderCriticalErrors() {
@@ -251,7 +251,7 @@ ESEMPI CORRETTI PER RIFERIMENTO:
   }
   
   // ========================================================================
-  // TEMPLATE 2: SYSTEM ROLE
+  // TEMPLATE 2: RUOLO SISTEMA
   // ========================================================================
   
   _renderSystemRole() {
@@ -290,7 +290,7 @@ NON sei un chatbot freddo - sei una persona reale della segreteria che vuole aiu
   }
   
   // ========================================================================
-  // TEMPLATE 3: LANGUAGE INSTRUCTION
+  // TEMPLATE 3: ISTRUZIONI LINGUA
   // ========================================================================
   
   _renderLanguageInstruction(lang) {
@@ -362,7 +362,7 @@ This is MANDATORY. The sender may not understand Italian.
   }
   
   // ========================================================================
-  // TEMPLATE 4: MEMORY CONTEXT
+  // TEMPLATE 4: CONTESTO MEMORIA
   // ========================================================================
   
   _renderMemoryContext(memoryContext) {
@@ -462,7 +462,7 @@ ${knowledgeBase}
   }
   
   // ========================================================================
-  // TEMPLATE 6: TERRITORY VERIFICATION
+  // TEMPLATE 6: VERIFICA TERRITORIO
   // ========================================================================
   
   _renderTerritoryVerification() {
@@ -475,7 +475,7 @@ Se trovi il blocco "VERIFICA TERRITORIO AUTOMATICA":
   }
   
   // ========================================================================
-  // TEMPLATE 7: SEASONAL CONTEXT
+  // TEMPLATE 7: CONTESTO STAGIONALE
   // ========================================================================
   
   _renderSeasonalContext(currentSeason) {
@@ -485,11 +485,11 @@ Non mostrare mai entrambi i set di orari.`;
   }
   
   // ========================================================================
-  // TEMPLATE 7b: TEMPORAL AWARENESS (NEW)
+  // TEMPLATE 7b: CONSAPEVOLEZZA TEMPORALE (NUOVO)
   // ========================================================================
   
   _renderTemporalAwareness(currentDate) {
-    // Parse date for human-readable format
+    // Converte data in formato leggibile
     const dateObj = new Date(currentDate);
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     const humanDate = dateObj.toLocaleDateString('it-IT', options);
@@ -517,7 +517,7 @@ Non mostrare mai entrambi i set di orari.`;
   }
   
   // ========================================================================
-  // TEMPLATE 8: CATEGORY HINT
+  // TEMPLATE 8: SUGGERIMENTO CATEGORIA
   // ========================================================================
   
   _renderCategoryHint(category) {
@@ -538,16 +538,16 @@ ${hints[category]}`;
   }
   
   // ========================================================================
-  // TEMPLATE 8b: DYNAMIC DIRECTIVES (Smart RAG from Doctrine CSV)
+  // TEMPLATE 8b: DIRETTIVE DINAMICHE (Smart RAG da CSV Dottrina)
   // ========================================================================
   
   /**
    * Seleziona direttive specifiche basate su Category e Topic
    * Usa GLOBAL_CACHE.doctrineStructured (caricato da foglio Google Sheets)
-   * ✅ FIX: Defensive programming su tutti i campi del foglio
+   * ✅ FIX: Programmazione difensiva su tutti i campi del foglio
    */
   _renderDynamicDirectives(topic) {
-    // Guard clauses
+    // Clausole di guardia
     if (typeof GLOBAL_CACHE === 'undefined') return null;
     if (!GLOBAL_CACHE.doctrineStructured || GLOBAL_CACHE.doctrineStructured.length === 0) return null;
     if (!topic) return null;
@@ -559,7 +559,7 @@ ${hints[category]}`;
       
       const targetTopic = String(topic || '').toLowerCase();
       
-      // Match Logica: se c'è topic, cerca in Sotto-tema o tags
+      // Logica Match: se c'è topic, cerca in Sotto-tema o tags
       if (targetTopic && (rowTopic.includes(targetTopic) || rowTags.includes(targetTopic))) {
         return true;
       }
@@ -572,7 +572,7 @@ ${hints[category]}`;
     // Limita a max 3 risultati
     const topRows = relevantRows.slice(0, 3);
     
-    // ✅ SAFE: Defensive programming su ogni campo con fallback 'N/A'
+    // ✅ SICURO: Programmazione difensiva su ogni campo con fallback 'N/A'
     const directives = topRows.map(row => {
       const sottotema = String(row['Sotto-tema'] || 'N/A');
       const tono = String(row['Tono consigliato'] || 'N/A');
@@ -597,7 +597,7 @@ ${directives}
   }
   
   // ========================================================================
-  // TEMPLATE 9: FORMATTING GUIDELINES (FULL)
+  // TEMPLATE 9: LINEE GUIDA FORMATTAZIONE (COMPLETO)
   // ========================================================================
   
   _renderFormattingGuidelines() {
@@ -709,11 +709,11 @@ Esempio NON formattato (corretto così):
   }
   
   // ========================================================================
-  // TEMPLATE 10: RESPONSE STRUCTURE
+  // TEMPLATE 10: STRUTTURA RISPOSTA
   // ========================================================================
   
   _renderResponseStructure(category, subIntents) {
-    // Structure hints based on category and emotional state
+    // Suggerimenti struttura basati su categoria e stato emotivo
     let hint = null;
     
     if (subIntents && subIntents.emotional_distress) {
@@ -745,7 +745,7 @@ Esempio NON formattato (corretto così):
   }
   
   // ========================================================================
-  // TEMPLATE 11: CONVERSATION HISTORY
+  // TEMPLATE 11: CRONOLOGIA CONVERSAZIONE
   // ========================================================================
   
   _renderConversationHistory(conversationHistory) {
@@ -757,7 +757,7 @@ ${conversationHistory}
   }
   
   // ========================================================================
-  // TEMPLATE 12: EMAIL CONTENT
+  // TEMPLATE 12: CONTENUTO EMAIL
   // ========================================================================
   
   _renderEmailContent(emailContent, emailSubject, senderName, senderEmail, detectedLanguage) {
@@ -773,7 +773,7 @@ ${emailContent}
   }
   
   // ========================================================================
-  // TEMPLATE 13: NO REPLY RULES
+  // TEMPLATE 13: REGOLE NO REPLY
   // ========================================================================
   
   _renderNoReplyRules() {
@@ -794,7 +794,7 @@ ${emailContent}
   }
   
   // ========================================================================
-  // TEMPLATE 14: HUMAN TONE GUIDELINES (FULL)
+  // TEMPLATE 14: LINEE GUIDA TONO UMANO (COMPLETO)
   // ========================================================================
   
   _renderHumanToneGuidelines() {
@@ -846,7 +846,7 @@ ${emailContent}
   }
   
   // ========================================================================
-  // TEMPLATE 15: EXAMPLES (FULL with link formatting)
+  // TEMPLATE 15: ESEMPI (COMPLETO con formattazione link)
   // ========================================================================
   
   _renderExamples(category) {
@@ -929,7 +929,7 @@ Segreteria Parrocchia Sant'Eugenio
   }
   
   // ========================================================================
-  // TEMPLATE 16: RESPONSE GUIDELINES
+  // TEMPLATE 16: LINEE GUIDA RISPOSTA
   // ========================================================================
   
   _renderResponseGuidelines(lang, season, salutation, closing) {
@@ -1009,7 +1009,7 @@ ${criticalSection}`;
   }
   
   // ========================================================================
-  // TEMPLATE 17: SPECIAL CASES
+  // TEMPLATE 17: CASI SPECIALI
   // ========================================================================
   
   _renderSpecialCases() {
@@ -1053,7 +1053,7 @@ Esempio SBAGLIATO (da evitare):
   }
   
   // ========================================================================
-  // TEMPLATE 18: FINAL CHECKLIST
+  // TEMPLATE 18: CHECKLIST FINALE
   // ========================================================================
   
   _renderFinalChecklist() {
@@ -1087,18 +1087,18 @@ Prima di generare la risposta, verifica mentalmente:
   }
   
   // ========================================================================
-  // TOKEN ESTIMATION
+  // STIMA TOKEN
   // ========================================================================
   
   /**
-   * Estimate tokens from text
+   * Stima token dal testo
    */
   estimateTokens(text) {
     return Math.round(text.length / 4);
   }
 }
 
-// Factory function
+// Funzione factory
 function createPromptEngine() {
   return new PromptEngine();
 }

@@ -24,11 +24,11 @@ class ResponseValidator {
   constructor() {
     console.log('🔍 Inizializzazione ResponseValidator...');
     
-    // Get config - fallback to defaults if CONFIG not defined
+    // Ottieni config - fallback a default se CONFIG non definito
     const strictMode = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_STRICT_MODE : false;
     const minScore = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_MIN_SCORE : 0.6;
     
-    // Minimum acceptable score
+    // Soglia minima accettabile
     this.MIN_VALID_SCORE = strictMode ? 0.8 : minScore;
     this.STRICT_MODE_SCORE = 0.8;
     
@@ -53,7 +53,7 @@ class ResponseValidator {
       'immagino'
     ];
     
-    // Language markers (shared constant if available, else local)
+    // Marcatori lingua (costante condivisa se disponibile, altrimenti locale)
     this.languageMarkers = typeof LANGUAGE_MARKERS !== 'undefined' ? LANGUAGE_MARKERS : {
       'it': ['grazie', 'cordiali', 'saluti', 'gentile', 'parrocchia', 'messa', 'vorrei', 'quando'],
       'en': ['thank', 'regards', 'dear', 'parish', 'mass', 'church', 'would', 'could'],
@@ -63,7 +63,7 @@ class ResponseValidator {
     // Placeholder
     this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
     
-    // Signature pattern (case-insensitive) - includes all apostrophe variants: ' ' ' '
+    // Pattern firma (case-insensitive) - include tutte le varianti di apostrofo: ' ' ' '
     this.signaturePattern = /segreteria\s+parrocchia\s+sant[''''']?eugenio/i;
     
     console.log('✓ ResponseValidator inizializzato');
@@ -161,7 +161,7 @@ class ResponseValidator {
   }
   
   // ========================================================================
-  // VALIDATION CHECKS (Private Methods)
+  // CONTROLLI DI VALIDAZIONE (Metodi Privati)
   // ========================================================================
   
   /**
@@ -198,7 +198,7 @@ class ResponseValidator {
     
     const responseLower = response.toLowerCase();
     
-    // Detect actual language using markers
+    // Rileva lingua attuale usando marcatori
     const markerScores = {};
     for (const lang in this.languageMarkers) {
       markerScores[lang] = this.languageMarkers[lang].reduce((count, marker) => {
@@ -206,7 +206,7 @@ class ResponseValidator {
       }, 0);
     }
     
-    // Pick highest scoring language
+    // Scegli lingua con punteggio più alto
     let detectedLang = expectedLanguage;
     let maxScore = 0;
     for (const lang in markerScores) {
@@ -216,7 +216,7 @@ class ResponseValidator {
       }
     }
     
-    // Check match
+    // Verifica corrispondenza
     if (detectedLang !== expectedLanguage) {
       if (markerScores[detectedLang] >= 3 && markerScores[expectedLanguage] < 2) {
         errors.push(
@@ -230,7 +230,7 @@ class ResponseValidator {
       }
     }
     
-    // Check mixed languages
+    // Verifica lingue miste
     const highScoringLangs = Object.keys(markerScores).filter(
       lang => markerScores[lang] >= 3
     );
@@ -282,9 +282,9 @@ class ResponseValidator {
     // Rilevamento placeholder intelligente
     const foundPlaceholders = [];
     for (const p of this.placeholders) {
-      // For '...', check if it's used as placeholder (not ellipsis in text)
+      // Per '...', verifica se usato come placeholder (non ellissi nel testo)
       if (p === '...') {
-        // Look for patterns like [...] or "..." at end of sentences
+        // Cerca pattern come [...] o "..." a fine frase
         if (/\[\.\.\.]/g.test(response) || /\.\.\.\s*$/g.test(response)) {
           foundPlaceholders.push(p);
         }
@@ -298,7 +298,7 @@ class ResponseValidator {
       score = 0.0;
     }
     
-    // Check NO_REPLY leakage
+    // Verifica perdita NO_REPLY
     if (response.includes('NO_REPLY') && response.trim().length > 20) {
       errors.push("Contains 'NO_REPLY' instruction (should have been filtered)");
       score = 0.0;
@@ -318,7 +318,7 @@ class ResponseValidator {
     const hallucinations = {};
     
     // Helper normalizzazione orari
-    // FIX: Only replace dots between digits (time patterns), not in URLs
+    // FIX: Sostituisce i punti solo tra cifre (pattern orari), non negli URL
     const normalizeTime = (t) => {
       t = t.replace(/(\d{1,2})\.(\d{2})/g, '$1:$2');
       const parts = t.split(':');
@@ -339,7 +339,7 @@ class ResponseValidator {
     // Helper normalizzazione telefono
     const normalizePhone = (p) => p.replace(/\D/g, '');
     
-    // === Check 1: Times ===
+    // === Controllo 1: Orari ===
     const timePattern = /\b\d{1,2}[:\.]\d{2}\b/g;
     const responseTimesRaw = response.match(timePattern) || [];
     const kbTimesRaw = knowledgeBase.match(timePattern) || [];
@@ -354,7 +354,7 @@ class ResponseValidator {
       hallucinations.times = inventedTimes;
     }
     
-    // === Check 2: Email Addresses ===
+    // === Controllo 2: Indirizzi Email ===
     const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi;
     const responseEmails = new Set(
       (response.match(emailPattern) || []).map(e => e.toLowerCase())
@@ -370,7 +370,7 @@ class ResponseValidator {
       hallucinations.emails = inventedEmails;
     }
     
-    // === Check 3: Phone Numbers ===
+    // === Controllo 3: Numeri di Telefono ===
     // Pattern telefono e soglia 8+ cifre
     const phonePattern = /\b(?:0\d|3\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
     const responsePhonesRaw = response.match(phonePattern) || [];
@@ -404,7 +404,7 @@ class ResponseValidator {
     const warnings = [];
     let score = 1.0;
     
-    // Italian words that should NOT be capitalized after a comma
+    // Parole italiane che NON devono essere maiuscole dopo una virgola
     const italianForbiddenCaps = [
       // Verbs (most common violations)
       'Siamo', 'Restiamo', 'Sono', 'È', "E'", 'Era', 'Sarà', 
@@ -428,15 +428,15 @@ class ResponseValidator {
       'Ecco', 'Gentile', 'Caro', 'Cara', 'Spettabile'
     ];
     
-    // English words - In English, capitalization after comma is often acceptable
-    // (e.g., "Hello, We are happy to..." is common in formal correspondence)
-    // So we use a very limited list for obvious errors only
+    // Parole inglesi - In inglese, la maiuscola dopo virgola è spesso accettabile
+    // (es. "Hello, We are happy to..." è comune nella corrispondenza formale)
+    // Quindi usiamo una lista molto limitata solo per errori ovvi
     const englishForbiddenCaps = [
       // Only articles and prepositions that are clearly wrong
       'The', 'An', 'For', 'With', 'On', 'At', 'If', 'Or', 'And', 'But'
     ];
     
-    // Spanish words
+    // Parole spagnole
     const spanishForbiddenCaps = [
       'Estamos', 'Somos', 'Estaremos', 'Seremos',
       'El', 'Los', 'Las', 'Una',
@@ -444,7 +444,7 @@ class ResponseValidator {
       'Pero', 'Que'
     ];
     
-    // Select the right list based on language
+    // Seleziona la lista corretta in base alla lingua
     let forbiddenCaps;
     let isStrictMode = true; // Strict for Italian (error), lenient for others (warning)
     
@@ -462,7 +462,7 @@ class ResponseValidator {
       isStrictMode = true;
     }
     
-    // Regex to find ", Word" - comma followed by space(s) and capital letter
+    // Regex per trovare ", Parola" - virgola seguita da spazio/i e lettera maiuscola
     const pattern = /,\s+([A-ZÀÈÉÌÒÙ][a-zàèéìòù]*)/g;
     let match;
     const violations = [];
@@ -477,7 +477,7 @@ class ResponseValidator {
             `Grammar error: Capital '${word}' after comma. Should be lowercase: '${word.toLowerCase()}'`
           );
         } else {
-          // For English: warning only, as it may be stylistically acceptable
+          // Per inglese: solo warning, potrebbe essere stilisticamente accettabile
           warnings.push(
             `Possible grammar issue: '${word}' capitalized after comma`
           );
@@ -489,7 +489,7 @@ class ResponseValidator {
       if (isStrictMode) {
         score *= Math.max(0.5, 1.0 - (violations.length * 0.15));
       } else {
-        score *= Math.max(0.9, 1.0 - (violations.length * 0.05)); // Lighter penalty for English
+        score *= Math.max(0.9, 1.0 - (violations.length * 0.05)); // Penalità più leggera per inglese
       }
     }
     
@@ -497,11 +497,11 @@ class ResponseValidator {
   }
   
   // ========================================================================
-  // UTILITY METHODS
+  // METODI UTILITÀ
   // ========================================================================
   
   /**
-   * Get validator configuration statistics
+   * Ottieni statistiche configurazione validatore
    */
   getValidationStats() {
     return {
@@ -516,7 +516,7 @@ class ResponseValidator {
   }
 }
 
-// Factory function for compatibility
+// Funzione factory per compatibilità
 function createResponseValidator() {
   return new ResponseValidator();
 }

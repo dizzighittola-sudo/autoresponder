@@ -18,7 +18,7 @@ class EmailProcessor {
   constructor(options = {}) {
     console.log('📬 Inizializzazione EmailProcessor...');
     
-    // Inject dependencies or create defaults
+    // Inietta dipendenze o crea default
     this.geminiService = options.geminiService || new GeminiService();
     this.classifier = options.classifier || new EmailClassifier();
     this.requestClassifier = options.requestClassifier || new RequestTypeClassifier();
@@ -28,7 +28,7 @@ class EmailProcessor {
     this.promptEngine = options.promptEngine || new PromptEngine();
     this.memoryService = options.memoryService || new MemoryService();
     
-    // Configuration
+    // Configurazione
     this.config = {
       validationEnabled: typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_ENABLED : true,
       dryRun: typeof CONFIG !== 'undefined' ? CONFIG.DRY_RUN : false,
@@ -38,13 +38,12 @@ class EmailProcessor {
       validationErrorLabel: typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_ERROR_LABEL : 'IA_VALIDATION_ERROR'
     };
     
-    console.log('✓ EmailProcessor initialized');
+    console.log('✓ EmailProcessor inizializzato');
     console.log(`   Validation: ${this.config.validationEnabled ? 'ENABLED' : 'DISABLED'}`);
     console.log(`   Dry run: ${this.config.dryRun ? 'YES' : 'NO'}`);
   }
   
   /**
-   * Process a single email thread
    * Processa un singolo thread email
    */
   processThread(thread, knowledgeBase, doctrineBase = '') {
@@ -56,13 +55,13 @@ class EmailProcessor {
     };
     
     // ═══════════════════════════════════════════════════════════════
-    // LOCK ACQUISITION (prevents race condition between triggers)
+    // ACQUISIZIONE LOCK (previene race condition tra trigger)
     // ═══════════════════════════════════════════════════════════════
     const threadId = thread.getId();
     const lock = LockService.getScriptLock();
     
     try {
-      // Wait up to 30s for lock
+      // Attendi fino a 30s per lock
       if (!lock.tryLock(30000)) {
         console.warn(`⏱️ Could not acquire lock for thread ${threadId}, skipping`);
         result.status = 'skipped';
@@ -70,7 +69,7 @@ class EmailProcessor {
         return result;
       }
       
-      // CRITICAL: Re-check if thread already labeled (another process may have processed it)
+      // CRITICO: Ri-verifica se thread già etichettato (un altro processo potrebbe averlo già elaborato)
       const currentLabels = thread.getLabels().map(l => l.getName());
       if (currentLabels.includes(this.config.labelName)) {
         console.log(`   ⊘ Thread already processed (labeled by another process)`);
@@ -79,12 +78,12 @@ class EmailProcessor {
         return result;
       }
       
-      // Get last UNREAD message in thread (to avoid missing replies when our response is last)
+      // Ottieni ultimo messaggio NON LETTO nel thread (per evitare di saltare risposte quando la nostra è l'ultima)
       const messages = thread.getMessages();
       const unreadMessages = messages.filter(m => m.isUnread());
       const candidate = unreadMessages.length > 0 
-        ? unreadMessages[unreadMessages.length - 1]  // Last unread message
-        : messages[messages.length - 1];              // Fallback to last message
+        ? unreadMessages[unreadMessages.length - 1]  // Ultimo messaggio non letto
+        : messages[messages.length - 1];              // Fallback all'ultimo messaggio
       const messageDetails = this.gmailService.extractMessageDetails(candidate);
       
       console.log(`\n📧 Processing: ${messageDetails.subject.substring(0, 50)}...`);
@@ -265,15 +264,15 @@ ${GLOBAL_CACHE.doctrineBase}
       // ═══════════════════════════════════════════════════════════════
       let conversationHistory = '';
       if (messages.length > 1) {
-        // Exclude the candidate message to avoid duplication in prompt
+        // Escludi il messaggio candidato per evitare duplicazione nel prompt
         const candidateId = candidate.getId();
         const historyMessages = messages.filter(m => m.getId() !== candidateId);
         
         if (historyMessages.length > 0) {
           conversationHistory = this.gmailService.buildConversationHistory(
             historyMessages,
-            10, // Max messages
-            myEmail // Our email for marking our messages
+            10, // Max messaggi
+            myEmail // La nostra email per marcare i nostri messaggi
           );
         }
       }
@@ -384,7 +383,7 @@ const promptOptions = {
       };
 const prompt = this.promptEngine.buildPrompt(promptOptions);
       
-      // Add request type hint
+      // Aggiungi hint tipo richiesta
       const typeHint = this.requestClassifier.getRequestTypeHint(requestType.type);
       const fullPrompt = typeHint + '\n\n' + prompt;
       
@@ -402,7 +401,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         return result;
       }
       
-      // Check for NO_REPLY marker (exact match only to avoid false positives)
+      // Controlla marcatore NO_REPLY (solo corrispondenza esatta per evitare falsi positivi)
       if (response.trim() === 'NO_REPLY') {
         console.log('   ⊘ AI returned NO_REPLY');
         this._markAsProcessed(thread);
@@ -453,7 +452,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         category: classification.category || requestType.type
       });
       
-      // Detect provided topics from response
+      // Rileva topic forniti dalla risposta
       const providedTopics = this._detectProvidedTopics(response);
       if (providedTopics.length > 0) {
         this.memoryService.addProvidedInfoTopics(threadId, providedTopics);
@@ -471,7 +470,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       result.error = error.message;
       return result;
     } finally {
-      // Always release lock
+      // Rilascia sempre il lock
       try {
         lock.releaseLock();
       } catch (e) {
@@ -481,7 +480,6 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
   }
   
   /**
-   * Process all unread emails
    * Processa tutte le email non lette
    */
   processUnreadEmails(knowledgeBase, doctrineBase = '') {
@@ -493,7 +491,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       console.warn('🔴 DRY_RUN MODE ACTIVE - Emails will NOT be sent!');
     }
     
-    // Search for unread threads
+    // Cerca thread non letti
     const threads = GmailApp.search(
       `is:unread -label:${this.config.labelName}`,
       0,
@@ -507,7 +505,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     
     console.log(`📬 Trovate ${threads.length} email da elaborare`);
     
-    // Stats
+    // Statistiche
     const stats = {
       total: 0,
       replied: 0,
@@ -518,7 +516,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       skipped: 0
     };
     
-    // Process each thread
+    // Processa ogni thread
     threads.forEach((thread, index) => {
       console.log(`\n--- Thread ${index + 1}/${threads.length} ---`);
       
@@ -539,7 +537,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       }
     });
     
-    // Print summary
+    // Stampa riepilogo
     console.log('\n' + '='.repeat(70));
     console.log('📊 RIEPILOGO ELABORAZIONE');
     console.log('='.repeat(70));
@@ -556,11 +554,11 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
   }
   
   // ========================================================================
-  // HELPER METHODS
+  // METODI HELPER
   // ========================================================================
   
   _shouldIgnoreEmail(messageDetails) {
-    // Get ignore lists from CONFIG or GLOBAL_CACHE with safe fallbacks
+    // Ottieni liste ignore da CONFIG o GLOBAL_CACHE con fallback sicuri
     let ignoreDomains = [];
     let ignoreKeywords = [];
     
@@ -580,7 +578,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     const subject = messageDetails.subject.toLowerCase();
     const body = messageDetails.body.toLowerCase();
     
-    // Check domains
+    // Controlla domini
     for (const domain of ignoreDomains) {
       if (email.includes(domain.toLowerCase())) {
         console.log(`   Domain ignored: ${domain}`);
@@ -588,7 +586,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       }
     }
     
-    // Check keywords
+    // Controlla parole chiave
     for (const keyword of ignoreKeywords) {
       if (subject.includes(keyword.toLowerCase()) || body.includes(keyword.toLowerCase())) {
         console.log(`   Keyword ignored: ${keyword}`);
@@ -601,7 +599,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
   
   _getCurrentSeason() {
     const month = new Date().getMonth() + 1; // 1-12
-    // Estivo: June-September, otherwise Invernale
+    // Estivo: Giugno-Settembre, altrimenti Invernale
     return (month >= 6 && month <= 9) ? 'estivo' : 'invernale';
   }
   
@@ -618,13 +616,13 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
   }
   
   /**
-   * Detect topics provided in the response (for memory anti-repetition)
+   * Rileva topic forniti nella risposta (per anti-ripetizione memoria)
    */
   _detectProvidedTopics(response) {
     const topics = [];
     const lower = response.toLowerCase();
     
-    // Topic patterns
+    // Pattern topic
     const patterns = {
       'orari_messe': /messe?\b.*\d{1,2}[:.]\d{2}|orari\w*\s+messe/i,
       'contatti': /telefono|email|@|segreteria/i,
@@ -647,18 +645,18 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
 }
 
 // ====================================================================
-// SALUTATION MODE CALCULATOR
-// Determines greeting mode based on conversation state
+// CALCOLATORE MODALITÀ SALUTO
+// Determina la modalità saluto in base allo stato conversazione
 // ====================================================================
 
 /**
- * Compute salutation mode based on structural signals
- * @param {Object} params - Input parameters
- * @param {boolean} params.isReply - Is this a reply?
- * @param {number} params.messageCount - Number of messages in thread
- * @param {boolean} params.memoryExists - Does memory exist for this thread?
- * @param {string|null} params.lastUpdated - ISO timestamp of last memory update
- * @param {Date} params.now - Current date
+ * Calcola modalità saluto basata su segnali strutturali
+ * @param {Object} params - Parametri di input
+ * @param {boolean} params.isReply - È una risposta?
+ * @param {number} params.messageCount - Numero di messaggi nel thread
+ * @param {boolean} params.memoryExists - Esiste memoria per questo thread?
+ * @param {string|null} params.lastUpdated - Timestamp ISO ultimo aggiornamento memoria
+ * @param {Date} params.now - Data corrente
  * @returns {'full'|'soft'|'none_or_continuity'}
  */
 function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdated, now = new Date() }) {
@@ -677,7 +675,7 @@ function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdate
     const parsedLastUpdated = new Date(lastUpdated);
     const hoursSinceLast = (now.getTime() - parsedLastUpdated.getTime()) / (1000 * 60 * 60);
 
-    // FIX Bug 7: If timestamp is invalid (NaN), treat as recent follow-up
+    // FIX Bug 7: Se timestamp invalido (NaN), tratta come follow-up recente
     if (isNaN(hoursSinceLast)) {
       console.warn('⚠️ computeSalutationMode: Invalid lastUpdated timestamp, defaulting to none_or_continuity');
       return 'none_or_continuity';
@@ -701,35 +699,35 @@ function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdate
   return 'full';
 }
 
-// Factory function
+// Funzione factory
 function createEmailProcessor(options) {
   return new EmailProcessor(options);
 }
 
 // ====================================================================
-// MAIN ENTRY POINT - For script trigger
+// ENTRY POINT PRINCIPALE - Per trigger script
 // ====================================================================
 
 function processUnreadEmailsMain() {
   try {
-    // Check suspension time
+    // Controlla orario sospensione
     if (typeof isInSuspensionTime === 'function' && isInSuspensionTime()) {
       console.log('Servizio sospeso per orario di lavoro.');
       return;
     }
     
-    // Load resources
+    // Carica risorse
     if (typeof loadResources === 'function') {
       loadResources();
     }
     
-    // Get knowledge base
+    // Ottieni knowledge base
     const knowledgeBase = typeof GLOBAL_CACHE !== 'undefined' ? 
                           GLOBAL_CACHE.knowledgeBase || '' : '';
     const doctrineBase = typeof GLOBAL_CACHE !== 'undefined' ? 
                          GLOBAL_CACHE.doctrineBase || '' : '';
     
-    // Create processor and run
+    // Crea processore ed esegui
     const processor = new EmailProcessor();
     processor.processUnreadEmails(knowledgeBase, doctrineBase);
     
