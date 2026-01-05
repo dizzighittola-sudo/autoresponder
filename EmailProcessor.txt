@@ -55,7 +55,30 @@ class EmailProcessor {
       error: null
     };
     
+    // ═══════════════════════════════════════════════════════════════
+    // LOCK ACQUISITION (prevents race condition between triggers)
+    // ═══════════════════════════════════════════════════════════════
+    const threadId = thread.getId();
+    const lock = LockService.getScriptLock();
+    
     try {
+      // Wait up to 30s for lock
+      if (!lock.tryLock(30000)) {
+        console.warn(`⏱️ Could not acquire lock for thread ${threadId}, skipping`);
+        result.status = 'skipped';
+        result.reason = 'lock_timeout';
+        return result;
+      }
+      
+      // CRITICAL: Re-check if thread already labeled (another process may have processed it)
+      const currentLabels = thread.getLabels().map(l => l.getName());
+      if (currentLabels.includes(this.config.labelName)) {
+        console.log(`   ⊘ Thread already processed (labeled by another process)`);
+        result.status = 'skipped';
+        result.reason = 'already_labeled_concurrent';
+        return result;
+      }
+      
       // Get last UNREAD message in thread (to avoid missing replies when our response is last)
       const messages = thread.getMessages();
       const unreadMessages = messages.filter(m => m.isUnread());
@@ -447,6 +470,13 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       result.status = 'error';
       result.error = error.message;
       return result;
+    } finally {
+      // Always release lock
+      try {
+        lock.releaseLock();
+      } catch (e) {
+        console.warn('⚠️ Failed to release lock:', e.message);
+      }
     }
   }
   
