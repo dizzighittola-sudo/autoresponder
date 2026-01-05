@@ -28,10 +28,10 @@ class GeminiService {
       throw new Error('GEMINI_API_KEY non configurata correttamente');
     }
     
-    // Configurazione retry
+    // Configurazione retry (ottimizzato BUG 13)
     this.maxRetries = 3;
-    this.retryDelay = 5000; // ms (5 secondi - aumentato per rate limit)
-    this.backoffFactor = 2;
+    this.retryDelay = 2000; // ms (2 secondi - bilanciato per UX e rate limit)
+    this.backoffFactor = 1.5; // crescita graduale: 2s → 3s → 4.5s
     
     console.log(`✓ GeminiService inizializzato con modello: ${this.modelName}`);
   }
@@ -496,17 +496,11 @@ Output JSON atteso:
   "reason": "string"
 }`;
 
-    // ✅ FIX: Use local keyword detection as fallback + Confidence Check
+    // ✅ FIX: Use local keyword detection as fallback for language only
+    // NOTE: High confidence ONLY skips language re-detection, NOT the shouldRespond decision
+    // Gemini must ALWAYS evaluate whether to respond (filters newsletters, thank-you's, etc.)
     const detection = this.detectEmailLanguage(emailContent, emailSubject);
     const fallbackLang = detection.lang;
-    const confidence = detection.confidence;
-    const CONFIDENCE_THRESHOLD = 4; // Soglia per saltare Gemini (es. 4 matches)
-
-    // Se la confidenza è alta, saltiamo Gemini
-    if (confidence >= CONFIDENCE_THRESHOLD) {
-      console.log(`🔎 Confidenza locale alta (${confidence} >= ${CONFIDENCE_THRESHOLD}), skip quick‑check.`);
-      return { shouldRespond: true, language: fallbackLang, reason: 'local_confidence_high' };
-    }
 
     const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
     
