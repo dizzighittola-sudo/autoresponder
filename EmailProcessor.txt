@@ -56,10 +56,13 @@ class EmailProcessor {
     };
     
     try {
-      // Get last message in thread
+      // Get last UNREAD message in thread (to avoid missing replies when our response is last)
       const messages = thread.getMessages();
-      const lastMessage = messages[messages.length - 1];
-      const messageDetails = this.gmailService.extractMessageDetails(lastMessage);
+      const unreadMessages = messages.filter(m => m.isUnread());
+      const candidate = unreadMessages.length > 0 
+        ? unreadMessages[unreadMessages.length - 1]  // Last unread message
+        : messages[messages.length - 1];              // Fallback to last message
+      const messageDetails = this.gmailService.extractMessageDetails(candidate);
       
       console.log(`\n📧 Processing: ${messageDetails.subject.substring(0, 50)}...`);
       console.log(`   From: ${messageDetails.senderEmail}`);
@@ -434,6 +437,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     } catch (error) {
       console.error(`   ❌ Error processing thread: ${error.message}`);
       this._addErrorLabel(thread);
+      this._markAsProcessed(thread); // Prevent infinite reprocessing loop
       result.status = 'error';
       result.error = error.message;
       return result;
