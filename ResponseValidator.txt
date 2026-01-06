@@ -327,9 +327,14 @@ class ResponseValidator {
     const hallucinations = {};
     
     // Helper normalizzazione orari
-    // FIX: Sostituisce i punti solo tra cifre (pattern orari), non negli URL
+    // FIX: Sostituisce solo pattern orari validi (0-23:00-59), evita URL
     const normalizeTime = (t) => {
-      t = t.replace(/(\d{1,2})\.(\d{2})/g, '$1:$2');
+      t = t.replace(/\b(\d{1,2})\.([0-5]\d)\b/g, (match, h, m) => {
+        const hour = parseInt(h, 10);
+        // Solo orari validi (0-23), altrimenti lascia invariato
+        if (hour >= 0 && hour <= 23) return `${h}:${m}`;
+        return match;
+      });
       const parts = t.split(':');
       if (parts.length === 2) {
         try {

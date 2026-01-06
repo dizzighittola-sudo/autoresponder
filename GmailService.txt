@@ -332,18 +332,21 @@ class GmailService {
     finalResponse = this.fixPunctuation(finalResponse, messageDetails.senderName);
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
-    // 2. Converti in HTML
-    const htmlBody = markdownToHtml(finalResponse);
-
+    // 2. Converti in HTML e invia
     const gmailThread = typeof thread === 'string'
       ? GmailApp.getThreadById(thread)
       : thread;
 
-    gmailThread.reply('', {
-      htmlBody: htmlBody
-    });
-
-    console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
+    try {
+      const htmlBody = markdownToHtml(finalResponse);
+      gmailThread.reply('', { htmlBody: htmlBody });
+      console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
+    } catch (error) {
+      console.error(`❌ Markdown conversion failed: ${error.message}`);
+      // Fallback: invia come testo plain
+      gmailThread.reply(finalResponse);
+      console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
+    }
   }
 
   // ========================================================================

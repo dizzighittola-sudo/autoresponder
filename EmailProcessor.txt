@@ -448,16 +448,14 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       // ═══════════════════════════════════════════════════════════════
       // STEP 11: UPDATE MEMORY (for next interaction)
       // ═══════════════════════════════════════════════════════════════
-      this.memoryService.updateMemory(threadId, {
-        language: detectedLanguage,
-        category: classification.category || requestType.type
-      });
-      
       // Rileva topic forniti dalla risposta
       const providedTopics = this._detectProvidedTopics(response);
-      if (providedTopics.length > 0) {
-        this.memoryService.addProvidedInfoTopics(threadId, providedTopics);
-      }
+      
+      // ✅ Operazione atomica: aggiorna memoria e topic in un singolo lock
+      this.memoryService.updateMemoryAtomic(threadId, {
+        language: detectedLanguage,
+        category: classification.category || requestType.type
+      }, providedTopics.length > 0 ? providedTopics : null);
       
       this._markAsProcessed(thread);
       result.status = 'replied';
