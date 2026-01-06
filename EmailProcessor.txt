@@ -280,7 +280,7 @@ ${GLOBAL_CACHE.doctrineBase}
       // ═══════════════════════════════════════════════════════════════
       // STEP 6.5: GET MEMORY CONTEXT (avoid repetition)
       // ═══════════════════════════════════════════════════════════════
-      const threadId = thread.getId();
+      // threadId già dichiarato alla linea 60
       const memoryContext = this.memoryService.getMemory(threadId);
       
       if (Object.keys(memoryContext).length > 0) {
