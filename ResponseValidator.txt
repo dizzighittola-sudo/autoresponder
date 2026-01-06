@@ -73,8 +73,9 @@ class ResponseValidator {
   /**
    * Valida risposta in modo completo
    * ✅ 7 controlli di sicurezza
+   * @param {string} salutationMode - 'full'|'soft'|'none_or_continuity' per controlli contestuali
    */
-  validateResponse(response, detectedLanguage, knowledgeBase, emailContent, emailSubject) {
+  validateResponse(response, detectedLanguage, knowledgeBase, emailContent, emailSubject, salutationMode = 'full') {
     const errors = [];
     const warnings = [];
     const details = {};
@@ -96,8 +97,8 @@ class ResponseValidator {
     details.language = langResult;
     score *= langResult.score;
     
-    // === CHECK 3: Signature (CRITICAL for brand identity) ===
-    const sigResult = this._checkSignature(response);
+    // === CHECK 3: Signature (CRITICAL for brand identity, optional in follow-ups) ===
+    const sigResult = this._checkSignature(response, salutationMode);
     errors.push(...sigResult.errors);
     warnings.push(...sigResult.warnings);
     details.signature = sigResult;
@@ -244,13 +245,21 @@ class ResponseValidator {
   }
   
   /**
-   * Check 3: Firma obbligatoria (warning non bloccante)
+   * Check 3: Firma (obbligatoria su primo contatto, opzionale su follow-up)
+   * @param {string} salutationMode - 'full'|'soft'|'none_or_continuity'
    */
-  _checkSignature(response) {
+  _checkSignature(response, salutationMode = 'full') {
     const errors = [];
     const warnings = [];
     let score = 1.0;
     
+    // NEI FOLLOW-UP RAVVICINATI LA FIRMA È OPZIONALE (non vietata, ma non richiesta)
+    if (salutationMode === 'none_or_continuity') {
+      // Skip check: Gemini può includerla o meno, entrambi sono validi
+      return { score, errors, warnings };
+    }
+    
+    // Per primo contatto ('full') e riprese dopo pausa ('soft'): firma attesa
     if (!this.signaturePattern.test(response)) {
       warnings.push("Missing signature 'Segreteria Parrocchia Sant'Eugenio'");
       score = 0.95;

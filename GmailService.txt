@@ -130,17 +130,39 @@ class GmailService {
    */
   _extractSenderName(fromField) {
     const match = fromField.match(/^"?(.+?)"?\s*</);
+    let name = null;
+    
     if (match) {
-      return match[1].trim();
+      name = match[1].trim();
+    } else {
+      // Usa prefisso email come fallback
+      const email = this._extractEmailAddress(fromField);
+      if (email) {
+        name = email.split('@')[0];
+      }
     }
     
-    // Usa prefisso email come fallback
-    const email = this._extractEmailAddress(fromField);
-    if (email) {
-      return email.split('@')[0];
+    // Capitalizza il nome (prima lettera maiuscola per ogni parola)
+    if (name) {
+      return this._capitalizeName(name);
     }
     
     return 'Utente';
+  }
+  
+  /**
+   * Capitalizza un nome proprio (prima lettera maiuscola per ogni parola)
+   */
+  _capitalizeName(name) {
+    if (!name) return name;
+    
+    return name
+      .split(/[\s-]+/)
+      .map(word => {
+        if (word.length === 0) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
   }
   
   /**
@@ -306,8 +328,8 @@ class GmailService {
       }
     }
     
-    // 1. Applica Safeguard di Formattazione (Ripristino legacy)
-    finalResponse = this.fixPunctuation(finalResponse);
+    // 1. Applica Safeguard di Formattazione
+    finalResponse = this.fixPunctuation(finalResponse, messageDetails.senderName);
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
     // 2. Converti in HTML
@@ -332,25 +354,44 @@ class GmailService {
    * Corregge errori comuni di punteggiatura
    * Es. "Buongiorno, Siamo" -> "Buongiorno, siamo"
    * 
-   * COMPORTAMENTO INTENZIONALE:
-   * - Corregge SOLO parole con prima lettera maiuscola + resto minuscolo (es. "Siamo")
-   * - NON modifica acronimi/sigle tutto maiuscolo (es. "DON", "SPQR", "CEI")
-   *   perché la regex cattura solo [A-Z][a-z]*, non [A-Z]+
-   * - Eccezioni esplicite per titoli: Don, Padre, Suor, Monsignor, Papa, Signore, Signora
+   * COMPORTAMENTO:
+   * - Corregge maiuscole dopo virgola (es. "Siamo" -> "siamo")
+   * - Eccezioni: titoli (Don, Padre, ecc.) e nome mittente
+   * - ✅ NON tocca parole tra due virgole (vocativo: ", Federica,")
    */
-  fixPunctuation(text) {
+  fixPunctuation(text, senderName = '') {
     if (!text) return text;
     
-    // Parole che DEVONO rimanere maiuscole dopo virgola (titoli, nomi propri)
+    // Parole che DEVONO rimanere maiuscole dopo virgola
     const exceptions = ['Don', 'Padre', 'Suor', 'Monsignor', 'Papa', 'Signore', 'Signora'];
     
-    // Fix generico: minuscola dopo virgola (escluse eccezioni e acronimi tutto-maiuscolo)
-    return text.replace(/,\s+([A-ZÀÈÉÌÒÙ])([a-zàèéìòù]*)/g, (match, firstLetter, rest) => {
+    // Aggiungi nome mittente alle eccezioni
+    if (senderName) {
+      const nameParts = senderName.split(/\s+/);
+      for (const part of nameParts) {
+        if (part && !exceptions.includes(part)) {
+          exceptions.push(part);
+        }
+      }
+    }
+    
+    // Fix: minuscola dopo virgola (escluse eccezioni e vocativi tra virgole)
+    return text.replace(/,\s+([A-ZÀÈÉÌÒÙ])([a-zàèéìòù]*)/g, (match, firstLetter, rest, offset) => {
       const word = firstLetter + rest;
-      // Mantieni se è un'eccezione
+      
+      // Eccezione 1: titoli e nome mittente
       if (exceptions.includes(word)) {
         return match;
       }
+      
+      // Eccezione 2: vocativo tra virgole (es. ", Federica,")
+      // Controlla se dopo la parola c'è una virgola
+      const afterMatch = text.substring(offset + match.length);
+      if (afterMatch.match(/^\s*,/)) {
+        // È un vocativo, non minuscolizzare
+        return match;
+      }
+      
       return `, ${firstLetter.toLowerCase()}${rest}`;
     });
   }

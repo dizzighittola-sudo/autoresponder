@@ -266,6 +266,28 @@ Linee guida per la risposta:
 - Non scivolare nel permissivismo
 - Bilancia informazione e accoglienza
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    } else if (requestType === 'doctrinal') {
+      return `
+🎯 TIPO RICHIESTA RILEVATO: DOTTRINALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Linee guida per la risposta:
+- RISPONDI DIRETTAMENTE alle domande di fede
+- Spiega la dottrina in modo chiaro e accessibile
+- Usa fonti: Catechismo, Magistero, Scrittura
+- NON rimandare al sacerdote per domande informative
+
+📖 REGOLA DOTTRINALE (GAS-02):
+Questa è una richiesta di SPIEGAZIONE dottrinale generale.
+✅ DEVI: Spiegare l'insegnamento della Chiesa
+✅ DEVI: Essere chiaro, fedele, informativo
+❌ NON: Rimandare al sacerdote per domande teoriche
+❌ NON: Evitare di rispondere per "prudenza"
+
+Il rinvio al sacerdote è riservato SOLO a:
+- Situazioni personali concrete
+- Discernimento su stati di vita
+- Accompagnamento spirituale individuale
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }
     
     // Fallback predefinito

@@ -418,7 +418,8 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
           detectedLanguage,
           enrichedKnowledgeBase,
           messageDetails.body,
-          messageDetails.subject
+          messageDetails.subject,
+          salutationMode  // Per controllo firma contestuale (opzionale in follow-up)
         );
         
         if (!validation.isValid) {

@@ -52,6 +52,12 @@ class EmailClassifier {
       'complaint': [
         'lamentela', 'problema', 'disservizio', 'insoddisfatto',
         'reclamo', 'complaint', 'problem', 'issue', 'dissatisfied'
+      ],
+      'quotation': [
+        'preventivo', 'offerta', 'quotazione', 'proposta commerciale',
+        'prezzo', 'tariffa', 'costo', 'listino', 'budget',
+        'orçamento', 'cotação', 'proposta', 'preço',
+        'quote', 'quotation', 'pricing', 'offer', 'estimate', 'price list'
       ]
     };
     
