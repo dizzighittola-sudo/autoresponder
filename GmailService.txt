@@ -387,11 +387,11 @@ class GmailService {
         return match;
       }
       
-      // Eccezione 2: vocativo tra virgole (es. ", Federica,")
-      // Controlla se dopo la parola c'è una virgola
+      // Eccezione 2: vocativo seguito da virgola o punto (es. ", Federica," o ", Marco.")
+      // Controlla se dopo la parola c'è una virgola o un punto (indica nome proprio)
       const afterMatch = text.substring(offset + match.length);
-      if (afterMatch.match(/^\s*,/)) {
-        // È un vocativo, non minuscolizzare
+      if (afterMatch.match(/^\s*[,.]/)) {
+        // È un nome proprio (vocativo o conclusione frase), non minuscolizzare
         return match;
       }
       
