@@ -3,6 +3,7 @@
 // ✅ RETRY con exponential backoff
 // ✅ Language detection centralizzata
 // ✅ Quick check per decidere se rispondere
+// ✅ RATE LIMITER integrato (v2.0)
 // ====================================================================
 
 /**
@@ -13,6 +14,7 @@
  * ✅ Rilevamento lingua centralizzato
  * ✅ Quick check per should_respond + lingua
  * ✅ Saluto adattivo per ora e lingua
+ * ✅ Rate Limiter intelligente con quota tracking
  */
 class GeminiService {
   constructor() {
@@ -33,8 +35,174 @@ class GeminiService {
     this.retryDelay = 2000; // ms (2 secondi - bilanciato per UX e rate limit)
     this.backoffFactor = 1.5; // crescita graduale: 2s → 3s → 4.5s
     
+    // ✅ Rate Limiter (abilitato da CONFIG.USE_RATE_LIMITER)
+    this.useRateLimiter = typeof CONFIG !== 'undefined' && CONFIG.USE_RATE_LIMITER === true;
+    if (this.useRateLimiter) {
+      try {
+        this.rateLimiter = new GeminiRateLimiter();
+        console.log('✓ Rate Limiter ENABLED');
+      } catch (e) {
+        console.warn(`⚠️ Rate Limiter init failed: ${e.message}`);
+        this.useRateLimiter = false;
+      }
+    } else {
+      console.log('   Rate Limiter: DISABLED (set CONFIG.USE_RATE_LIMITER = true to enable)');
+    }
+    
     console.log(`✓ GeminiService inizializzato con modello: ${this.modelName}`);
   }
+  
+  // ========================================================================
+  // RATE LIMITER HELPERS
+  // ========================================================================
+  
+  /**
+   * Stima token da testo (approssimazione: 1 token ≈ 4 caratteri)
+   */
+  _estimateTokens(text) {
+    return Math.ceil((text || '').length / 4);
+  }
+  
+  /**
+   * Genera risposta con modello specifico (per Rate Limiter)
+   * @param {string} prompt - Prompt completo
+   * @param {string} modelName - Nome modello API (es. 'gemini-2.5-flash')
+   * @returns {string|null} Testo generato
+   */
+  _generateWithModel(prompt, modelName) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    const temperature = typeof CONFIG !== 'undefined' ? CONFIG.TEMPERATURE : 0.5;
+    const maxTokens = typeof CONFIG !== 'undefined' ? CONFIG.MAX_OUTPUT_TOKENS : 4000;
+    
+    console.log(`🤖 Calling ${modelName} (prompt: ${prompt.length} chars)...`);
+    
+    const response = UrlFetchApp.fetch(`${url}?key=${this.apiKey}`, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: temperature,
+          maxOutputTokens: maxTokens
+        }
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const responseCode = response.getResponseCode();
+    
+    if (responseCode === 429 || responseCode === 503) {
+      throw new Error(`rate limit or service unavailable: ${responseCode}`);
+    }
+    
+    if (responseCode !== 200) {
+      throw new Error(`API error: ${responseCode} - ${response.getContentText().substring(0, 200)}`);
+    }
+    
+    const result = JSON.parse(response.getContentText());
+    
+    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+      throw new Error('Invalid Gemini response: no candidates');
+    }
+    
+    const generatedText = result.candidates[0].content.parts[0].text;
+    
+    if (!generatedText || generatedText.trim().length === 0) {
+      throw new Error('Gemini returned empty response');
+    }
+    
+    console.log(`✓ Generated ${generatedText.length} chars`);
+    return generatedText;
+  }
+  
+  /**
+   * Quick check con modello specifico (per Rate Limiter)
+   * @param {string} emailContent - Contenuto email
+   * @param {string} emailSubject - Oggetto email
+   * @param {string} modelName - Nome modello API
+   * @returns {Object} Risultato quick check
+   */
+  _quickCheckWithModel(emailContent, emailSubject, modelName) {
+    const prompt = `Analizza questa email.
+Rispondi ESCLUSIVAMENTE con un oggetto JSON.
+
+Email:
+Oggetto: ${emailSubject}
+Testo: ${emailContent.substring(0, 800)}
+
+Compiti:
+1. Decidi se richiede risposta (reply_needed).
+2. Rileva la lingua dell'email (language) - usa codice ISO 639-1.
+3. Classifica la richiesta (category): "TECHNICAL", "PASTORAL", "DOCTRINAL", "MIXED".
+4. Estrai l'argomento principale (topic).
+5. Fornisci un breve ragionamento (reason).
+
+Output JSON atteso:
+{
+  "reply_needed": boolean,
+  "language": "string",
+  "category": "TECHNICAL" | "PASTORAL" | "DOCTRINAL" | "MIXED",
+  "topic": "string",
+  "confidence": number (0.0-1.0),
+  "reason": "string"
+}`;
+    
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    
+    console.log(`🔍 Quick check via ${modelName}...`);
+    
+    const response = UrlFetchApp.fetch(`${url}?key=${this.apiKey}`, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 1024
+        }
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const responseCode = response.getResponseCode();
+    
+    if (responseCode === 429 || responseCode === 503) {
+      throw new Error(`rate limit or service unavailable: ${responseCode}`);
+    }
+    
+    if (responseCode !== 200) {
+      throw new Error(`API error: ${responseCode}`);
+    }
+    
+    const result = JSON.parse(response.getContentText());
+    
+    if (!result.candidates || !result.candidates[0]) {
+      throw new Error('No candidates in response');
+    }
+    
+    const candidate = result.candidates[0];
+    if (candidate.finishReason && ['SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST'].includes(candidate.finishReason)) {
+      throw new Error(`Response blocked: ${candidate.finishReason}`);
+    }
+    
+    const textResponse = candidate.content.parts[0].text;
+    const data = parseGeminiJsonLenient(textResponse);
+    
+    // Detection locale per fallback lingua
+    const detection = this.detectEmailLanguage(emailContent, emailSubject);
+    
+    return {
+      shouldRespond: data.reply_needed === true,
+      language: this._resolveLanguage(data.language, detection.lang, detection.safetyGrade),
+      reason: data.reason || 'quick_check',
+      classification: {
+        category: data.category || 'TECHNICAL',
+        topic: data.topic || '',
+        confidence: data.confidence || 0.8
+      }
+    };
+  }
+
   
   // ========================================================================
   // WRAPPER RETRY
@@ -526,9 +694,41 @@ class GeminiService {
   
   /**
    * Chiamata rapida Gemini per decidere se email richiede risposta E rilevare lingua
-   * ✅ AGGIORNATO: Migliorata gestione errori e fallback
+   * ✅ AGGIORNATO: Supporto Rate Limiter + fallback originale
    */
   shouldRespondToEmail(emailContent, emailSubject) {
+    // Detection locale per fallback lingua
+    const detection = this.detectEmailLanguage(emailContent, emailSubject);
+    const fallbackLang = detection.lang;
+    const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
+    
+    // ✅ RATE LIMITER PATH
+    if (this.useRateLimiter) {
+      try {
+        const result = this.rateLimiter.executeRequest(
+          'quick_check',
+          (modelName) => this._quickCheckWithModel(emailContent, emailSubject, modelName),
+          {
+            estimatedTokens: 500,
+            preferQuality: false  // Economia > qualità per quick check
+          }
+        );
+        
+        if (result.success) {
+          console.log(`✓ Quick check via Rate Limiter (model: ${result.modelKey})`);
+          return result.result;
+        }
+      } catch (error) {
+        if (error.message && error.message.includes('QUOTA_EXHAUSTED')) {
+          console.error('❌ Quota exhausted, using local detection only');
+          return defaultResult;
+        }
+        console.warn(`⚠️ Rate Limiter quick check failed: ${error.message}`);
+        // Fall through to original implementation
+      }
+    }
+    
+    // ✅ ORIGINAL IMPLEMENTATION (fallback o quando Rate Limiter disabilitato)
     const prompt = `Analizza questa email.
 Rispondi ESCLUSIVAMENTE con un oggetto JSON.
 
@@ -557,13 +757,7 @@ Output JSON atteso:
   "reason": "string"
 }`;
 
-    // ✅ FIX: Usa rilevamento locale keyword come fallback solo per la lingua
-    // NOTA: Alta confidenza salta SOLO ri-rilevamento lingua, NON la decisione shouldRespond
-    // Gemini deve SEMPRE valutare se rispondere (filtra newsletter, ringraziamenti, ecc.)
-    const detection = this.detectEmailLanguage(emailContent, emailSubject);
-    const fallbackLang = detection.lang;
-
-    const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
+    // NOTA: detection, fallbackLang, defaultResult già dichiarati all'inizio della funzione
     
     try {
       console.log(`🔍 Gemini quick check for: ${emailSubject.substring(0, 40)}...`);
@@ -672,8 +866,38 @@ Output JSON atteso:
   
   /**
    * Genera risposta AI con retry
+   * ✅ AGGIORNATO: Supporto Rate Limiter + fallback originale
    */
   generateResponse(prompt) {
+    // ✅ RATE LIMITER PATH
+    if (this.useRateLimiter) {
+      try {
+        const estimatedTokens = this._estimateTokens(prompt);
+        
+        const result = this.rateLimiter.executeRequest(
+          'generation',
+          (modelName) => this._generateWithModel(prompt, modelName),
+          {
+            estimatedTokens: estimatedTokens,
+            preferQuality: true  // Qualità > economia per generation
+          }
+        );
+        
+        if (result.success) {
+          console.log(`✓ Generated via Rate Limiter (model: ${result.modelKey}, tokens: ~${estimatedTokens})`);
+          return result.result;
+        }
+      } catch (error) {
+        if (error.message && error.message.includes('QUOTA_EXHAUSTED')) {
+          console.error('❌ Quota exhausted for generation');
+          return null;
+        }
+        console.warn(`⚠️ Rate Limiter generation failed: ${error.message}`);
+        // Fall through to original implementation
+      }
+    }
+    
+    // ✅ ORIGINAL IMPLEMENTATION (fallback o quando Rate Limiter disabilitato)
     return this._withRetry(() => {
       console.log(`🤖 Calling Gemini API (prompt size: ${prompt.length} chars)...`);
       

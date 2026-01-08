@@ -39,6 +39,36 @@ const CONFIG = {
   
   // === Modalità ===
   DRY_RUN: false,  // Cambia a true per test senza invio email
+  USE_RATE_LIMITER: true,  // ✅ Rate Limiter intelligente ABILITATO
+  
+  // === Modelli Gemini (CENTRALIZZATO - Modifica qui quando cambiano) ===
+  // 📌 AGGIORNA QUESTI VALORI se Google modifica le quote gratuite!
+  // 🔗 Verifica limiti quota: https://ai.google.dev/gemini-api/docs/rate-limits
+  GEMINI_MODELS: {
+    'flash-2.5': {
+      name: 'gemini-2.5-flash',       // Modello principale
+      rpm: 5,                          // Richieste Per Minuto (verificato Gen 2026)
+      tpm: 250000,                    // Token Per Minuto
+      rpd: 20,                        // Richieste Per Giorno ⚠️
+      useCases: ['generation', 'all']
+    },
+    'flash-lite': {
+      name: 'gemini-2.5-flash-lite',  // Più economico, ideale per quick check
+      rpm: 10,                         // RPM più alto!
+      tpm: 250000,
+      rpd: 20,
+      useCases: ['quick_check', 'classification']
+    }
+    // NOTA: gemini-1.5-flash non più disponibile nel tier gratuito
+  },
+  
+  // Strategia selezione modelli per task (ordine = priorità)
+  // ⚠️ Con solo 20 RPD per modello, usiamo flash-lite per quick check
+  MODEL_STRATEGY: {
+    'quick_check': ['flash-lite', 'flash-2.5'],   // Quick check usa flash-lite
+    'generation': ['flash-2.5', 'flash-lite'],    // Generation usa flash-2.5
+    'fallback': ['flash-lite', 'flash-2.5']
+  },
   
   // === Ignore Lists ===
   IGNORE_DOMAINS: [
