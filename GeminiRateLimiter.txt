@@ -119,14 +119,17 @@ class GeminiRateLimiter {
   // ================================================================
   
   _initializeCounters() {
-    const today = this._getItalianDate();
-    const currentDate = this.props.getProperty('rate_limit_date');
+    // ✅ FIX: Usa data Pacific per allinearsi al reset reale delle quote Google
+    // Il reset Google avviene a mezzanotte Pacific = 9:00 AM italiana
+    const pacificDate = this._getPacificDate();
+    const storedDate = this.props.getProperty('rate_limit_date');
     
-    // Reset giornaliero (9:00 AM italiana = midnight Pacific)
-    if (currentDate !== today) {
-      console.log(`📅 New day (${today}), resetting daily counters`);
+    // Reset quando cambia la data Pacific (non italiana!)
+    if (storedDate !== pacificDate) {
+      console.log(`📅 Pacific day changed (${pacificDate}), resetting daily counters`);
+      console.log(`   (Italian time: ${Utilities.formatDate(new Date(), 'Europe/Rome', 'HH:mm')})`);
       this._resetDailyCounters();
-      this.props.setProperty('rate_limit_date', today);
+      this.props.setProperty('rate_limit_date', pacificDate);
     }
   }
   
@@ -143,13 +146,23 @@ class GeminiRateLimiter {
   
   /**
    * Get data in formato italiano (per logging user-friendly)
-   * NOTA: Reset quota avviene a mezzanotte Pacific = 9:00 AM italiana
    */
   _getItalianDate() {
     const now = new Date();
-    // Ottieni data italiana corrente
     const italianDate = Utilities.formatDate(now, 'Europe/Rome', 'yyyy-MM-dd');
     return italianDate;
+  }
+  
+  /**
+   * ✅ Get data Pacific (per reset quote Google)
+   * Il reset delle quote Google avviene a mezzanotte Pacific Time.
+   * Mezzanotte Pacific = 9:00 AM italiana (in inverno, 8:00 in estate con DST)
+   */
+  _getPacificDate() {
+    const now = new Date();
+    // America/Los_Angeles gestisce automaticamente DST (PST/PDT)
+    const pacificDate = Utilities.formatDate(now, 'America/Los_Angeles', 'yyyy-MM-dd');
+    return pacificDate;
   }
   
   /**
@@ -615,6 +628,6 @@ function showQuotaDashboard() {
 function resetQuotaCounters() {
   const limiter = new GeminiRateLimiter();
   limiter._resetDailyCounters();
-  limiter.props.setProperty('rate_limit_date', limiter._getItalianDate());
-  console.log('✓ Contatori quota resettati manualmente');
+  limiter.props.setProperty('rate_limit_date', limiter._getPacificDate());
+  console.log('✓ Contatori quota resettati manualmente (usando data Pacific)');
 }

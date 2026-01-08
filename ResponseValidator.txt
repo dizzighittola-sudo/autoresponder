@@ -63,8 +63,9 @@ class ResponseValidator {
     // Placeholder
     this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
     
-    // Pattern firma (case-insensitive) - include tutte le varianti di apostrofo: ' ' ' '
-    this.signaturePattern = /segreteria\s+parrocchia\s+sant[''''']?eugenio/i;
+    // Pattern firma (case-insensitive) - include varianti di apostrofo:
+    // ' (U+0027 ASCII), ' (U+2018 left single quote), ' (U+2019 right single quote)
+    this.signaturePattern = /segreteria\s+parrocchia\s+sant['\u2018\u2019]?eugenio/i;
     
     console.log('✓ ResponseValidator inizializzato');
     console.log(`   Soglia minima validità: ${this.MIN_VALID_SCORE}`);
