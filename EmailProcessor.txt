@@ -60,6 +60,7 @@ class EmailProcessor {
     const threadId = thread.getId();
     const lock = LockService.getScriptLock();
     
+    let candidate = null;
     try {
       // Attendi fino a 30s per lock
       if (!lock.tryLock(30000)) {
@@ -69,21 +70,48 @@ class EmailProcessor {
         return result;
       }
       
-      // CRITICO: Ri-verifica se thread già etichettato (un altro processo potrebbe averlo già elaborato)
+      // Raccogli informazioni su thread e messaggi
       const currentLabels = thread.getLabels().map(l => l.getName());
-      if (currentLabels.includes(this.config.labelName)) {
-        console.log(`   ⊘ Thread already processed (labeled by another process)`);
+      const hasProcessedLabel = currentLabels.includes(this.config.labelName);
+      
+      // Ottieni ultimo messaggio NON LETTO nel thread
+      const messages = thread.getMessages();
+      const unreadMessages = messages.filter(m => m.isUnread());
+      
+      const myEmail = Session.getActiveUser().getEmail();
+      
+      // ═══════════════════════════════════════════════════════════════
+      // FILTRO A LIVELLO MESSAGGIO: seleziona messaggi non ancora etichettati
+      // ═══════════════════════════════════════════════════════════════
+      const unlabeledUnread = unreadMessages.filter(message => {
+        const labelNames = message.getLabels().map(label => label.getName());
+        return !labelNames.includes(this.config.labelName);
+      });
+
+      // Considera solo messaggi non letti da mittenti esterni
+      const externalUnread = unlabeledUnread.filter(message => {
+        const senderEmail = this.gmailService.extractMessageDetails(message).senderEmail;
+        return senderEmail && senderEmail.toLowerCase() !== myEmail.toLowerCase();
+      });
+      
+      // Se non ci sono messaggi non letti non ancora etichettati → skip
+      if (unlabeledUnread.length === 0) {
+        console.log('   ⊘ Thread already processed (no new unread message)');
         result.status = 'skipped';
-        result.reason = 'already_labeled_concurrent';
+        result.reason = 'already_labeled_no_new_unread';
         return result;
       }
       
-      // Ottieni ultimo messaggio NON LETTO nel thread (per evitare di saltare risposte quando la nostra è l'ultima)
-      const messages = thread.getMessages();
-      const unreadMessages = messages.filter(m => m.isUnread());
-      const candidate = unreadMessages.length > 0 
-        ? unreadMessages[unreadMessages.length - 1]  // Ultimo messaggio non letto
-        : messages[messages.length - 1];              // Fallback all'ultimo messaggio
+      // Se non ci sono messaggi da esterni → skip
+      if (externalUnread.length === 0) {
+        console.log('   ⊘ Skipped: no new external unread message');
+        result.status = 'skipped';
+        result.reason = 'no_external_unread';
+        return result;
+      }
+      
+      // Seleziona ultimo messaggio non letto non etichettato da esterni
+      candidate = externalUnread[externalUnread.length - 1];
       const messageDetails = this.gmailService.extractMessageDetails(candidate);
       
       console.log(`\n📧 Processing: ${messageDetails.subject.substring(0, 50)}...`);
@@ -92,10 +120,9 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       // STEP 0: ANTI-SELF-REPLY (mandatory first check)
       // ═══════════════════════════════════════════════════════════════
-      const myEmail = Session.getActiveUser().getEmail();
       if (messageDetails.senderEmail.toLowerCase() === myEmail.toLowerCase()) {
         console.log('   ⊘ Skipped: self-sent message');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'skipped';
         result.reason = 'self_sent';
         return result;
@@ -107,7 +134,7 @@ class EmailProcessor {
       const MAX_THREAD_LENGTH = 10;
       if (messages.length > MAX_THREAD_LENGTH) {
         console.log(`   ⊘ Skipped: thread too long (${messages.length} > ${MAX_THREAD_LENGTH})`);
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'skipped';
         result.reason = 'thread_too_long';
         return result;
@@ -118,7 +145,7 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       if (/no-reply|do-not-reply|noreply/i.test(messageDetails.senderEmail)) {
         console.log('   ⊘ Skipped: no-reply sender');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         result.reason = 'no_reply_sender';
         return result;
@@ -129,7 +156,7 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       if (this._shouldIgnoreEmail(messageDetails)) {
         console.log('   ⊘ Filtered: domain/keyword ignore');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -145,7 +172,7 @@ class EmailProcessor {
       
       if (!classification.shouldReply) {
         console.log(`   ⊘ Filtered by classifier: ${classification.reason}`);
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -160,7 +187,7 @@ class EmailProcessor {
       
       if (!quickCheck.shouldRespond) {
         console.log(`   ⊘ Gemini quick check: no response needed (${quickCheck.reason})`);
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -395,7 +422,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       if (!response) {
         console.error('   ❌ Failed to generate response');
         this._addErrorLabel(thread);
-        this._markAsProcessed(thread); // Prevent infinite reprocessing
+        this._markMessageAsProcessed(candidate); // Prevent infinite reprocessing
         result.status = 'error';
         result.error = 'Generation failed';
         return result;
@@ -404,7 +431,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       // Controlla marcatore NO_REPLY (solo corrispondenza esatta per evitare falsi positivi)
       if (response.trim() === 'NO_REPLY') {
         console.log('   ⊘ AI returned NO_REPLY');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -425,7 +452,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         if (!validation.isValid) {
           console.warn(`   ❌ Validation FAILED (score: ${validation.score.toFixed(2)})`);
           this._addValidationErrorLabel(thread);
-          this._markAsProcessed(thread); // Prevent infinite reprocessing
+          this._markMessageAsProcessed(candidate); // Prevent infinite reprocessing
           result.status = 'validation_failed';
           result.validationFailed = true;
           return result;
@@ -457,14 +484,18 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         category: classification.category || requestType.type
       }, providedTopics.length > 0 ? providedTopics : null);
       
-      this._markAsProcessed(thread);
+      if (candidate) {
+        this._markMessageAsProcessed(candidate);
+      }
       result.status = 'replied';
       return result;
       
     } catch (error) {
       console.error(`   ❌ Error processing thread: ${error.message}`);
       this._addErrorLabel(thread);
-      this._markAsProcessed(thread); // Prevent infinite reprocessing loop
+      if (candidate) {
+        this._markMessageAsProcessed(candidate); // Prevent infinite reprocessing loop
+      }
       result.status = 'error';
       result.error = error.message;
       return result;
@@ -491,8 +522,9 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     }
     
     // Cerca thread non letti
+    // ✅ FIX: Non escludiamo più per etichetta thread - filtriamo a livello messaggio
     const threads = GmailApp.search(
-      `is:unread -label:${this.config.labelName}`,
+      'is:unread',
       0,
       this.config.maxEmailsPerRun
     );
@@ -602,8 +634,13 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     return (month >= 6 && month <= 9) ? 'estivo' : 'invernale';
   }
   
-  _markAsProcessed(thread) {
-    this.gmailService.addLabelToThread(thread, this.config.labelName);
+  /**
+   * Marca un messaggio specifico come processato
+   * ✅ Usa etichettatura a livello messaggio per permettere follow-up
+   */
+  _markMessageAsProcessed(message) {
+    // NON segnare come letto - la segreteria vuole vederle!
+    this.gmailService.addLabelToMessage(message.getId(), this.config.labelName);
   }
   
   _addErrorLabel(thread) {

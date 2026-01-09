@@ -78,6 +78,21 @@ class GmailService {
     thread.addLabel(label);
     console.log(`✓ Added label '${labelName}' to thread`);
   }
+
+  /**
+   * Aggiunge etichetta a un messaggio specifico (Gmail API avanzata)
+   * ✅ Permette di etichettare SOLO il messaggio, non l'intero thread
+   * ✅ Richiede "Gmail API" abilitata nei Servizi Avanzati
+   */
+  addLabelToMessage(messageId, labelName) {
+    const label = this.getOrCreateLabel(labelName);
+    const labelId = label.getId();
+    Gmail.Users.Messages.modify({
+      addLabelIds: [labelId],
+      removeLabelIds: []
+    }, 'me', messageId);
+    console.log(`✓ Added label '${labelName}' to message ${messageId}`);
+  }
   
   // ========================================================================
   // ESTRAZIONE MESSAGGI (con supporto Reply-To)

@@ -132,15 +132,19 @@ Testo: ${emailContent.substring(0, 800)}
 
 Compiti:
 1. Decidi se richiede risposta (reply_needed).
-2. Rileva la lingua dell'email (language) - usa codice ISO 639-1.
-3. Classifica la richiesta (category): "TECHNICAL", "PASTORAL", "DOCTRINAL", "MIXED".
-4. Estrai l'argomento principale (topic).
+2. Rileva la lingua dell'email (language) - usa codice ISO 639-1 (es: "it", "en", "es", "fr", "de", "pl", "tr", "pt", etc.).
+3. Classifica la richiesta (category) in una di queste:
+   - "TECHNICAL": orari, documenti, procedure, info pratiche, iscrizioni, prenotazioni, cambi camera, pagamenti, aspetti organizzativi
+   - "PASTORAL": richieste di aiuto, sfogo, situazioni personali, lutto, richiesta colloqui personali
+   - "DOCTRINAL": dubbi di fede, domande teologiche, "perché la chiesa..."
+   - "MIXED": mix di tecnica e pastorale (es. cerco info ma sono arrabbiato/triste)
+4. Estrai l'argomento principale (topic) es. "Battesimo", "Messa", "Orari", "Lutto", "Iscrizioni".
 5. Fornisci un breve ragionamento (reason).
 
 Output JSON atteso:
 {
   "reply_needed": boolean,
-  "language": "string",
+  "language": "string (codice ISO 639-1, es: it, en, es, fr, de, pl, tr...)",
   "category": "TECHNICAL" | "PASTORAL" | "DOCTRINAL" | "MIXED",
   "topic": "string",
   "confidence": number (0.0-1.0),
@@ -465,36 +469,53 @@ Output JSON atteso:
       greeting = specialGreeting;
     } else {
       // Fallback a saluto standard basato sull'ora
+      // Verifica anche i minuti per la fascia notturna 23:30-5:00
+      const minutes = now.getMinutes();
+      const isNightTime = (hour >= 0 && hour < 5) || (hour === 23 && minutes >= 30);
+      
       if (language === 'it') {
-        if (day === 0) {
+        if (isNightTime) {
+          // Fascia notturna (23:30-5:00): saluto neutro con nome
+          greeting = `Gentile ${senderName},`;
+        } else if (day === 0) {
           greeting = 'Buona domenica.';
-        } else if (hour >= 6 && hour < 13) {
+        } else if (hour >= 5 && hour < 13) {
           greeting = 'Buongiorno.';
         } else if (hour >= 13 && hour < 19) {
           greeting = 'Buon pomeriggio.';
         } else {
+          // 19:00-23:29
           greeting = 'Buonasera.';
         }
       } else if (language === 'en') {
-        if (day === 0) {
+        if (isNightTime) {
+          // Fascia notturna (23:30-5:00): saluto neutro con nome
+          greeting = 'Good day,';
+        } else if (day === 0) {
           greeting = 'Happy Sunday,';
-        } else if (hour >= 6 && hour < 12) {
+        } else if (hour >= 5 && hour < 12) {
           greeting = 'Good morning,';
         } else if (hour >= 12 && hour < 18) {
           greeting = 'Good afternoon,';
         } else {
+          // 18:00-23:29
           greeting = 'Good evening,';
         }
       } else if (language === 'es') {
-        if (day === 0) {
+        if (isNightTime) {
+          // Fascia notturna (23:30-5:00): saluto neutro con nome
+          greeting = `Estimado/a ${senderName},`;
+        } else if (day === 0) {
           greeting = 'Feliz domingo,';
-        } else if (hour >= 6 && hour < 13) {
+        } else if (hour >= 5 && hour < 13) {
           greeting = 'Buenos días,';
         } else {
+          // 13:00-23:29
           greeting = 'Buenas tardes,';
         }
       } else {
-        greeting = `Gentile ${senderName},`;
+        // Altre lingue: sempre saluto neutro
+        greeting = 'Good day,';
       }
     }
     

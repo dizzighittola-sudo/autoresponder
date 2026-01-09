@@ -15,7 +15,7 @@ const CONFIG = {
   
   // === Generazione ===
   TEMPERATURE: 0.5,
-  MAX_OUTPUT_TOKENS: 4000,
+  MAX_OUTPUT_TOKENS: 6000,
   
   // === Validazione ===
   VALIDATION_ENABLED: true,

@@ -514,20 +514,52 @@ Non mostrare mai entrambi i set di orari.`;
 📅 DATA ODIERNA: ${currentDate} (${humanDate})
 ═══════════════════════════════════════════════════════════════════════════
 
-⚠️ REGOLE TEMPORALI CRITICHE:
+⚠️ REGOLE TEMPORALI CRITICHE - PENSA COME UN UMANO:
 
-1. **NON menzionare eventi/date già passati**
-   • Se un corso è iniziato PRIMA di oggi → NON menzionarlo
-   • Esempio: se oggi è 23/12/2025 e un corso iniziava il 04/10/2025 → è già passato, IGNORALO
-   • Menziona SOLO eventi FUTURI rispetto alla data odierna
+1. **ORDINE CRONOLOGICO OBBLIGATORIO**
+   • Presenta SEMPRE gli eventi futuri dal più vicino al più lontano
+   • Se ci sono corsi il 7/3 e il 3/10 → menziona PRIMA il 7/3, POI il 3/10
+   • NON seguire l'ordine della knowledge base se non è cronologico
 
-2. **Filtra automaticamente le informazioni**
-   • Se nella knowledge base ci sono 2 corsi e uno è già iniziato → menziona SOLO quello futuro
-   • Un essere umano non direbbe mai "c'è un corso che iniziava 3 mesi fa"
+2. **NON usare etichette che confondono**
+   • Se la KB dice "primo corso: ottobre" e "secondo corso: marzo"
+     NON ripetere queste etichette: l'utente penserebbe all'ordine temporale
+   • Usa: "Il prossimo corso disponibile...", "Il corso successivo..."
+   • Oppure: "Sono previsti due corsi: il più vicino inizia il..."
 
-3. **Se TUTTI gli eventi di un tipo sono passati**
-   • Dì che al momento non ci sono date disponibili
-   • Suggerisci di contattare la segreteria per informazioni sui prossimi appuntamenti
+3. **EVENTI GIÀ PASSATI - COMUNICALO CHIARAMENTE**
+   
+   Se l'utente chiede di un evento ANNUALE (Prime Comunioni, Cresime, ecc.)
+   e la data è GIÀ PASSATA rispetto a oggi:
+   
+   ✅ DÌ che l'evento di quest'anno si è già svolto
+   ✅ Indica QUANDO si è svolto (es. "si sono già celebrate il 17 maggio")
+   ✅ Suggerisci QUANDO chiedere info per l'anno prossimo
+   
+   ESEMPIO CORRETTO (domanda a giugno, Comunioni erano il 17/5):
+   "Le Prime Comunioni di quest'anno si sono già celebrate il 17 maggio.
+    Per informazioni sulle prossime, può contattarci a settembre quando
+    riprende il percorso di catechesi."
+   
+   ESEMPIO SBAGLIATO:
+   ❌ "Non ci sono date disponibili" (troppo vago)
+   ❌ Dare la data dell'anno prossimo senza spiegare (confonde)
+   ❌ Dare la data passata come se fosse futura
+
+4. **CORSI CON PIÙ EDIZIONI ANNUALI**
+   
+   Per corsi che si ripetono (prematrimoniali, cresima adulti):
+   • Se TUTTE le edizioni dell'anno sono passate → indica quando riprendono
+   • Se ALCUNE sono passate → menziona SOLO quelle future, in ordine cronologico
+   
+   ESEMPIO (oggi 9 gennaio, corsi a marzo e ottobre):
+   ✅ "Il prossimo corso inizia il 7 marzo. Un secondo corso è previsto a ottobre."
+   ❌ "Primo corso: ottobre. Secondo corso: marzo." (ordine illogico)
+
+5. **Anno pastorale vs anno solare**
+   • L'anno pastorale va da settembre ad agosto
+   • "Quest'anno" per eventi parrocchiali = anno pastorale corrente
+   • Se siamo a gennaio 2026, l'anno pastorale è 2025-2026
 
 ═══════════════════════════════════════════════════════════════════════════`;
   }
