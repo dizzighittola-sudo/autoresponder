@@ -93,6 +93,25 @@ class GmailService {
     }, 'me', messageId);
     console.log(`✓ Added label '${labelName}' to message ${messageId}`);
   }
+
+  /**
+   * Controlla se un messaggio ha una specifica etichetta (Gmail API avanzata)
+   * @param {string} messageId - ID del messaggio
+   * @param {string} labelName - Nome dell'etichetta da cercare
+   * @returns {boolean} - true se il messaggio ha l'etichetta
+   */
+  messageHasLabel(messageId, labelName) {
+    try {
+      const label = this.getOrCreateLabel(labelName);
+      const labelId = label.getId();
+      const msgData = Gmail.Users.Messages.get('me', messageId, { format: 'metadata', metadataHeaders: [] });
+      const labelIds = msgData.labelIds || [];
+      return labelIds.includes(labelId);
+    } catch (e) {
+      console.warn(`⚠️ Could not check labels for message ${messageId}: ${e.message}`);
+      return false; // In caso di errore, considera come non etichettato
+    }
+  }
   
   // ========================================================================
   // ESTRAZIONE MESSAGGI (con supporto Reply-To)
