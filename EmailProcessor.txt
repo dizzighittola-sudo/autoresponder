@@ -82,10 +82,11 @@ class EmailProcessor {
       
       // ═══════════════════════════════════════════════════════════════
       // FILTRO A LIVELLO MESSAGGIO: seleziona messaggi non ancora etichettati
+      // ✅ OTTIMIZZATO: Una sola chiamata API per ottenere tutti i msg etichettati
       // ═══════════════════════════════════════════════════════════════
+      const labeledMessageIds = this.gmailService.getMessageIdsWithLabel(this.config.labelName);
       const unlabeledUnread = unreadMessages.filter(message => {
-        // Usa Gmail API per controllare etichette a livello messaggio
-        return !this.gmailService.messageHasLabel(message.getId(), this.config.labelName);
+        return !labeledMessageIds.has(message.getId());
       });
 
       // Considera solo messaggi non letti da mittenti esterni

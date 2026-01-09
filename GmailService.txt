@@ -95,21 +95,32 @@ class GmailService {
   }
 
   /**
-   * Controlla se un messaggio ha una specifica etichetta (Gmail API avanzata)
-   * @param {string} messageId - ID del messaggio
+   * Ottiene gli ID di tutti i messaggi con una specifica etichetta (Gmail API avanzata)
+   * ✅ OTTIMIZZATO: Una sola chiamata API invece di N chiamate
    * @param {string} labelName - Nome dell'etichetta da cercare
-   * @returns {boolean} - true se il messaggio ha l'etichetta
+   * @returns {Set<string>} - Set di message IDs che hanno l'etichetta
    */
-  messageHasLabel(messageId, labelName) {
+  getMessageIdsWithLabel(labelName) {
     try {
       const label = this.getOrCreateLabel(labelName);
       const labelId = label.getId();
-      const msgData = Gmail.Users.Messages.get('me', messageId, { format: 'metadata', metadataHeaders: [] });
-      const labelIds = msgData.labelIds || [];
-      return labelIds.includes(labelId);
+      
+      // Una sola chiamata API per ottenere tutti i messaggi con questa etichetta
+      const response = Gmail.Users.Messages.list('me', { 
+        labelIds: [labelId], 
+        maxResults: 500  // Dovrebbe essere più che sufficiente
+      });
+      
+      const messageIds = new Set();
+      if (response.messages) {
+        response.messages.forEach(m => messageIds.add(m.id));
+      }
+      
+      console.log(`📦 Found ${messageIds.size} messages with label '${labelName}'`);
+      return messageIds;
     } catch (e) {
-      console.warn(`⚠️ Could not check labels for message ${messageId}: ${e.message}`);
-      return false; // In caso di errore, considera come non etichettato
+      console.warn(`⚠️ Could not get messages with label ${labelName}: ${e.message}`);
+      return new Set(); // In caso di errore, ritorna set vuoto
     }
   }
   
