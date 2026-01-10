@@ -566,6 +566,8 @@ function markdownToHtml(text) {
   });
 
   // ✅ STEP 3: Headers (markdown → HTML)
+  // IMPORTANTE: Ordine decrescente (#### prima di ###) per evitare match parziali
+  html = html.replace(/^####\s+(.+)$/gm, '<p style="font-size:14px;font-weight:bold;">$1</p>');
   html = html.replace(/^###\s+(.+)$/gm, '<p style="font-size:16px;font-weight:bold;">$1</p>');
   html = html.replace(/^##\s+(.+)$/gm, '<p style="font-size:18px;font-weight:bold;">$1</p>');
   html = html.replace(/^#\s+(.+)$/gm, '<p style="font-size:20px;font-weight:bold;">$1</p>');
