@@ -461,20 +461,17 @@ class ResponseValidator {
     
     // Seleziona la lista corretta in base alla lingua
     let forbiddenCaps;
-    let isStrictMode = true; // Strict for Italian (error), lenient for others (warning)
+    // ✅ WARNING ONLY: non blocca l'invio, solo segnalazione
+    const isStrictMode = false;
     
     if (expectedLanguage === 'it') {
       forbiddenCaps = italianForbiddenCaps;
-      isStrictMode = true;
     } else if (expectedLanguage === 'en') {
       forbiddenCaps = englishForbiddenCaps;
-      isStrictMode = false; // English is more flexible with capitalization
     } else if (expectedLanguage === 'es') {
       forbiddenCaps = spanishForbiddenCaps;
-      isStrictMode = true;
     } else {
       forbiddenCaps = italianForbiddenCaps; // Default to Italian
-      isStrictMode = true;
     }
     
     // Regex per trovare ", Parola" - virgola seguita da spazio/i e lettera maiuscola

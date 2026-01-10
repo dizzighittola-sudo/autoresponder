@@ -45,8 +45,9 @@ class EmailProcessor {
   
   /**
    * Processa un singolo thread email
+   * @param {Set} labeledMessageIds - Set di ID messaggi già etichettati (passato da processUnreadEmails per evitare chiamate API ripetute)
    */
-  processThread(thread, knowledgeBase, doctrineBase = '') {
+  processThread(thread, knowledgeBase, doctrineBase = '', labeledMessageIds = null) {
     const result = {
       status: 'unknown',
       validationFailed: false,
@@ -82,11 +83,12 @@ class EmailProcessor {
       
       // ═══════════════════════════════════════════════════════════════
       // FILTRO A LIVELLO MESSAGGIO: seleziona messaggi non ancora etichettati
-      // ✅ OTTIMIZZATO: Una sola chiamata API per ottenere tutti i msg etichettati
+      // ✅ OTTIMIZZATO: Set passato da processUnreadEmails (una sola chiamata API)
       // ═══════════════════════════════════════════════════════════════
-      const labeledMessageIds = this.gmailService.getMessageIdsWithLabel(this.config.labelName);
+      // Se non è stato passato il Set, fallback a chiamata locale (per test/uso standalone)
+      const effectiveLabeledIds = labeledMessageIds || this.gmailService.getMessageIdsWithLabel(this.config.labelName);
       const unlabeledUnread = unreadMessages.filter(message => {
-        return !labeledMessageIds.has(message.getId());
+        return !effectiveLabeledIds.has(message.getId());
       });
 
       // Considera solo messaggi non letti da mittenti esterni
@@ -459,6 +461,12 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
           return result;
         }
         
+        // ✅ Se ci sono WARNING (ma validazione passata), aggiungi etichetta "verifica"
+        if (validation.warnings && validation.warnings.length > 0) {
+          console.log(`   ⚠️ Validation PASSED with ${validation.warnings.length} warning(s) - adding 'verifica' label`);
+          this.gmailService.addLabelToThread(thread, 'verifica');
+        }
+        
         console.log(`   ✓ Validation PASSED (score: ${validation.score.toFixed(2)})`);
       }
       
@@ -512,6 +520,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
   
   /**
    * Processa tutte le email non lette
+   * ✅ OTTIMIZZATO: chiamata API etichette solo se ci sono email non lette
    */
   processUnreadEmails(knowledgeBase, doctrineBase = '') {
     console.log('\n' + '='.repeat(70));
@@ -522,20 +531,28 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       console.warn('🔴 DRY_RUN MODE ACTIVE - Emails will NOT be sent!');
     }
     
-    // Cerca thread non letti
-    // ✅ FIX: Non escludiamo più per etichetta thread - filtriamo a livello messaggio
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Cerca thread non letti (SENZA chiamata API avanzata)
+    // ═══════════════════════════════════════════════════════════════
     const threads = GmailApp.search(
       'is:unread',
       0,
       this.config.maxEmailsPerRun
     );
     
+    // Se non ci sono email non lette, esci subito (NESSUNA chiamata API)
     if (threads.length === 0) {
       console.log('Nessuna email da processare.');
       return { total: 0, replied: 0, filtered: 0, errors: 0 };
     }
     
     console.log(`📬 Trovate ${threads.length} email da elaborare`);
+    
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 2: Solo ora, fai UNA SOLA chiamata API per le etichette
+    // ═══════════════════════════════════════════════════════════════
+    const labeledMessageIds = this.gmailService.getMessageIdsWithLabel(this.config.labelName);
+    console.log(`📦 Found ${labeledMessageIds.size} messages with label '${this.config.labelName}'`);
     
     // Statistiche
     const stats = {
@@ -548,11 +565,12 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       skipped: 0
     };
     
-    // Processa ogni thread
+    // Processa ogni thread, passando il Set già caricato
     threads.forEach((thread, index) => {
       console.log(`\n--- Thread ${index + 1}/${threads.length} ---`);
       
-      const result = this.processThread(thread, knowledgeBase, doctrineBase);
+      // ✅ Passa labeledMessageIds per evitare chiamate API ripetute
+      const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds);
       stats.total++;
       
       if (result.validationFailed) {
