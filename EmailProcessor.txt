@@ -216,6 +216,7 @@ class EmailProcessor {
       );
       
       let enrichedKnowledgeBase = knowledgeBase;
+      let territoryBlock = '';
       
       // 5.1: SPECIAL MASS RULE INJECTION (Prioritary)
       const specialMassRule = getSpecialMassTimeRule(new Date());
@@ -239,6 +240,7 @@ Dettaglio: ${v.reason}
 ⚠️ Usa ESATTAMENTE queste informazioni verificate programmaticamente.
 ════════════════════════════════════════════════════════════════════════
 `;
+        territoryBlock = territoryContext;
         enrichedKnowledgeBase = territoryContext + '\n\n' + knowledgeBase;
       }
       
@@ -394,23 +396,52 @@ console.log('🧠 PromptContext:', JSON.stringify(promptContext.meta));
 const promptOptions = {
         emailContent: messageDetails.body,
         emailSubject: messageDetails.subject,
-        knowledgeBase: enrichedKnowledgeBase, // Use enrichedKnowledgeBase
-        senderName: messageDetails.senderName, // Use messageDetails.senderName
-        senderEmail: messageDetails.senderEmail, // Use messageDetails.senderEmail
+        knowledgeBase: enrichedKnowledgeBase, // Placeholder, verrà sostituito
+        senderName: messageDetails.senderName,
+        senderEmail: messageDetails.senderEmail,
         conversationHistory: conversationHistory,
-        category: classification.category, // Use classification.category
-        topic: quickCheck.classification ? quickCheck.classification.topic : '', // ✅ Pass Topic
+        category: classification.category,
+        topic: quickCheck.classification ? quickCheck.classification.topic : '',
         detectedLanguage: detectedLanguage,
         currentSeason: this._getCurrentSeason(),
         currentDate: new Date().toISOString().split('T')[0],
-        salutation: greeting, // Use greeting
-        closing: closing, // Use closing
-        subIntents: classification.subIntents || {}, // Use classification.subIntents
-        memoryContext: memoryContext, // Use memoryContext
-        promptProfile: promptContext.profile, // Use promptContext.profile
-        activeConcerns: promptContext.concerns, // Use promptContext.concerns
+        salutation: greeting,
+        closing: closing,
+        subIntents: classification.subIntents || {},
+        memoryContext: memoryContext,
+        promptProfile: promptContext.profile,
+        activeConcerns: promptContext.concerns,
         salutationMode: salutationMode
       };
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 7.5: KB SELECTION LAYER
+      // ═══════════════════════════════════════════════════════════════
+      const knowledgePayload = buildKnowledgePayload({
+        subject: messageDetails.subject,
+        body: messageDetails.body,
+        topic: quickCheck.classification ? quickCheck.classification.topic : '',
+        classification: classification,
+        requestType: requestType,
+        promptProfile: promptContext.profile,
+        activeConcerns: promptContext.meta.activeConcerns || [],
+        territoryBlock: territoryBlock,
+        fullEnrichedKB: enrichedKnowledgeBase,
+        knowledgeRows: typeof GLOBAL_CACHE !== 'undefined' ? GLOBAL_CACHE.knowledgeStructured : [],
+        aiCoreLiteRows: typeof GLOBAL_CACHE !== 'undefined' ? GLOBAL_CACHE.aiCoreLiteStructured : [],
+        aiCoreRows: typeof GLOBAL_CACHE !== 'undefined' ? GLOBAL_CACHE.aiCoreStructured : [],
+        doctrineRows: typeof GLOBAL_CACHE !== 'undefined' ? GLOBAL_CACHE.doctrineStructured : [],
+        selectionConfig: typeof CONFIG !== 'undefined' ? CONFIG.KB_SELECTION : null
+      });
+
+      console.log(`   🧩 KB Selection: chunks=${knowledgePayload.debug.selectedCount}, chars=${knowledgePayload.debug.budgetUsedChars}, profile=${knowledgePayload.debug.promptProfile}`);
+      if (knowledgePayload.debug.selectedRows.length > 0) {
+        console.log(`   🧩 KB Rows: ${knowledgePayload.debug.selectedRows.join(' | ')}`);
+      }
+
+      // Usa KB selettiva per prompt
+      promptOptions.knowledgeBase = knowledgePayload.kbForPrompt;
+
 const prompt = this.promptEngine.buildPrompt(promptOptions);
       
       // Aggiungi hint tipo richiesta
@@ -446,10 +477,10 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         const validation = this.validator.validateResponse(
           response,
           detectedLanguage,
-          enrichedKnowledgeBase,
+          knowledgePayload.kbForValidation, // Policy V1: usa KB completa per validation
           messageDetails.body,
           messageDetails.subject,
-          salutationMode  // Per controllo firma contestuale (opzionale in follow-up)
+          salutationMode
         );
         
         if (!validation.isValid) {

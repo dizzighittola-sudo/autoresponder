@@ -36,6 +36,14 @@ const CONFIG = {
   DOCTRINE_SHEET: 'Dottrina',
   REPLACEMENTS_SHEET_NAME: 'Sostituzioni',
   MEMORY_SHEET_NAME: 'ConversationMemory',
+
+  // === KB Selection Layer ===
+  // Budget per profilo prompt (chunks e caratteri massimi)
+  KB_SELECTION: {
+    LITE: { maxChunks: 1, maxChars: 800 },
+    STANDARD: { maxChunks: 2, maxChars: 1200 },
+    HEAVY: { maxChunks: 3, maxChars: 1600 }
+  },
   
   // === Modalità ===
   DRY_RUN: false,  // Cambia a true per test senza invio email
@@ -657,6 +665,71 @@ function testHybridFlow() {
      console.log('📚 Dynamic Directives (Smart RAG):');
      console.log(directives || 'NONE');
   }
+}
+
+/**
+ * TEST: Verifica KB Selection Layer
+ */
+function testKnowledgeSelector() {
+  loadResources();
+  console.log('\n' + '═'.repeat(50));
+  console.log('🧪 TESTING KNOWLEDGE SELECTOR');
+  console.log('═'.repeat(50));
+  
+  // Test 1: Richiesta tecnica (orari)
+  console.log('\n--- Test 1: Richiesta Tecnica (profilo lite) ---');
+  const result1 = buildKnowledgePayload({
+    subject: 'Orari messe',
+    body: 'Quali sono gli orari delle messe domenicali?',
+    topic: 'orari',
+    classification: { category: 'information' },
+    requestType: { type: 'technical', needsDiscernment: false, needsDoctrine: false },
+    promptProfile: 'lite',
+    activeConcerns: [],
+    territoryBlock: '',
+    fullEnrichedKB: GLOBAL_CACHE.knowledgeBase,
+    knowledgeRows: GLOBAL_CACHE.knowledgeStructured,
+    aiCoreLiteRows: GLOBAL_CACHE.aiCoreLiteStructured || [],
+    aiCoreRows: GLOBAL_CACHE.aiCoreStructured || [],
+    doctrineRows: GLOBAL_CACHE.doctrineStructured || []
+  });
+  
+  console.log(`   kbForPrompt: ${result1.kbForPrompt.length} chars`);
+  console.log(`   kbForValidation: ${result1.kbForValidation.length} chars`);
+  console.log(`   Selected: ${result1.debug.selectedCount} chunks`);
+  console.log(`   Rows: ${result1.debug.selectedRows.join(' | ') || 'NONE'}`);
+  
+  if (result1.kbForPrompt.length < result1.kbForValidation.length) {
+    console.log('   ✅ PASS: kbForPrompt < kbForValidation (Policy V1)');
+  } else {
+    console.log('   ⚠️ NOTE: kbForPrompt == kbForValidation (fallback applied)');
+  }
+  
+  // Test 2: Richiesta con territorio
+  console.log('\n--- Test 2: Con Territory Block ---');
+  const territoryBlock = 'TERRITORIO: Via Roma 15 - RIENTRA nella parrocchia';
+  const result2 = buildKnowledgePayload({
+    subject: 'Verifica indirizzo',
+    body: 'Abito in via Roma 15, rientro nella vostra parrocchia?',
+    topic: 'territorio',
+    classification: { category: 'information' },
+    requestType: { type: 'technical' },
+    promptProfile: 'standard',
+    activeConcerns: [],
+    territoryBlock: territoryBlock,
+    fullEnrichedKB: GLOBAL_CACHE.knowledgeBase,
+    knowledgeRows: GLOBAL_CACHE.knowledgeStructured
+  });
+  
+  console.log(`   mandatoryTerritoryIncluded: ${result2.debug.mandatoryTerritoryIncluded}`);
+  if (result2.debug.mandatoryTerritoryIncluded) {
+    console.log('   ✅ PASS: Territory block included');
+  } else {
+    console.log('   ❌ FAIL: Territory block NOT included');
+  }
+  
+  console.log('\n' + '═'.repeat(50));
+  console.log('✓ KB Selector tests completed');
 }
 
 function healthCheck() {
