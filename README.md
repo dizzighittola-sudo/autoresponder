@@ -20,7 +20,7 @@ Parish AI Autoresponder is a production-ready, enterprise-grade email automation
 - 🔒 **Territory Validation**: Automatic verification of parish boundaries
 - 🕐 **Liturgical Awareness**: Context-aware greetings based on liturgical calendar
 - 💬 **Conversational Memory**: Maintains context across email threads
-- ⚡ **Circuit Breaker Pattern**: Resilient API failure handling
+
 - 🧪 **Comprehensive Testing**: Unit tests for critical components
 - 📊 **Smart Rate Limiting**: Multi-model API quota management
 
@@ -168,12 +168,7 @@ Geographic validation:
 - Parish boundary checking
 - Unicode-aware matching
 
-#### 8. **CircuitBreaker.gs**
-Resilience pattern:
-- API failure tracking
-- Automatic recovery
-- Persistent state (PropertiesService)
-- CLOSED → OPEN → HALF-OPEN states
+
 
 #### 9. **UnitTests.gs**
 Quality assurance:
@@ -208,7 +203,7 @@ runQuickTest()  // Fast sanity check
 ### Test individual components
 ```javascript
 testGeminiConnection()
-testCircuitBreaker()
+
 test_salutationMode_invalidTimestamp()
 test_integration_classifyTechnical()
 ```
@@ -229,11 +224,7 @@ test_integration_classifyTechnical()
 ✅ PASS: Bug #2: Time pattern should NOT match inside URL
 ✅ PASS: Bug #2: Time pattern should match standalone times
 
---- CircuitBreaker ---
-✅ PASS: CircuitBreaker: Initial state should be CLOSED
-✅ PASS: CircuitBreaker: Should be OPEN after 3 failures
-✅ PASS: CircuitBreaker: Should block calls when OPEN
-✅ PASS: CircuitBreaker: Failures should reset on success
+
 
 --- KnowledgeSelector ---
 ✅ PASS: KnowledgeSelector: Should return kbForPrompt and kbForValidation

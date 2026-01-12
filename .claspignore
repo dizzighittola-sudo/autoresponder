@@ -1,0 +1,24 @@
+# Files to ignore during clasp push
+
+# Documentation
+*.md
+*.csv
+
+# Sanitized versions (for GitHub)
+*_s.gs
+*_s.txt
+
+# Git and config
+.git/**
+.agent/**
+.gitignore
+
+# Batch files
+*.bat
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+*.tmp

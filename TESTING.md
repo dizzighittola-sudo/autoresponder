@@ -189,11 +189,7 @@ const mock = _createMockEmail('technical');
 ✅ PASS: Bug #2: Time pattern should NOT match inside URL
 ✅ PASS: Bug #2: Time pattern should match standalone times
 
---- CircuitBreaker ---
-✅ PASS: CircuitBreaker: Initial state should be CLOSED
-✅ PASS: CircuitBreaker: Should be OPEN after 3 failures
-✅ PASS: CircuitBreaker: Should block calls when OPEN
-✅ PASS: CircuitBreaker: Failures should reset on success
+
 
 ╔══════════════════════════════════════╗
 📊 Tests: 8/8 passed, 0 failed

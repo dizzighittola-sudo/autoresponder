@@ -19,7 +19,7 @@ Autoresponder Parrocchiale è un sistema di automazione email pronto per la prod
 - 🔒 **Validazione Territorio**: Verifica automatica dei confini parrocchiali
 - 🕐 **Consapevolezza Liturgica**: Saluti adattivi basati sul calendario liturgico
 - 💬 **Memoria Conversazionale**: Mantiene il contesto attraverso i thread email
-- ⚡ **Circuit Breaker**: Gestione resiliente dei fallimenti API
+
 - 🧪 **Test Completi**: Unit test e integration test per componenti critici
 - 📊 **Rate Limiting Intelligente**: Gestione quota API multi-modello
 
@@ -52,8 +52,8 @@ Autoresponder Parrocchiale è un sistema di automazione email pronto per la prod
 │  │ • Chiamate API│  │ • Tracking   │  │ • Selezione KB  │  │
 │  │ • Rilevamento │  │   thread     │  │ • Prompt        │  │
 │  │   lingua      │  │ • Gestione   │  │   dinamici      │  │
-│  │ • Circuit     │  │   contesto   │  │ • Contesto      │  │
-│  │   breaker     │  │              │  │   liturgico     │  │
+│  │               │  │   contesto   │  │ • Contesto      │  │
+│  │               │  │              │  │   liturgico     │  │
 │  └───────────────┘  └──────────────┘  └─────────────────┘  │
 │                                                              │
 │  ┌──────────────────┐  ┌─────────────────────────────────┐  │
@@ -139,7 +139,7 @@ Pipeline di elaborazione principale:
 Layer di integrazione AI:
 - Comunicazione API Gemini
 - Rilevamento lingua (ibrido AI + regex)
-- Integrazione Circuit Breaker
+
 - Rate limiting
 
 ### 4. **PromptEngine.gs**
@@ -170,7 +170,7 @@ Selezione intelligente KB:
 - Limiti per source
 - Mapping categorie
 
-### 8. **CircuitBreaker.gs**
+
 Pattern resilienza:
 - Tracking fallimenti API
 - Recovery automatico
@@ -180,7 +180,7 @@ Pattern resilienza:
 ### 9. **UnitTests.gs**
 Quality assurance:
 - Test regressione bug
-- Validazione circuit breaker
+
 - Copertura edge case
 - Test integrazione
 
@@ -330,7 +330,7 @@ Validazione multi-livello:
 ### Rate Limiting
 - ✅ Tracking quota API per modello
 - ✅ Periodi di cooldown tra richieste
-- ✅ Circuit breaker per fallimenti API
+
 
 ### Controllo Sistema (Kill-Switch)
 - ✅ Accensione/Spegnimento via Google Sheets (foglio `Controllo`, cella B2)
@@ -361,7 +361,7 @@ Validazione multi-livello:
 - **21 test totali** (12 unit + 9 integration)
 - **100% copertura** bug fix
 - **Test edge case** (null, invalidi, valori limite)
-- **Validazione circuit breaker** (tutti gli stati)
+
 - **Integrazione componenti** (classificazione, rilevamento lingua, validazione)
 - **Workflow end-to-end** (modalità dry-run)
 
@@ -374,7 +374,7 @@ Validazione multi-livello:
 ## 📝 Changelog
 
 ### v2.0.0 (Attuale)
-- ✅ Aggiunto pattern Circuit Breaker per resilienza API
+
 - ✅ Implementato framework unit testing completo
 - ✅ Corretti 6 bug critici
 - ✅ Aggiunto Layer Selezione KB per ottimizzazione token

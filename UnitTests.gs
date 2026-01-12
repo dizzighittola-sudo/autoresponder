@@ -146,68 +146,7 @@ function test_timeRegex_matchValidTime() {
   );
 }
 
-// ====================================================================
-// TEST: CircuitBreaker
-// ====================================================================
 
-function test_circuitBreaker_initialClosed() {
-  const cb = new CircuitBreaker(3, 10000);
-  cb.reset(); // Ensure clean state
-  
-  return TestRunner.assertEqual(
-    cb.getStatus().state,
-    'CLOSED',
-    'CircuitBreaker: Initial state should be CLOSED'
-  );
-}
-
-function test_circuitBreaker_openAfterThreshold() {
-  const cb = new CircuitBreaker(3, 10000);
-  cb.reset();
-  
-  cb.recordFailure();
-  cb.recordFailure();
-  cb.recordFailure();
-  
-  return TestRunner.assertEqual(
-    cb.getStatus().state,
-    'OPEN',
-    'CircuitBreaker: Should be OPEN after 3 failures'
-  );
-}
-
-function test_circuitBreaker_blocksWhenOpen() {
-  const cb = new CircuitBreaker(3, 60000); // 60s timeout
-  cb.reset();
-  
-  cb.recordFailure();
-  cb.recordFailure();
-  cb.recordFailure();
-  
-  const canProceed = cb.canProceed();
-  cb.reset(); // Cleanup
-  
-  return TestRunner.assertEqual(
-    canProceed,
-    false,
-    'CircuitBreaker: Should block calls when OPEN'
-  );
-}
-
-function test_circuitBreaker_resetOnSuccess() {
-  const cb = new CircuitBreaker(3, 10000);
-  cb.reset();
-  
-  cb.recordFailure();
-  cb.recordFailure();
-  cb.recordSuccess();
-  
-  return TestRunner.assertEqual(
-    cb.getStatus().failures,
-    0,
-    'CircuitBreaker: Failures should reset on success'
-  );
-}
 
 // ====================================================================
 // TEST: KnowledgeSelector (se disponibile)
@@ -394,13 +333,6 @@ function runAllTests() {
   test_timeRegex_notMatchURL();
   test_timeRegex_matchValidTime();
   
-  // CircuitBreaker tests
-  console.log('\n--- CircuitBreaker ---');
-  test_circuitBreaker_initialClosed();
-  test_circuitBreaker_openAfterThreshold();
-  test_circuitBreaker_blocksWhenOpen();
-  test_circuitBreaker_resetOnSuccess();
-  
   // KnowledgeSelector tests
   console.log('\n--- KnowledgeSelector ---');
   test_knowledgeSelector_basicPayload();
@@ -422,7 +354,7 @@ function runQuickTest() {
   console.log('🧪 Quick Test...');
   TestRunner.reset();
   test_salutationMode_firstMessage();
-  test_circuitBreaker_initialClosed();
+  test_salutationMode_firstMessage();
   TestRunner.summary();
 }
 
