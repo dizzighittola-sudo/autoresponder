@@ -328,10 +328,13 @@ class ResponseValidator {
     const hallucinations = {};
     
     // Helper normalizzazione orari
-    // FIX: Sostituisce solo pattern orari validi (0-23:00-59), evita URL come page.19.html
+    // FIX Bug #5: Sostituisce solo pattern orari validi, evita URL come page.19.html (richiede 2+ caratteri prima/dopo)
     const normalizeTime = (t) => {
-      // Ignora se sembra parte di un URL o file (es. parole.numeri.parole)
-      if (/[a-z]\.\d{1,2}\.[a-z]/i.test(t)) return t;
+      // ✅ Stronger exclusion pattern: 2+ lettere prima E dopo
+      if (/[a-z]{2,}\.\d{1,2}\.[a-z]{2,}/i.test(t)) return t;
+      
+      // Oppure: verifica se contesto è file/URL (estensione file)
+      if (/\/([\w-]+\.\d{1,2}\.\w+)$/i.test(t)) return t;
 
       t = t.replace(/\b(\d{1,2})\.([0-5]\d)\b/g, (match, h, m) => {
         const hour = parseInt(h, 10);

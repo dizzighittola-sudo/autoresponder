@@ -571,13 +571,33 @@ function markdownToHtml(text) {
   });
 
   // ✅ STEP 2: Converti links PRIMA di escape (preserva URL intatti)
+  // ✅ STEP 2: Converti links con sanitizzazione (FIX Bug #3 XSS)
   html = html.replace(/\[(.+?)\]\((.+?)\)/g, (match, linkText, url) => {
-    // Escape solo il testo del link, NON l'URL
+    // Sanitize link text
     const escapedText = linkText
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    return `<a href="${url}" style="color:#351c75;">${escapedText}</a>`;
+    
+    // ✅ SANITIZE URL
+    const escapedUrl = url
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    
+    // ✅ VALIDATE URL protocol (only http/https)
+    // Se protocollo sospetto (javascript:, vbscript:, data:), ritorna solo testo
+    const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(escapedUrl);
+    // Permetti solo http/s e mailto
+    const isSafeProtocol = /^\s*(https?|mailto):/i.test(escapedUrl);
+
+    if (isDangerous || !isSafeProtocol) {
+      console.warn(`⚠️ Blocked suspicious URL: ${escapedUrl}`);
+      return escapedText; // Return just text, no link
+    }
+    
+    return `<a href="${escapedUrl}" style="color:#351c75;">${escapedText}</a>`;
   });
 
   // ✅ STEP 3: Headers (markdown → HTML)

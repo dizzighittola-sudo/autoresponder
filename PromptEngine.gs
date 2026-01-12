@@ -601,19 +601,21 @@ ${hints[category]}`;
     if (!GLOBAL_CACHE.doctrineStructured || GLOBAL_CACHE.doctrineStructured.length === 0) return null;
     if (!topic) return null;
     
+    const normalizedTopic = (topic || '').toLowerCase();
+    
+    // FIX Bug #4: Crash if row/Sotto-tema is undefined
     const relevantRows = GLOBAL_CACHE.doctrineStructured.filter(row => {
-      // Normalizzazione stringhe per confronto con fallback sicuro
+      // ✅ Guard clause
+      if (!row || typeof row !== 'object') return false;
+
       const rowTopic = String(row['Sotto-tema'] || '').toLowerCase();
-      const rowTags = String(row['Indicazioni operative AI'] || '').toLowerCase();
+      const rowTags = String(row['Indicazioni operative AI'] || '').toLowerCase(); // Use 'Indicazioni operative AI' as generic tags field
       
-      const targetTopic = String(topic || '').toLowerCase();
-      
-      // Logica Match: se c'è topic, cerca in Sotto-tema o tags
-      if (targetTopic && (rowTopic.includes(targetTopic) || rowTags.includes(targetTopic))) {
-        return true;
-      }
-      
-      return false; 
+      // Match se topic è incluso nel sotto-tema o viceversa (match parziale)
+      return (rowTopic && normalizedTopic.includes(rowTopic)) || 
+             (rowTopic && rowTopic.includes(normalizedTopic)) ||
+             (rowTags && normalizedTopic.includes(rowTags)) ||
+             (rowTags && rowTags.includes(normalizedTopic));
     });
     
     if (relevantRows.length === 0) return null;

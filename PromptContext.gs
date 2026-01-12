@@ -5,6 +5,11 @@
 
 class PromptContext {
   constructor(input) {
+    // FIX Bug 10: Input validation
+    if (!input || typeof input !== 'object') {
+      console.warn('⚠️ PromptContext received invalid input, using empty object');
+      input = {}; // Fallback per prevenire crash
+    }
     this.input = input;
     this.concerns = this._computeConcerns();
     this.profile = this._computeProfile();

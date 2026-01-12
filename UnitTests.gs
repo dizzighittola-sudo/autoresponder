@@ -24,6 +24,7 @@ function runAllTests() {
     testRequestTypeClassifier();
     testTerritoryValidator();
     testResponseValidator();
+    testBugFixes(); // ✅ New Bug Fix Tests
     // testUtils(); // Decommentare se si aggiungono test per utils
     
   } catch (e) {
@@ -213,3 +214,77 @@ function testResponseValidator() {
   // Restore Config
   CONFIG.VALIDATION_STRICT_MODE = originalStrictMode;
 }
+
+/**
+ * Test per Bug Fixes Recenti (Priority Critical & High)
+ */
+function testBugFixes() {
+  console.log("\n🧪 Testing Recent Bug Fixes...");
+  
+  // Bug #1: MONTH Constant Indexing
+  // Verify JAN is 0
+  if (typeof MONTH !== 'undefined') {
+    assertEqual(MONTH.JAN, 0, "MONTH.JAN should be 0");
+    assertEqual(MONTH.DEC, 11, "MONTH.DEC should be 11");
+  }
+
+  // Bug #2: Invalid JSON Parsing
+  // Test parseGeminiJsonLenient with problematic content
+  if (typeof parseGeminiJsonLenient !== 'undefined') { // Check global scope availability
+    const badJson = '{ response: "This is a test: with colon", "valid": true }'; // Key 'response' unquoted, string has colon
+    // The previous regex corrupted "test: with" into "test": "with"
+    try {
+      const parsed = parseGeminiJsonLenient(badJson);
+      assertEqual(parsed.response, "This is a test: with colon", "JSON with colons in strings should parse correctly");
+    } catch(e) {
+      assert(false, "parseGeminiJsonLenient threw error: " + e.message);
+    }
+  }
+
+  // Bug #5: ResponseValidator Time Regex
+  // Verify normalizeTime doesn't break filenames
+  const validator = new ResponseValidator();
+  // We need to access private method or test public implementation that uses it.
+  // _checkHallucinations uses normalizeTime internally. 
+  // Let's test via public validateResponse with strict mode (to trigger hallucination checks for times)
+  const originalStrictMode = CONFIG.VALIDATION_STRICT_MODE;
+  CONFIG.VALIDATION_STRICT_MODE = true;
+  
+  const mockKB = "Orari: 10:00";
+  // "page.19.html" previously matched time pattern 19.xx and normalization logic might have corrupted it or flagged it.
+  // Actually the issue was false positive hallucination.
+  // If the Validator sees "19.00" it validates against KB times. If "page.19.html" is seen as time "19:00", it might pass or fail depending on KB.
+  // But if it's NOT a time, it shouldn't be checked.
+  // Let's assume the fix allows "page.19.html" to pass without being treated as a time hallucination.
+  const resFilename = validator.validateResponse("Vedi page.19.html", "it", mockKB, "body", "subject");
+  assertTrue(resFilename.isValid, "Filename page.19.html should not trigger time hallucination check failure");
+
+  CONFIG.VALIDATION_STRICT_MODE = originalStrictMode;
+
+  // Bug #7: Rate Limiter Timezone
+  if (typeof GeminiRateLimiter !== 'undefined') {
+     const limiter = new GeminiRateLimiter();
+     // Test _isAfterPacificReset method logic (needs to handle LA timezone)
+     // Since we can't easily mock Date inside the class without dependency injection, we just verify the method exists and runs without error.
+      try {
+        const check = limiter._isAfterPacificReset();
+        assert(typeof check === 'boolean', "_isAfterPacificReset should return boolean");
+      } catch (e) {
+        assert(false, "GeminiRateLimiter._isAfterPacificReset threw error: " + e.message);
+      }
+  }
+
+  // Bug #3: XSS in Markdown
+  if (typeof GmailService !== 'undefined') {
+      const service = new GmailService();
+      const maliciousMd = "[Click me](javascript:alert(1))";
+      // We expect the javascript link to be stripped or sanitized to # or similar, NOT rendered as href="javascript:..."
+      const html = service.markdownToHtml(maliciousMd);
+      const isSanitized = !html.includes('href="javascript:alert(1)"');
+      assertTrue(isSanitized, "Markdown XSS should be sanitized");
+  }
+}
+
+// Add call to testBugFixes in runAllTests
+// (See modified runAllTests below)
+

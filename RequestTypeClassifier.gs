@@ -137,11 +137,16 @@ class RequestTypeClassifier {
    * ✅ Supporta override da classificazione Gemini (Hybrid approach)
    */
   classify(subject, body, externalHint = null) {
-    // FIX Bug 9: Limit text length to avoid slow regex on very long emails
-    const MAX_ANALYSIS_LENGTH = 2000;
+    // FIX Bug #6: Smart Truncation (First 1500 + Last 1500 chars)
+    // Avoid losing pastoral cues at end of long emails
+    const MAX_ANALYSIS_LENGTH = 3000;
     const fullText = `${subject} ${body}`;
     const text = fullText.length > MAX_ANALYSIS_LENGTH 
-      ? fullText.substring(0, MAX_ANALYSIS_LENGTH).toLowerCase()
+      ? (
+          fullText.substring(0, 1500) + 
+          ' ... ' + 
+          fullText.substring(fullText.length - 1500)
+        ).toLowerCase()
       : fullText.toLowerCase();
     
     // Calcola punteggi (backup/validazione basata su Regex)

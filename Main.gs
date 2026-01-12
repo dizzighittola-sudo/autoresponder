@@ -204,9 +204,10 @@ function loadResources() {
 // Giorni in cui il sistema DEVE rispondere (Dipendenti in ferie)
 // Formato: [Mese, Giorno]
 // 1 Gen, 6 Gen, 25 Apr, 1 Mag, 29 Giu, 15 Ago, 1 Nov, 8 Dic, 25 Dic, 26 Dic
+// FIX Bug #1: JavaScript Date uses 0-indexed months (0=Jan, 11=Dec)
 const MONTH = {
-  JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
-  JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12
+  JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+  JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11
 };
 
 const ALWAYS_OPERATING_DAYS = [
@@ -230,6 +231,9 @@ const SUSPENSION_HOURS = {
   5: [[8, 17]]     // Venerdì: 8–17
 };
 
+/**
+ * Calcola la Domenica di Pasqua per un dato anno (Occidentale/Gregoriano)
+ */
 /**
  * Calcola la Domenica di Pasqua per un dato anno (Occidentale/Gregoriano)
  */

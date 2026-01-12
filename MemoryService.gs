@@ -319,6 +319,14 @@ class MemoryService {
       lastUpdated: values[5] || null,
       messageCount: parseInt(values[6]) || 0
     };
+    
+    // FIX Bug 9: Validate lastUpdated timestamp
+    if (obj.lastUpdated && isNaN(new Date(obj.lastUpdated).getTime())) {
+      console.warn(`⚠️ Invalid date in memory for thread ${obj.threadId}: ${obj.lastUpdated}`);
+      obj.lastUpdated = null;
+    }
+    
+    return obj;
   }
   
   /**
