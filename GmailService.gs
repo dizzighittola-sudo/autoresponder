@@ -105,16 +105,23 @@ class GmailService {
       const label = this.getOrCreateLabel(labelName);
       const labelId = label.getId();
       
-      // Una sola chiamata API per ottenere tutti i messaggi con questa etichetta
-      const response = Gmail.Users.Messages.list('me', { 
-        labelIds: [labelId], 
-        maxResults: 500  // Dovrebbe essere più che sufficiente
-      });
-      
       const messageIds = new Set();
-      if (response.messages) {
-        response.messages.forEach(m => messageIds.add(m.id));
-      }
+      let pageToken;
+      
+      // Recupera tutte le pagine per evitare risultati parziali
+      do {
+        const response = Gmail.Users.Messages.list('me', {
+          labelIds: [labelId],
+          maxResults: 500,
+          pageToken: pageToken
+        });
+        
+        if (response.messages) {
+          response.messages.forEach(m => messageIds.add(m.id));
+        }
+        
+        pageToken = response.nextPageToken;
+      } while (pageToken);
       
       console.log(`📦 Found ${messageIds.size} messages with label '${labelName}'`);
       return messageIds;
