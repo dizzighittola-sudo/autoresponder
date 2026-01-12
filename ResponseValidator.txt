@@ -1,0 +1,525 @@
+// ====================================================================
+// RESPONSE VALIDATOR - Validazione risposte AI (Allineato a CF v2.1)
+// Estratto da script.txt e allineato con response_validator.py CF
+// ====================================================================
+
+/**
+ * Response Validator - Aligned with CF version
+ * 
+ * WHAT WE CHECK (Critical):
+ * ✅ Length (too short/long = bad UX)
+ * ✅ Language consistency (critical for multilingual)
+ * ✅ Forbidden phrases (hallucination indicators)
+ * ✅ Placeholders (incomplete response)
+ * ✅ Required signature (brand identity)
+ * ✅ Hallucinated data (emails, phones, times not in KB)
+ * ✅ Capital after comma (grammar error)
+ * 
+ * ALIGNED WITH CF:
+ * ✅ Smart placeholder detection (ellipsis vs placeholder)
+ * ✅ Phone validation with 8+ digit threshold
+ * ✅ Time normalization (9.30 → 09:30)
+ */
+class ResponseValidator {
+  constructor() {
+    console.log('🔍 Initializing ResponseValidator (CF-aligned v2.1)...');
+    
+    // Get config - fallback to defaults if CONFIG not defined
+    const strictMode = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_STRICT_MODE : false;
+    const minScore = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_MIN_SCORE : 0.6;
+    
+    // Minimum acceptable score
+    this.MIN_VALID_SCORE = strictMode ? 0.8 : minScore;
+    this.STRICT_MODE_SCORE = 0.8;
+    
+    // Length thresholds (aligned with CF)
+    this.MIN_LENGTH_CHARS = 25;
+    this.OPTIMAL_MIN_LENGTH = 100;
+    this.WARNING_MAX_LENGTH = 3000;
+    
+    // Forbidden phrases (hallucination/uncertainty indicators)
+    // ✅ ALIGNED: Same list as CF
+    this.forbiddenPhrases = [
+      'non ho abbastanza informazioni',
+      'non posso rispondere',
+      'mi dispiace ma non',
+      'scusa ma non',
+      'purtroppo non posso',
+      'non sono sicuro',
+      'non sono sicura',
+      'potrebbe essere',
+      'probabilmente',
+      'forse',
+      'suppongo',
+      'immagino'
+    ];
+    
+    // Language markers (shared constant if available, else local)
+    this.languageMarkers = typeof LANGUAGE_MARKERS !== 'undefined' ? LANGUAGE_MARKERS : {
+      'it': ['grazie', 'cordiali', 'saluti', 'gentile', 'parrocchia', 'messa', 'vorrei', 'quando'],
+      'en': ['thank', 'regards', 'dear', 'parish', 'mass', 'church', 'would', 'could'],
+      'es': ['gracias', 'saludos', 'estimado', 'parroquia', 'misa', 'iglesia', 'querría']
+    };
+    
+    // Placeholders - ✅ ALIGNED: Same as CF
+    this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
+    
+    // Signature pattern (case-insensitive)
+    this.signaturePattern = /segreteria\s+parrocchia\s+sant[''']?eugenio/i;
+    
+    console.log('✓ ResponseValidator initialized (CF-aligned v2.1)');
+    console.log(`   Min valid score: ${this.MIN_VALID_SCORE}`);
+  }
+  
+  /**
+   * Validate response comprehensively
+   * ✅ ALIGNED: Same 7 checks as CF
+   */
+  validateResponse(response, detectedLanguage, knowledgeBase, emailContent, emailSubject) {
+    const errors = [];
+    const warnings = [];
+    const details = {};
+    let score = 1.0;
+    
+    console.log(`🔍 Validating response (${response.length} chars, lang=${detectedLanguage})...`);
+    
+    // === CHECK 1: Length (CRITICAL for UX) ===
+    const lengthResult = this._checkLength(response);
+    errors.push(...lengthResult.errors);
+    warnings.push(...lengthResult.warnings);
+    details.length = lengthResult;
+    score *= lengthResult.score;
+    
+    // === CHECK 2: Language Consistency (CRITICAL for multilingual) ===
+    const langResult = this._checkLanguage(response, detectedLanguage);
+    errors.push(...langResult.errors);
+    warnings.push(...langResult.warnings);
+    details.language = langResult;
+    score *= langResult.score;
+    
+    // === CHECK 3: Signature (CRITICAL for brand identity) ===
+    const sigResult = this._checkSignature(response);
+    errors.push(...sigResult.errors);
+    warnings.push(...sigResult.warnings);
+    details.signature = sigResult;
+    score *= sigResult.score;
+    
+    // === CHECK 4: Forbidden Content (CRITICAL) ===
+    const contentResult = this._checkForbiddenContent(response);
+    errors.push(...contentResult.errors);
+    details.content = contentResult;
+    score *= contentResult.score;
+    
+    // === CHECK 5: Hallucinations (CRITICAL) ===
+    const hallucResult = this._checkHallucinations(response, knowledgeBase);
+    errors.push(...hallucResult.errors);
+    warnings.push(...hallucResult.warnings);
+    details.hallucinations = hallucResult;
+    score *= hallucResult.score;
+    
+    // === CHECK 6: Capital After Comma (Grammar - CRITICAL for Italian) ===
+    const capResult = this._checkCapitalAfterComma(response, detectedLanguage);
+    errors.push(...capResult.errors);
+    warnings.push(...capResult.warnings);
+    details.capitalAfterComma = capResult;
+    score *= capResult.score;
+    
+    // === DETERMINE VALIDITY ===
+    const isValid = errors.length === 0 && score >= this.MIN_VALID_SCORE;
+    
+    // === LOG RESULTS ===
+    if (errors.length > 0) {
+      console.warn(`❌ Validation FAILED: ${errors.length} error(s)`);
+      errors.forEach((err, i) => console.warn(`   ${i + 1}. ${err}`));
+    }
+    
+    if (warnings.length > 0) {
+      console.log(`⚠️  ${warnings.length} warning(s)`);
+      warnings.slice(0, 3).forEach((warn, i) => console.log(`   ${i + 1}. ${warn}`));
+      if (warnings.length > 3) {
+        console.log(`   ... and ${warnings.length - 3} more`);
+      }
+    }
+    
+    if (isValid) {
+      console.log(`✓ Validation PASSED (score: ${score.toFixed(2)})`);
+    } else {
+      console.warn(`✗ Validation FAILED (score: ${score.toFixed(2)}, threshold: ${this.MIN_VALID_SCORE})`);
+    }
+    
+    return {
+      isValid: isValid,
+      score: score,
+      errors: errors,
+      warnings: warnings,
+      details: details,
+      metadata: {
+        responseLength: response.length,
+        expectedLanguage: detectedLanguage,
+        threshold: this.MIN_VALID_SCORE
+      }
+    };
+  }
+  
+  // ========================================================================
+  // VALIDATION CHECKS (Private Methods)
+  // ========================================================================
+  
+  /**
+   * Check 1: Length validation
+   * ✅ ALIGNED: Same thresholds as CF
+   */
+  _checkLength(response) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    const length = response.trim().length;
+    
+    if (length < this.MIN_LENGTH_CHARS) {
+      errors.push(`Response too short (${length} chars, min ${this.MIN_LENGTH_CHARS})`);
+      score = 0.0;
+    } else if (length < this.OPTIMAL_MIN_LENGTH) {
+      warnings.push(`Response quite short (${length} chars)`);
+      score *= 0.85;
+    } else if (length > this.WARNING_MAX_LENGTH) {
+      warnings.push(`Response very long (${length} chars, may be verbose)`);
+      score *= 0.95;
+    }
+    
+    return { score, errors, warnings, length };
+  }
+  
+  /**
+   * Check 2: Language consistency
+   * ✅ ALIGNED: Same logic as CF
+   */
+  _checkLanguage(response, expectedLanguage) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    const responseLower = response.toLowerCase();
+    
+    // Detect actual language using markers
+    const markerScores = {};
+    for (const lang in this.languageMarkers) {
+      markerScores[lang] = this.languageMarkers[lang].reduce((count, marker) => {
+        return count + (responseLower.includes(marker) ? 1 : 0);
+      }, 0);
+    }
+    
+    // Pick highest scoring language
+    let detectedLang = expectedLanguage;
+    let maxScore = 0;
+    for (const lang in markerScores) {
+      if (markerScores[lang] > maxScore) {
+        maxScore = markerScores[lang];
+        detectedLang = lang;
+      }
+    }
+    
+    // Check match
+    if (detectedLang !== expectedLanguage) {
+      if (markerScores[detectedLang] >= 3 && markerScores[expectedLanguage] < 2) {
+        errors.push(
+          `Language mismatch: expected ${expectedLanguage.toUpperCase()}, ` +
+          `detected ${detectedLang.toUpperCase()}`
+        );
+        score *= 0.30;
+      } else {
+        warnings.push('Possible language inconsistency');
+        score *= 0.85;
+      }
+    }
+    
+    // Check mixed languages
+    const highScoringLangs = Object.keys(markerScores).filter(
+      lang => markerScores[lang] >= 3
+    );
+    
+    if (highScoringLangs.length > 1) {
+      warnings.push(`Possible mixed languages: ${highScoringLangs.join(', ')}`);
+      score *= 0.85;
+    }
+    
+    return { score, errors, warnings, detectedLang, markerScores };
+  }
+  
+  /**
+   * Check 3: Required signature
+   * ✅ ALIGNED: Non-blocking warning (same as CF)
+   */
+  _checkSignature(response) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    if (!this.signaturePattern.test(response)) {
+      warnings.push("Missing signature 'Segreteria Parrocchia Sant'Eugenio'");
+      score = 0.95;
+    }
+    
+    return { score, errors, warnings };
+  }
+  
+  /**
+   * Check 4: Forbidden content and placeholders
+   * ✅ ALIGNED: Smart placeholder detection from CF
+   */
+  _checkForbiddenContent(response) {
+    const errors = [];
+    let score = 1.0;
+    
+    const responseLower = response.toLowerCase();
+    
+    // Check forbidden phrases (uncertainty indicators)
+    const foundForbidden = this.forbiddenPhrases.filter(
+      phrase => responseLower.includes(phrase)
+    );
+    
+    if (foundForbidden.length > 0) {
+      errors.push(`Contains uncertainty phrases: ${foundForbidden.slice(0, 2).join(', ')}`);
+      score *= 0.50;
+    }
+    
+    // ✅ ALIGNED: Smart placeholder detection from CF
+    const foundPlaceholders = [];
+    for (const p of this.placeholders) {
+      // For '...', check if it's used as placeholder (not ellipsis in text)
+      if (p === '...') {
+        // Look for patterns like [...] or "..." at end of sentences
+        if (/\[\.\.\.]/g.test(response) || /\.\.\.\s*$/g.test(response)) {
+          foundPlaceholders.push(p);
+        }
+      } else if (responseLower.includes(p.toLowerCase())) {
+        foundPlaceholders.push(p);
+      }
+    }
+    
+    if (foundPlaceholders.length > 0) {
+      errors.push(`Contains placeholders: ${foundPlaceholders.join(', ')}`);
+      score = 0.0;
+    }
+    
+    // Check NO_REPLY leakage
+    if (response.includes('NO_REPLY') && response.trim().length > 20) {
+      errors.push("Contains 'NO_REPLY' instruction (should have been filtered)");
+      score = 0.0;
+    }
+    
+    return { score, errors, foundForbidden, foundPlaceholders };
+  }
+  
+  /**
+   * Check 5: Hallucinations (invented data not in KB)
+   * ✅ ALIGNED: Phone 8+ digits, time normalization from CF
+   */
+  _checkHallucinations(response, knowledgeBase) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    const hallucinations = {};
+    
+    // ✅ ALIGNED: Time normalization helper from CF
+    const normalizeTime = (t) => {
+      t = t.replace('.', ':');
+      const parts = t.split(':');
+      if (parts.length === 2) {
+        try {
+          const h = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          if (!isNaN(h) && !isNaN(m)) {
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          }
+        } catch (e) {
+          return t;
+        }
+      }
+      return t;
+    };
+    
+    // ✅ ALIGNED: Phone normalization helper from CF
+    const normalizePhone = (p) => p.replace(/\D/g, '');
+    
+    // === Check 1: Times ===
+    const timePattern = /\b\d{1,2}[:\.]\d{2}\b/g;
+    const responseTimesRaw = response.match(timePattern) || [];
+    const kbTimesRaw = knowledgeBase.match(timePattern) || [];
+    
+    const responseTimes = new Set(responseTimesRaw.map(normalizeTime));
+    const kbTimes = new Set(kbTimesRaw.map(normalizeTime));
+    const inventedTimes = [...responseTimes].filter(t => !kbTimes.has(t));
+    
+    if (inventedTimes.length > 0) {
+      warnings.push(`Times not in KB: ${inventedTimes.join(', ')}`);
+      score *= 0.85;
+      hallucinations.times = inventedTimes;
+    }
+    
+    // === Check 2: Email Addresses ===
+    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi;
+    const responseEmails = new Set(
+      (response.match(emailPattern) || []).map(e => e.toLowerCase())
+    );
+    const kbEmails = new Set(
+      (knowledgeBase.match(emailPattern) || []).map(e => e.toLowerCase())
+    );
+    const inventedEmails = [...responseEmails].filter(e => !kbEmails.has(e));
+    
+    if (inventedEmails.length > 0) {
+      errors.push(`Email addresses not in KB: ${inventedEmails.join(', ')}`);
+      score *= 0.50;
+      hallucinations.emails = inventedEmails;
+    }
+    
+    // === Check 3: Phone Numbers ===
+    // ✅ ALIGNED: Pattern and 8+ digit threshold from CF
+    const phonePattern = /\b(?:0\d|3\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
+    const responsePhonesRaw = response.match(phonePattern) || [];
+    const kbPhonesRaw = knowledgeBase.match(phonePattern) || [];
+    
+    // ✅ ALIGNED: 8+ digits minimum to avoid false positives (CF fix)
+    const responsePhones = new Set(
+      responsePhonesRaw.map(normalizePhone).filter(p => p.length >= 8)
+    );
+    const kbPhones = new Set(
+      kbPhonesRaw.map(normalizePhone).filter(p => p.length >= 8)
+    );
+    const inventedPhones = [...responsePhones].filter(p => !kbPhones.has(p));
+    
+    if (inventedPhones.length > 0) {
+      errors.push(`Phone numbers not in KB: ${inventedPhones.join(', ')}`);
+      score *= 0.50;
+      hallucinations.phones = inventedPhones;
+    }
+    
+    return { score, errors, warnings, hallucinations };
+  }
+  
+  /**
+   * Check 6: Capital after comma
+   * ✅ ALIGNED: Same forbidden caps list as CF (for Italian)
+   * ⚠️ FIX: Apply strict rules only for Italian - English has different capitalization rules
+   */
+  _checkCapitalAfterComma(response, expectedLanguage = 'it') {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    // Italian words that should NOT be capitalized after a comma
+    const italianForbiddenCaps = [
+      // Verbs (most common violations)
+      'Siamo', 'Restiamo', 'Sono', 'È', "E'", 'Era', 'Sarà', 
+      'Ho', 'Hai', 'Ha', 'Abbiamo', 'Avete', 'Hanno', 
+      'Vorrei', 'Vorremmo', 'Volevamo', 'Desideriamo', 'Informiamo',
+      
+      // Articles
+      'Il', 'Lo', 'La', 'I', 'Gli', 'Le', 
+      'Un', 'Uno', 'Una', "Un'",
+      
+      // Prepositions
+      'Per', 'Con', 'In', 'Su', 'Tra', 'Fra', 'Da', 'Di', 'A',
+      
+      // Conjunctions and particles
+      'Ma', 'Se', 'Che', 'Non', 'Sì', 'No',
+      
+      // Pronouns
+      'Vi', 'Ti', 'Mi', 'Ci', 'Si', 'Li',
+      
+      // Other common words
+      'Ecco', 'Gentile', 'Caro', 'Cara', 'Spettabile'
+    ];
+    
+    // English words - In English, capitalization after comma is often acceptable
+    // (e.g., "Hello, We are happy to..." is common in formal correspondence)
+    // So we use a very limited list for obvious errors only
+    const englishForbiddenCaps = [
+      // Only articles and prepositions that are clearly wrong
+      'The', 'An', 'For', 'With', 'On', 'At', 'If', 'Or', 'And', 'But'
+    ];
+    
+    // Spanish words
+    const spanishForbiddenCaps = [
+      'Estamos', 'Somos', 'Estaremos', 'Seremos',
+      'El', 'Los', 'Las', 'Una',
+      'Por', 'En', 'De',
+      'Pero', 'Que'
+    ];
+    
+    // Select the right list based on language
+    let forbiddenCaps;
+    let isStrictMode = true; // Strict for Italian (error), lenient for others (warning)
+    
+    if (expectedLanguage === 'it') {
+      forbiddenCaps = italianForbiddenCaps;
+      isStrictMode = true;
+    } else if (expectedLanguage === 'en') {
+      forbiddenCaps = englishForbiddenCaps;
+      isStrictMode = false; // English is more flexible with capitalization
+    } else if (expectedLanguage === 'es') {
+      forbiddenCaps = spanishForbiddenCaps;
+      isStrictMode = true;
+    } else {
+      forbiddenCaps = italianForbiddenCaps; // Default to Italian
+      isStrictMode = true;
+    }
+    
+    // Regex to find ", Word" - comma followed by space(s) and capital letter
+    const pattern = /,\s+([A-ZÀÈÉÌÒÙ][a-zàèéìòù]*)/g;
+    let match;
+    const violations = [];
+    
+    while ((match = pattern.exec(response)) !== null) {
+      const word = match[1];
+      if (forbiddenCaps.includes(word)) {
+        violations.push(word);
+        
+        if (isStrictMode) {
+          errors.push(
+            `Grammar error: Capital '${word}' after comma. Should be lowercase: '${word.toLowerCase()}'`
+          );
+        } else {
+          // For English: warning only, as it may be stylistically acceptable
+          warnings.push(
+            `Possible grammar issue: '${word}' capitalized after comma`
+          );
+        }
+      }
+    }
+    
+    if (violations.length > 0) {
+      if (isStrictMode) {
+        score *= Math.max(0.5, 1.0 - (violations.length * 0.15));
+      } else {
+        score *= Math.max(0.9, 1.0 - (violations.length * 0.05)); // Lighter penalty for English
+      }
+    }
+    
+    return { score, errors, warnings, violations };
+  }
+  
+  // ========================================================================
+  // UTILITY METHODS
+  // ========================================================================
+  
+  /**
+   * Get validator configuration statistics
+   */
+  getValidationStats() {
+    return {
+      minValidScore: this.MIN_VALID_SCORE,
+      minLength: this.MIN_LENGTH_CHARS,
+      maxLengthWarning: this.WARNING_MAX_LENGTH,
+      forbiddenPhrasesCount: this.forbiddenPhrases.length,
+      supportedLanguages: Object.keys(this.languageMarkers),
+      placeholdersCount: this.placeholders.length,
+      version: '2.1 (CF-aligned)'
+    };
+  }
+}
+
+// Factory function for compatibility
+function createResponseValidator() {
+  return new ResponseValidator();
+}

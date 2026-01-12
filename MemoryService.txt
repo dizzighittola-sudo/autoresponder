@@ -1,0 +1,387 @@
+// ====================================================================
+// MEMORY SERVICE - Memoria conversazionale per GAS
+// ✅ Usa Google Sheet come storage (alternativa a Firestore)
+// ✅ Stessa struttura dati di CF
+// ====================================================================
+
+/**
+ * MemoryService - GAS version using Google Sheets
+ * 
+ * STORAGE: Google Sheet "ConversationMemory" con colonne:
+ * A: threadId
+ * B: language
+ * C: category
+ * D: tone
+ * E: providedInfo (JSON array)
+ * F: lastUpdated (timestamp)
+ * G: messageCount
+ * 
+ * CONFIGURATION:
+ * - Aggiungi MEMORY_SHEET_NAME in CONFIG (default: 'ConversationMemory')
+ * - Il foglio sarà creato automaticamente se non esiste
+ */
+class MemoryService {
+  constructor() {
+    console.log('🧠 Initializing MemoryService (Sheet-based)...');
+    
+    // Configuration
+    this.spreadsheetId = typeof CONFIG !== 'undefined' ? CONFIG.SPREADSHEET_ID : null;
+    this.sheetName = typeof CONFIG !== 'undefined' ? 
+                     (CONFIG.MEMORY_SHEET_NAME || 'ConversationMemory') : 
+                     'ConversationMemory';
+    
+    // Cache for performance (avoid repeated lookups)
+    this._cache = {};
+    this._cacheExpiry = 5 * 60 * 1000; // 5 minutes
+    
+    // Initialize sheet
+    this._sheet = null;
+    this._initialized = false;
+    
+    if (this.spreadsheetId) {
+      this._initializeSheet();
+    } else {
+      console.warn('⚠️ SPREADSHEET_ID not configured, MemoryService disabled');
+    }
+  }
+  
+  /**
+   * Initialize or create the memory sheet
+   */
+  _initializeSheet() {
+    try {
+      const spreadsheet = SpreadsheetApp.openById(this.spreadsheetId);
+      this._sheet = spreadsheet.getSheetByName(this.sheetName);
+      
+      if (!this._sheet) {
+        // Create new sheet with headers
+        this._sheet = spreadsheet.insertSheet(this.sheetName);
+        this._sheet.getRange('A1:G1').setValues([[
+          'threadId', 'language', 'category', 'tone', 
+          'providedInfo', 'lastUpdated', 'messageCount'
+        ]]);
+        this._sheet.getRange('A1:G1').setFontWeight('bold');
+        this._sheet.setFrozenRows(1);
+        console.log(`✓ Created new sheet: ${this.sheetName}`);
+      }
+      
+      this._initialized = true;
+      console.log(`✓ MemoryService initialized (Sheet: ${this.sheetName})`);
+      
+    } catch (error) {
+      console.error(`❌ Failed to initialize MemoryService: ${error.message}`);
+      this._initialized = false;
+    }
+  }
+  
+  /**
+   * Get memory for a thread
+   * ✅ ALIGNED: Same as CF get_memory
+   */
+  getMemory(threadId) {
+    if (!this._initialized || !threadId) {
+      return {};
+    }
+    
+    // Check cache first
+    const cacheKey = `memory_${threadId}`;
+    const cached = this._getFromCache(cacheKey);
+    if (cached) {
+      console.log(`🧠 Memory hit (cached) for thread ${threadId}`);
+      return cached;
+    }
+    
+    try {
+      // Find row by threadId
+      const row = this._findRowByThreadId(threadId);
+      
+      if (row) {
+        const data = this._rowToObject(row);
+        console.log(`🧠 Memory hit for thread ${threadId} (Lang: ${data.language})`);
+        
+        // Cache it
+        this._setCache(cacheKey, data);
+        return data;
+      } else {
+        console.log(`🧠 Memory miss for thread ${threadId} (New conversation)`);
+        return {};
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error retrieving memory: ${error.message}`);
+      return {};
+    }
+  }
+  
+  /**
+   * Update memory for a thread (merge with existing)
+   * ✅ ALIGNED: Same as CF update_memory
+   */
+  updateMemory(threadId, newData) {
+    if (!this._initialized || !threadId) {
+      return;
+    }
+    
+    try {
+      const existingRow = this._findRowByThreadId(threadId);
+      const now = new Date().toISOString();
+      
+      if (existingRow) {
+        // Merge with existing data
+        const existingData = this._rowToObject(existingRow.values);
+        const mergedData = Object.assign({}, existingData, newData);
+        mergedData.lastUpdated = now;
+        mergedData.messageCount = (existingData.messageCount || 0) + 1;
+        
+        // Update row
+        this._updateRow(existingRow.rowIndex, mergedData);
+        console.log(`🧠 Memory updated for thread ${threadId}`);
+      } else {
+        // Create new row
+        newData.threadId = threadId;
+        newData.lastUpdated = now;
+        newData.messageCount = 1;
+        
+        this._appendRow(newData);
+        console.log(`🧠 Memory created for thread ${threadId}`);
+      }
+      
+      // Invalidate cache
+      this._invalidateCache(`memory_${threadId}`);
+      
+    } catch (error) {
+      console.error(`❌ Error updating memory: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Add topics to provided info list
+   * ✅ ALIGNED: Same as CF add_provided_info_topics
+   */
+  addProvidedInfoTopics(threadId, topics) {
+    if (!this._initialized || !threadId || !topics || topics.length === 0) {
+      return;
+    }
+    
+    try {
+      const existingMemory = this.getMemory(threadId);
+      const existingTopics = existingMemory.providedInfo || [];
+      
+      // Merge without duplicates
+      const mergedTopics = [...new Set([...existingTopics, ...topics])];
+      
+      this.updateMemory(threadId, {
+        providedInfo: mergedTopics
+      });
+      
+      console.log(`🧠 Memory: Added provided topics ${JSON.stringify(topics)}`);
+      
+    } catch (error) {
+      console.error(`❌ Error adding provided info: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Set language for a thread
+   */
+  setLanguage(threadId, language) {
+    this.updateMemory(threadId, { language: language });
+  }
+  
+  /**
+   * Set category for a thread
+   */
+  setCategory(threadId, category) {
+    this.updateMemory(threadId, { category: category });
+  }
+  
+  // ========================================================================
+  // PRIVATE HELPER METHODS
+  // ========================================================================
+  
+  /**
+   * Find row by threadId
+   * Returns { rowIndex, values } or null
+   */
+  _findRowByThreadId(threadId) {
+    const data = this._sheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) { // Skip header
+      if (data[i][0] === threadId) {
+        return {
+          rowIndex: i + 1, // 1-indexed for Sheets
+          values: data[i]
+        };
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Convert row array to object
+   */
+  _rowToObject(row) {
+    // Handle both array and object with .values
+    const values = Array.isArray(row) ? row : row.values || row;
+    
+    let providedInfo = [];
+    try {
+      if (values[4]) {
+        providedInfo = JSON.parse(values[4]);
+      }
+    } catch (e) {
+      providedInfo = values[4] ? [values[4]] : [];
+    }
+    
+    return {
+      threadId: values[0],
+      language: values[1] || 'it',
+      category: values[2] || null,
+      tone: values[3] || 'standard',
+      providedInfo: providedInfo,
+      lastUpdated: values[5] || null,
+      messageCount: parseInt(values[6]) || 0
+    };
+  }
+  
+  /**
+   * Update existing row
+   */
+  _updateRow(rowIndex, data) {
+    const providedInfoJson = JSON.stringify(data.providedInfo || []);
+    
+    this._sheet.getRange(rowIndex, 1, 1, 7).setValues([[
+      data.threadId,
+      data.language || 'it',
+      data.category || '',
+      data.tone || 'standard',
+      providedInfoJson,
+      data.lastUpdated,
+      data.messageCount || 1
+    ]]);
+  }
+  
+  /**
+   * Append new row
+   */
+  _appendRow(data) {
+    const providedInfoJson = JSON.stringify(data.providedInfo || []);
+    
+    this._sheet.appendRow([
+      data.threadId,
+      data.language || 'it',
+      data.category || '',
+      data.tone || 'standard',
+      providedInfoJson,
+      data.lastUpdated,
+      data.messageCount || 1
+    ]);
+  }
+  
+  // ========================================================================
+  // CACHE METHODS
+  // ========================================================================
+  
+  _getFromCache(key) {
+    const cached = this._cache[key];
+    if (cached && (Date.now() - cached.timestamp) < this._cacheExpiry) {
+      return cached.data;
+    }
+    return null;
+  }
+  
+  _setCache(key, data) {
+    this._cache[key] = {
+      data: data,
+      timestamp: Date.now()
+    };
+  }
+  
+  _invalidateCache(key) {
+    delete this._cache[key];
+  }
+  
+  /**
+   * Clear all cache
+   */
+  clearCache() {
+    this._cache = {};
+    console.log('🗑️ Memory cache cleared');
+  }
+  
+  // ========================================================================
+  // UTILITY METHODS
+  // ========================================================================
+  
+  /**
+   * Clean old entries (older than N days)
+   */
+  cleanOldEntries(daysOld = 30) {
+    if (!this._initialized) return 0;
+    
+    try {
+      const data = this._sheet.getDataRange().getValues();
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+      
+      let deletedCount = 0;
+      
+      // Go backwards to avoid index shifting issues
+      for (let i = data.length - 1; i >= 1; i--) {
+        const lastUpdated = new Date(data[i][5]);
+        if (lastUpdated < cutoffDate) {
+          this._sheet.deleteRow(i + 1);
+          deletedCount++;
+        }
+      }
+      
+      console.log(`🧹 Cleaned ${deletedCount} old memory entries`);
+      return deletedCount;
+      
+    } catch (error) {
+      console.error(`❌ Error cleaning old entries: ${error.message}`);
+      return 0;
+    }
+  }
+  
+  /**
+   * Get stats about memory usage
+   */
+  getStats() {
+    if (!this._initialized) {
+      return { initialized: false };
+    }
+    
+    const data = this._sheet.getDataRange().getValues();
+    return {
+      initialized: true,
+      sheetName: this.sheetName,
+      totalEntries: data.length - 1, // Exclude header
+      cacheSize: Object.keys(this._cache).length
+    };
+  }
+  
+  /**
+   * Check if service is healthy
+   */
+  isHealthy() {
+    return this._initialized;
+  }
+}
+
+// Factory function
+function createMemoryService() {
+  return new MemoryService();
+}
+
+// ====================================================================
+// CLEANUP TRIGGER FUNCTION
+// Run this periodically to clean old memory entries
+// ====================================================================
+
+function cleanupOldMemory() {
+  const memoryService = new MemoryService();
+  const deleted = memoryService.cleanOldEntries(30); // 30 days
+  console.log(`Memory cleanup complete: ${deleted} entries removed`);
+}

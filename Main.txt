@@ -1,0 +1,604 @@
+// ====================================================================
+// MAIN.GS - Entry Point Pulito (Gennaio 2026)
+// ✅ Usa solo moduli CF-aligned
+// ✅ Nessun codice legacy
+// ====================================================================
+
+// ====================================================================
+// CONFIGURAZIONE
+// ====================================================================
+
+const CONFIG = {
+  // === API ===
+  GEMINI_API_KEY: PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'),
+  MODEL_NAME: 'gemini-2.5-flash',
+  
+  // === Generazione ===
+  TEMPERATURE: 0.5,
+  MAX_OUTPUT_TOKENS: 4000,
+  
+  // === Validazione ===
+  VALIDATION_ENABLED: true,
+  VALIDATION_MIN_SCORE: 0.6,
+  VALIDATION_STRICT_MODE: false,
+  
+  // === Gmail ===
+  LABEL_NAME: 'IA',
+  ERROR_LABEL_NAME: 'IA-Error',
+  VALIDATION_ERROR_LABEL: 'IA_VALIDATION_ERROR',
+  MAX_EMAILS_PER_RUN: 10,
+  
+  // === Knowledge Base ===
+  SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
+  KB_SHEET_NAME: 'Istruzioni',
+  MEMORY_SHEET_NAME: 'ConversationMemory',
+  
+  // === Modalità ===
+  DRY_RUN: false,  // Cambia a true per test senza invio email
+  
+  // === Ignore Lists ===
+  IGNORE_DOMAINS: [
+    'noreply', 'no-reply', 'newsletter', 'marketing',
+    'promo', 'ads', 'notifications'
+  ],
+  IGNORE_KEYWORDS: [
+    'unsubscribe', 'opt-out', 'newsletter'
+  ]
+};
+
+// ====================================================================
+// LANGUAGE MARKERS (Shared constant)
+// ====================================================================
+
+const LANGUAGE_MARKERS = {
+  'it': ['grazie', 'cordiali', 'saluti', 'gentile', 'parrocchia', 'messa', 'vorrei', 'quando', 'buongiorno', 'buonasera'],
+  'en': ['thank', 'regards', 'dear', 'parish', 'mass', 'church', 'would', 'could', 'please', 'sincerely'],
+  'es': ['gracias', 'saludos', 'estimado', 'parroquia', 'misa', 'iglesia', 'querría', 'buenos', 'días']
+};
+
+// ====================================================================
+// GLOBAL CACHE (populated by loadResources)
+// ====================================================================
+
+var GLOBAL_CACHE = {
+  knowledgeBase: '',
+  doctrineBase: '',
+  ignoreDomains: CONFIG.IGNORE_DOMAINS,
+  ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
+  loaded: false
+};
+
+// ====================================================================
+// RESOURCE LOADING
+// ====================================================================
+
+function loadResources() {
+  if (GLOBAL_CACHE.loaded) {
+    console.log('📦 Resources already loaded (cached)');
+    return;
+  }
+  
+  console.log('📦 Loading resources...');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    
+    // Load Knowledge Base
+    const kbSheet = spreadsheet.getSheetByName(CONFIG.KB_SHEET_NAME);
+    if (kbSheet) {
+      const kbData = kbSheet.getDataRange().getValues();
+      GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
+      console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
+    }
+    
+    GLOBAL_CACHE.loaded = true;
+    console.log('✓ Resources loaded successfully');
+    
+  } catch (error) {
+    console.error(`❌ Error loading resources: ${error.message}`);
+  }
+}
+
+// ====================================================================
+// SUSPENSION TIME CHECK
+// ====================================================================
+
+// Days when the system MUST respond (Employees are OFF)
+// Format: [Month, Day]
+// 1 Jan, 6 Jan, 25 Apr, 1 May, 29 Jun, 15 Aug, 1 Nov, 8 Dec, 25 Dec, 26 Dec
+const ALWAYS_OPERATING_DAYS = [
+  [1, 1],    // Capodanno
+  [1, 6],    // Epifania
+  [4, 25],   // Liberazione
+  [5, 1],    // Festa del Lavoro
+  [6, 29],   // SS. Pietro e Paolo
+  [8, 15],   // Assunzione (Ferragosto)
+  [11, 1],   // Ognissanti
+  [12, 8],   // Immacolata
+  [12, 25],  // Natale
+  [12, 26]   // Santo Stefano
+];
+
+const SUSPENSION_HOURS = {
+  1: [[8, 20]],    // Lunedì: 8–20
+  2: [[8, 14]],    // Martedì: 8–14
+  3: [[8, 17]],    // Mercoledì: 8–17
+  4: [[8, 14]],    // Giovedì: 8–14
+  5: [[8, 17]]     // Venerdì: 8–17
+};
+
+/**
+ * Calculates Easter Sunday for a given year (Western/Gregorian)
+ */
+function calculateEaster(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31); // 3=March, 4=April
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Checks if a date is within the Ferragosto vacation period
+ * Rule: Fixed period from August 15th to August 31st (inclusive)
+ */
+function isFerragostoFixedPeriod(date) {
+  const month = date.getMonth() + 1; // 1-12
+  const day = date.getDate();
+  return month === 8 && day >= 15 && day <= 31;
+}
+
+/**
+ * Checks if the system should be SUSPENDED (i.e. Employees are WORKING)
+ * Returns TRUE if Suspended (Secretariat working)
+ * Returns FALSE if Active (System responding, e.g., Holidays, Night, Weekend)
+ * @param {Date} [checkDate] - Optional date to check (defaults to now)
+ */
+function isInSuspensionTime(checkDate = new Date()) {
+  const now = checkDate;
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const date = now.getDate();
+  const day = now.getDay();
+  const hour = now.getHours();
+
+  // ----------------------------------------------------------
+  // 1. CHECK "ALWAYS OPERATING" DAYS (Priority)
+  // If it's a holiday, the system MUST work (return false)
+  // ----------------------------------------------------------
+
+  // A. Fixed Holidays
+  for (const [hMonth, hDay] of ALWAYS_OPERATING_DAYS) {
+    if (month === hMonth && date === hDay) {
+      console.log('📅 Giorno Festivo Fisso (Sistema Attivo)');
+      return false; // Active
+    }
+  }
+  // Special active period: Dec 24 and Dec 31 from 14:00, full day Dec 25-26, Jan 1
+  if (month === 12 && ((date === 24 && hour >= 14) || date === 25 || date === 26 || (date === 31 && hour >= 14))) {
+    console.log('📅 Periodo speciale attivo (Natale/Capodanno)');
+    return false; // Active
+  }
+
+  // B. Easter Mobile Dates
+  const easter = calculateEaster(year);
+  
+  // Pasquetta (Easter + 1 day)
+  const pasquetta = new Date(easter);
+  pasquetta.setDate(easter.getDate() + 1);
+  if (month === (pasquetta.getMonth() + 1) && date === pasquetta.getDate()) {
+    console.log('📅 Pasquetta (Sistema Attivo)');
+    return false;
+  }
+
+  // Holy Saturday (Easter - 1 day)
+  const holySaturday = new Date(easter);
+  holySaturday.setDate(easter.getDate() - 1);
+  if (month === (holySaturday.getMonth() + 1) && date === holySaturday.getDate()) {
+    console.log('📅 Sabato Santo (Sistema Attivo)');
+    return false;
+  }
+
+  // C. Ferragosto Period (Fixed: August 15-31)
+  if (isFerragostoFixedPeriod(now)) {
+    console.log('📅 Periodo Ferragosto (Sistema Attivo)');
+    return false;
+  }
+
+  // ----------------------------------------------------------
+  // 2. CHECK REGULAR OFFICE HOURS
+  // If not a holiday, check if employees are working
+  // ----------------------------------------------------------
+  if (SUSPENSION_HOURS[day]) {
+    for (const [startH, endH] of SUSPENSION_HOURS[day]) {
+      if (hour >= startH && hour < endH) {
+        // We are within working hours, and it's NOT a holiday
+        return true; // SUSPENDED
+      }
+    }
+  }
+
+  // Default: Not in suspension hours -> Active
+  return false;
+}
+
+// ====================================================================
+// SPECIAL MASS RULES (Legacy Feature Restore)
+// ====================================================================
+
+/**
+ * Returns a special rule string if today is a special feast day.
+ * Rule: On special days (Easter Monday, 25 Apr, 1 May, 2 Jun, 26 Dec),
+ * Mass is ONLY at 19:00 (unless it's Sunday).
+ */
+function getSpecialMassTimeRule(date = new Date()) {
+  const month = date.getMonth() + 1; // 1-12
+  const day = date.getDate();
+  const weekDay = date.getDay(); // 0=Sun
+  
+  // If it's Sunday, standard Sunday rules usually apply (unless override needed)
+  // Legacy logic implied: "tranne se cadono di domenica" -> if Sunday, standard rules apply.
+  if (weekDay === 0) {
+    return null; 
+  }
+
+  // Special Fixed Days: 25 Apr, 1 May, 2 Jun, 26 Dec
+  const specialFixed = [
+    [4, 25], // Anniversario Liberazione
+    [5, 1],  // Festa Lavoro
+    [6, 2],  // Repubblica
+    [12, 26] // Santo Stefano
+  ];
+
+  let isSpecial = false;
+  
+  // Check Fixed
+  for (const [m, d] of specialFixed) {
+    if (month === m && day === d) {
+      isSpecial = true;
+      break;
+    }
+  }
+
+  // Check Easter Monday (Pasquetta)
+  if (!isSpecial) {
+    const easter = calculateEaster(date.getFullYear());
+    const pasquetta = new Date(easter);
+    pasquetta.setDate(easter.getDate() + 1);
+    
+    if (month === (pasquetta.getMonth() + 1) && day === pasquetta.getDate()) {
+      isSpecial = true;
+    }
+  }
+
+  if (isSpecial) {
+    return `
+════════════════════════════════════════════════════════════════════════
+🚨 REGOLA SPECIALE ORARIO MESSA (OGGI È GIORNO FESTIVO INFRASETTIMANALE)
+════════════════════════════════════════════════════════════════════════
+ATTENZIONE: Oggi è un giorno festivo speciale (es. Lunedì dell'Angelo, 25 Aprile, 
+1 Maggio, 2 Giugno o Santo Stefano).
+
+REGOLA: In questi giorni, la Santa Messa viene celebrata ESCLUSIVAMENTE alle ore 19:00.
+NON citare orari feriali standard (es. 8:30 o 18:00).
+NON citare orari festivi standard se non è Domenica.
+
+Unico orario valido per OGGI: ore 19:00.
+════════════════════════════════════════════════════════════════════════
+`;
+  }
+
+  return null;
+}
+
+/**
+ * Returns a string describing the Ferragosto vacation period.
+ * Fixed period: August 15th to August 31st.
+ */
+function getFerragostoPeriodInfo(date = new Date()) {
+  const year = date.getFullYear();
+  return `Periodo Ferragosto: 15 ago - 31 ago ${year}`;
+}
+
+
+
+// ====================================================================
+// CRITICAL CONFIG ASSERTION (fail-fast)
+// ====================================================================
+
+function assertCriticalConfig() {
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('GEMINI_API_KEY')) {
+    throw new Error('❌ GEMINI_API_KEY missing in Script Properties');
+  }
+  if (!props.getProperty('SPREADSHEET_ID')) {
+    throw new Error('❌ SPREADSHEET_ID missing in Script Properties');
+  }
+}
+
+// ====================================================================
+// MAIN ENTRY POINT - For Trigger
+// ====================================================================
+
+/**
+ * Funzione principale da collegare al trigger
+ * Eseguire ogni 5-15 minuti
+ */
+function main() {
+  console.log('\n' + '═'.repeat(70));
+  console.log('🚀 AVVIO ELABORAZIONE EMAIL');
+  console.log('═'.repeat(70));
+  console.log(`⏰ ${new Date().toLocaleString('it-IT')}`);
+  
+  // Fail-fast on missing config
+  assertCriticalConfig();
+  
+  // Check suspension
+  if (isInSuspensionTime()) {
+    console.log('⏸️ Servizio sospeso: orario di lavoro segreteria');
+    return;
+  }
+  
+  // Load resources
+  loadResources();
+  
+  if (!GLOBAL_CACHE.knowledgeBase) {
+    console.error('❌ Knowledge Base non caricata, esco');
+    return;
+  }
+  
+  // Create and run processor
+  try {
+    const processor = new EmailProcessor();
+    const stats = processor.processUnreadEmails(
+      GLOBAL_CACHE.knowledgeBase,
+      GLOBAL_CACHE.doctrineBase
+    );
+    
+    console.log('\n✓ Elaborazione completata');
+    console.log(`   Processate: ${stats.total}, Risposte: ${stats.replied}, Filtrate: ${stats.filtered}`);
+    
+  } catch (error) {
+    console.error(`❌ Errore fatale: ${error.message}`);
+  }
+}
+
+// ====================================================================
+// UTILITY FUNCTIONS
+// ====================================================================
+
+/**
+ * Test connessione API Gemini
+ */
+function testGeminiConnection() {
+  console.log('🧪 Testing Gemini connection...');
+  const gemini = new GeminiService();
+  const result = gemini.testConnection();
+  console.log('Result:', JSON.stringify(result, null, 2));
+  return result;
+}
+
+/**
+ * Test connessione Gmail
+ */
+function testGmailConnection() {
+  console.log('🧪 Testing Gmail connection...');
+  const gmail = new GmailService();
+  const result = gmail.testConnection();
+  console.log('Result:', JSON.stringify(result, null, 2));
+  return result;
+}
+
+/**
+ * Test pipeline senza inviare email
+ */
+function testDryRun() {
+  console.log('🧪 Starting DRY RUN test...');
+  CONFIG.DRY_RUN = true;
+  main();
+}
+
+/**
+ * TEST FUNZIONE VACANZE
+ * Eseguire da editor per verificare la logica
+ */
+function testHolidayLogic() {
+  console.log('🧪 TESTING HOLIDAY LOGIC (Simulazione date)...');
+  
+  // Casi di test
+  // Nota: I mesi in JS Date sono 0-indexed (0=Gennaio, 11=Dicembre)
+  const testCases = [
+    // --- DATE FISSE (Devono essere ATTIVO/FALSE) ---
+    { label: 'Natale (Giovedì)', d: new Date(2025, 11, 25, 10, 0), expectSuspended: false },
+    { label: 'Santo Stefano (Venerdì)', d: new Date(2025, 11, 26, 10, 0), expectSuspended: false },
+    { label: 'Capodanno (Mercoledì)', d: new Date(2025, 0, 1, 10, 0), expectSuspended: false },
+    { label: 'Epifania (Lunedì)', d: new Date(2025, 0, 6, 10, 0), expectSuspended: false },
+    { label: 'Liberazione (Venerdì)', d: new Date(2025, 3, 25, 10, 0), expectSuspended: false },
+    { label: '1 Maggio (Giovedì)', d: new Date(2025, 4, 1, 10, 0), expectSuspended: false },
+    { label: 'SS Pietro Paolo (Domenica)', d: new Date(2025, 5, 29, 10, 0), expectSuspended: false },
+    { label: 'Ferragosto (Venerdì)', d: new Date(2025, 7, 15, 10, 0), expectSuspended: false },
+    { label: 'Ognissanti (Sabato)', d: new Date(2025, 10, 1, 10, 0), expectSuspended: false },
+    { label: 'Immacolata (Lunedì)', d: new Date(2025, 11, 8, 10, 0), expectSuspended: false },
+
+    // --- DATE MOBILI PASQUA 2025 (Pasqua: 20 Aprile) ---
+    { label: 'Sabato Santo 2025', d: new Date(2025, 3, 19, 10, 0), expectSuspended: false },
+    { label: 'Pasqua 2025', d: new Date(2025, 3, 20, 10, 0), expectSuspended: false },
+    { label: 'Pasquetta 2025', d: new Date(2025, 3, 21, 10, 0), expectSuspended: false },
+    
+    // --- PERIODO FERRAGOSTO 2025 (Fisso: 15-31 Agosto) ---
+    { label: 'Prima di Ferragosto (14 Ago - Giovedì)', d: new Date(2025, 7, 14, 10, 0), expectSuspended: true }, // Giovedì orario lavoro
+    { label: 'Inizio Ferragosto (15 Ago)', d: new Date(2025, 7, 15, 10, 0), expectSuspended: false },
+    { label: 'Durante Ferragosto (20 Ago)', d: new Date(2025, 7, 20, 10, 0), expectSuspended: false },
+    { label: 'Fine Ferragosto (31 Ago)', d: new Date(2025, 7, 31, 10, 0), expectSuspended: false },
+    { label: 'Dopo Ferragosto (1 Set - Lunedì)', d: new Date(2025, 8, 1, 10, 0), expectSuspended: true }, // Lunedì orario lavoro
+
+    // --- ORARI STANDARD ---
+    { label: 'Giovedì lavorativo (16 Ott)', d: new Date(2025, 9, 16, 10, 0), expectSuspended: true },  // Sospeso
+    { label: 'Giovedì sera (16 Ott)', d: new Date(2025, 9, 16, 20, 0), expectSuspended: false },       // Attivo (fuori orario)
+    { label: 'Domenica (non festiva)', d: new Date(2025, 9, 12, 10, 0), expectSuspended: false }       // Attivo
+  ];
+
+  let passed = 0;
+  console.log('---------------------------------------------------');
+  testCases.forEach(tc => {
+    const isSuspended = isInSuspensionTime(tc.d);
+    // expectSuspended: true = Sospeso (Employees working)
+    // expectSuspended: false = Attivo (Employees OFF)
+    
+    const resultStr = isSuspended ? "⛔ SOSPESO (Lavoro)" : "✅ ATTIVO (Bot risponde)";
+    const ok = isSuspended === tc.expectSuspended;
+    
+    if (ok) passed++;
+    const icon = ok ? "👍" : "❌ ERRORE";
+    
+    console.log(`${icon} ${tc.label} -> ${resultStr}`);
+    if (!ok) {
+      console.log(`   ⚠️ Atteso: ${tc.expectSuspended ? "SOSPESO" : "ATTIVO"} | Data: ${tc.d.toLocaleString()}`);
+    }
+  });
+  console.log('---------------------------------------------------');
+  console.log(`Risultato: ${passed}/${testCases.length} test passati.`);
+}
+
+function testRestoredFeatures() {
+  console.log('🧪 VERIFICA FUNZIONALITÀ RESTAURATE');
+  
+  // 1. TEST REGOLA MESSA SPECIALE
+  console.log('\n--- 1. Special Mass Rule Test ---');
+  const d = new Date(2026, 3, 6); // 6 Aprile 2026 (Lunedì dell'Angelo - Pasqua è il 5)
+  // Pasqua 2026 calcolo:
+  // a=2026%19=12, b=20, c=26, d=5, e=0, f=1, g=6, h=(19*12+20-5-6+15)%30 = (228+9+15)%30 = 252%30=12
+  // i=6, k=2, l=(32+0+12-12-2)%7 = 30%7=2
+  // m=(12+132+44)/451=0.
+  // month=(12+2+114)/31 = 128/31 = 4 (Aprile). day=(128%31)+1 = 5.
+  // Easter 2026 is April 5. Pasquetta is April 6.
+  
+  const rule = getSpecialMassTimeRule(d);
+  if (rule && rule.includes('19:00')) {
+    console.log('✅ Regola Pasquetta rilevata correttamente:\n', rule.trim().substring(0, 100) + '...');
+  } else {
+    console.error('❌ ERRORE: Regola Pasquetta NON rilevata per il ' + d.toDateString());
+  }
+  
+  const dNormal = new Date(2026, 3, 7); // 7 Aprile (Martedì)
+  if (getSpecialMassTimeRule(dNormal) === null) {
+    console.log('✅ Giorno normale = Nessuna regola (Corretto)');
+  } else {
+    console.error('❌ ERRORE: Rilevata regola speciale in giorno normale');
+  }
+
+  // 2. TEST FORMATTING SAFEGUARDS
+  console.log('\n--- 2. Formatting Safeguards Test ---');
+  const service = new GmailService();
+  
+  // A. Punctuation
+  const badPunc = "Buongiorno, Siamo lieti di...";
+  const fixedPunc = service.fixPunctuation(badPunc);
+  if (fixedPunc === "Buongiorno, siamo lieti di...") {
+    console.log(`✅ Fix Punctuation: "${badPunc}" -> "${fixedPunc}"`);
+  } else {
+    console.error(`❌ ERROR Punctuation: "${badPunc}" -> "${fixedPunc}"`);
+  }
+  
+  // B. Line Break
+  const badBreak = "Buongiorno, siamo\nEcco le info...";
+  const fixedBreak = service.ensureGreetingLineBreak(badBreak);
+  if (fixedBreak.includes('\n\n')) {
+    console.log(`✅ Fix LineBreak: Break inserted correctly.`);
+  } else {
+    console.error(`❌ ERROR LineBreak: Break NOT inserted.`);
+  }
+}
+
+/**
+ * Pulizia memoria vecchia (>30 giorni)
+ */
+function cleanupMemory() {
+  const memory = new MemoryService();
+  const deleted = memory.cleanOldEntries(30);
+  console.log(`🧹 Cleaned ${deleted} old memory entries`);
+  return deleted;
+}
+
+/**
+ * Status check completo
+ */
+function healthCheck() {
+  console.log('\n' + '═'.repeat(50));
+  console.log('🏥 HEALTH CHECK');
+  console.log('═'.repeat(50));
+  
+  // Gemini
+  const gemini = new GeminiService();
+  const geminiStatus = gemini.testConnection();
+  console.log(`Gemini API: ${geminiStatus.isHealthy ? '✓ OK' : '❌ FAIL'}`);
+  
+  // Gmail
+  const gmail = new GmailService();
+  const gmailStatus = gmail.testConnection();
+  console.log(`Gmail API: ${gmailStatus.isHealthy ? '✓ OK' : '❌ FAIL'}`);
+  
+  // Memory
+  const memory = new MemoryService();
+  const memoryStatus = memory.getStats();
+  console.log(`Memory: ${memoryStatus.initialized ? '✓ OK' : '❌ FAIL'} (${memoryStatus.totalEntries || 0} entries)`);
+  
+  // Knowledge Base
+  loadResources();
+  console.log(`Knowledge Base: ${GLOBAL_CACHE.knowledgeBase ? '✓ OK' : '❌ FAIL'} (${GLOBAL_CACHE.knowledgeBase?.length || 0} chars)`);
+  
+  console.log('═'.repeat(50));
+  
+  return {
+    gemini: geminiStatus.isHealthy,
+    gmail: gmailStatus.isHealthy,
+    memory: memoryStatus.initialized,
+    knowledgeBase: !!GLOBAL_CACHE.knowledgeBase
+  };
+}
+
+// ====================================================================
+// TRIGGER MANAGEMENT
+// ====================================================================
+
+/**
+ * Crea trigger temporizzato (ogni 10 minuti)
+ */
+function createTimeTrigger() {
+  // Rimuovi trigger esistenti
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'main') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+  
+  // Crea nuovo trigger
+  ScriptApp.newTrigger('main')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+    
+  console.log('✓ Trigger creato: main() ogni 10 minuti');
+}
+
+/**
+ * Rimuovi tutti i trigger
+ */
+function removeTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(trigger => ScriptApp.deleteTrigger(trigger));
+  console.log(`✓ Rimossi ${triggers.length} trigger`);
+}

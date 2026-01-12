@@ -1,0 +1,471 @@
+// ====================================================================
+// GMAIL SERVICE - Gestione operazioni Gmail (Allineato a CF)
+// ✅ Reply-To header support
+// ✅ Label cache per evitare chiamate ripetute
+// ✅ Conversation history builder
+// ====================================================================
+
+/**
+ * GmailService - Aligned with CF gmail_service.py
+ * 
+ * KEY FEATURES:
+ * ✅ Label cache for performance
+ * ✅ Reply-To header support for web forms
+ * ✅ Conversation history builder
+ * ✅ Quote/signature removal
+ */
+class GmailService {
+  constructor() {
+    console.log('📧 Initializing GmailService (CF-aligned)...');
+    
+    // Label cache to avoid repeated API calls
+    this._labelCache = {};
+    
+    console.log('✓ GmailService initialized with label cache');
+  }
+  
+  // ========================================================================
+  // LABEL MANAGEMENT (with cache)
+  // ========================================================================
+  
+  /**
+   * Get or create a Gmail label with caching
+   * ✅ ALIGNED: Label cache from CF get_or_create_label
+   */
+  getOrCreateLabel(labelName) {
+    // Check cache first
+    if (this._labelCache[labelName]) {
+      console.log(`📦 Label '${labelName}' found in cache`);
+      return this._labelCache[labelName];
+    }
+    
+    // Check if label exists
+    const labels = GmailApp.getUserLabels();
+    for (const label of labels) {
+      if (label.getName() === labelName) {
+        // Cache and return
+        this._labelCache[labelName] = label;
+        console.log(`✓ Label '${labelName}' found`);
+        return label;
+      }
+    }
+    
+    // Create new label
+    const newLabel = GmailApp.createLabel(labelName);
+    this._labelCache[labelName] = newLabel;
+    console.log(`✓ Created new label: ${labelName}`);
+    return newLabel;
+  }
+  
+  /**
+   * Clear the label cache
+   */
+  clearLabelCache() {
+    this._labelCache = {};
+    console.log('🗑️ Label cache cleared');
+  }
+  
+  /**
+   * Add label to thread
+   */
+  addLabelToThread(thread, labelName) {
+    const label = this.getOrCreateLabel(labelName);
+    thread.addLabel(label);
+    console.log(`✓ Added label '${labelName}' to thread`);
+  }
+  
+  // ========================================================================
+  // MESSAGE EXTRACTION (with Reply-To support)
+  // ========================================================================
+  
+  /**
+   * Extract message details with Reply-To support
+   * ✅ ALIGNED: Reply-To handling from CF extract_message_details
+   */
+  extractMessageDetails(message) {
+    const subject = message.getSubject();
+    const sender = message.getFrom();
+    const date = message.getDate();
+    const body = message.getPlainBody() || this._htmlToPlainText(message.getBody());
+    const messageId = message.getId();
+    
+    // ✅ NEW: Get Reply-To header
+    const replyTo = message.getReplyTo();
+    
+    // Use Reply-To if present and valid
+    let effectiveSender;
+    let hasReplyTo = false;
+    
+    if (replyTo && replyTo.includes('@') && replyTo !== sender) {
+      effectiveSender = replyTo;
+      hasReplyTo = true;
+      console.log(`   📧 Using Reply-To: ${replyTo} (Original From: ${sender})`);
+    } else {
+      effectiveSender = sender;
+    }
+    
+    // Extract name and email
+    const senderName = this._extractSenderName(effectiveSender);
+    const senderEmail = this._extractEmailAddress(effectiveSender);
+    
+    return {
+      id: messageId,
+      subject: subject,
+      sender: effectiveSender,
+      senderName: senderName,
+      senderEmail: senderEmail,
+      date: date,
+      body: body,
+      originalFrom: sender,
+      hasReplyTo: hasReplyTo
+    };
+  }
+  
+  /**
+   * Extract sender name from From field
+   */
+  _extractSenderName(fromField) {
+    const match = fromField.match(/^"?(.+?)"?\s*</);
+    if (match) {
+      return match[1].trim();
+    }
+    
+    // Use email prefix as fallback
+    const email = this._extractEmailAddress(fromField);
+    if (email) {
+      return email.split('@')[0];
+    }
+    
+    return 'Utente';
+  }
+  
+  /**
+   * Extract email address from From field
+   */
+  _extractEmailAddress(fromField) {
+    const match = fromField.match(/<(.+?)>/);
+    if (match) {
+      return match[1];
+    }
+    
+    // If no brackets, check if whole field is email
+    if (fromField.includes('@')) {
+      return fromField.trim();
+    }
+    
+    return '';
+  }
+  
+  /**
+   * Convert HTML to plain text
+   */
+  _htmlToPlainText(html) {
+    if (!html) return '';
+    
+    // Remove HTML tags
+    let text = html.replace(/<[^>]+>/g, ' ');
+    // Decode HTML entities
+    text = text.replace(/&nbsp;/g, ' ')
+               .replace(/&amp;/g, '&')
+               .replace(/&lt;/g, '<')
+               .replace(/&gt;/g, '>');
+    // Clean up whitespace
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    return text;
+  }
+  
+  // ========================================================================
+  // CONVERSATION HISTORY
+  // ========================================================================
+  
+  /**
+   * Build conversation history from thread messages
+   * ✅ ALIGNED: Same logic as CF build_conversation_history
+   */
+  buildConversationHistory(messages, maxMessages = 10, ourEmail = '') {
+    // Limit number of messages
+    if (messages.length > maxMessages) {
+      console.warn(`⚠️ Thread with ${messages.length} messages, limiting to last ${maxMessages}`);
+      messages = messages.slice(-maxMessages);
+    }
+    
+    const history = [];
+    
+    for (const msg of messages) {
+      const details = this.extractMessageDetails(msg);
+      const isOurs = ourEmail && details.senderEmail.toLowerCase() === ourEmail.toLowerCase();
+      
+      const prefix = isOurs ? 'Segreteria' : `Utente (${details.senderName})`;
+      
+      // Truncate very long messages
+      let body = details.body;
+      if (body.length > 2000) {
+        body = body.substring(0, 2000) + '\n[... messaggio troncato ...]';
+      }
+      
+      history.push(`${prefix}: ${body}\n---`);
+    }
+    
+    return history.join('\n');
+  }
+  
+  // ========================================================================
+  // QUOTE/SIGNATURE REMOVAL
+  // ========================================================================
+  
+  /**
+   * Extract main reply content, removing quoted text
+   * ✅ ALIGNED: Same logic as CF extract_main_reply
+   */
+  extractMainReply(content) {
+    const markers = [
+      /^>/m,
+      /^On .* wrote:/m,
+      /^Il giorno .* ha scritto:/m,
+      /^-{3,}.*Original Message/m
+    ];
+    
+    let result = content;
+    
+    for (const marker of markers) {
+      const match = content.search(marker);
+      if (match !== -1) {
+        result = content.substring(0, match);
+        break;
+      }
+    }
+    
+    // Remove signatures
+    const sigMarkers = [
+      /cordiali saluti/i,
+      /distinti saluti/i,
+      /in fede/i,
+      /best regards/i,
+      /sincerely/i,
+      /sent from my iphone/i,
+      /inviato da/i
+    ];
+    
+    for (const marker of sigMarkers) {
+      const match = result.search(marker);
+      if (match !== -1) {
+        result = result.substring(0, match);
+        break;
+      }
+    }
+    
+    return result.trim();
+  }
+  
+  // ========================================================================
+  // SEND REPLY
+  // ========================================================================
+  
+  /**
+   * Send reply to a thread
+   * ✅ Uses sender_email which includes Reply-To when present
+   */
+  sendReply(thread, replyText, messageDetails) {
+    // Get the GmailThread object if it's an ID
+    const gmailThread = typeof thread === 'string' ? 
+                        GmailApp.getThreadById(thread) : thread;
+    
+    // Reply to thread (Gmail handles threading automatically)
+    gmailThread.reply(replyText);
+    
+    console.log(`✓ Reply sent to ${messageDetails.senderEmail}`);
+    
+    if (messageDetails.hasReplyTo) {
+      console.log('   📧 Reply sent to Reply-To address');
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Send reply as HTML (for formatted responses)
+   * ✅ Applies formatting safeguards (legacy feature)
+   */
+  sendHtmlReply(thread, responseText, messageDetails) {
+    // 1. Apply Formatting Safeguards (Legacy restoration)
+    let finalResponse = this.fixPunctuation(responseText);
+    finalResponse = this.ensureGreetingLineBreak(finalResponse);
+
+    // 2. Convert to HTML
+    const htmlBody = markdownToHtml(finalResponse);
+
+    const gmailThread = typeof thread === 'string'
+      ? GmailApp.getThreadById(thread)
+      : thread;
+
+    gmailThread.reply('', {
+      htmlBody: htmlBody
+    });
+
+    console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
+  }
+
+  // ========================================================================
+  // FORMATTING SAFEGUARDS (Legacy Features)
+  // ========================================================================
+
+  /**
+   * Fixes common punctuation errors
+   * e.g., "Buongiorno, Siamo" -> "Buongiorno, siamo"
+   */
+  fixPunctuation(text) {
+    if (!text) return text;
+    
+    // Regex to find "Word, Capital" and lowercase the capital
+    // Exceptions can be added if needed, but usually after comma we want lowercase 
+    // unless it's a proper noun (which is hard to detect without NLP, but "Siamo", "La", "Vi" are common errors).
+    
+    // safe list of words that SHOULD be capitalized after comma (Proper nouns, Titles)
+    // For now, we apply a specific fix for the common "Greeting, We..." pattern logic if generalized is too risky.
+    // Legacy logic was likely simple. Let's fix common Italian errors.
+    
+    return text.replace(/(Buongiorno|Buonasera|Salve|Ciao)[,\.]\s+(Siamo|La|Vi|Il|I|Le)\b/g, (match, p1, p2) => {
+      // Keep p1 (Greeting) as is
+      // Lowercase p2 (The following word)
+      return `${p1}, ${p2.toLowerCase()}`;
+    });
+  }
+
+  /**
+   * Ensures there is a blank line after the greeting
+   */
+  ensureGreetingLineBreak(text) {
+    if (!text) return text;
+
+    // Pattern: Greeting line (start of string, some words, maybe comma/exclamation, newline)
+    // Followed by immediate text without empty line.
+    
+    // E.g. ^Buongiorno, \nSiamo... -> ^Buongiorno, \n\nSiamo...
+    
+    const lines = text.split('\n');
+    if (lines.length > 1) {
+      const firstLine = lines[0].trim();
+      // Check if it looks like a greeting
+      if (/^(Buongiorno|Buonasera|Salve|Gentile|Egregio|Ciao)/i.test(firstLine)) {
+        // Check if second line is NOT empty
+        if (lines[1].trim() !== '') {
+            // Insert empty line
+            lines.splice(1, 0, '');
+            return lines.join('\n');
+        }
+      }
+    }
+    return text;
+  }
+
+  // ========================================================================
+  // HEALTH CHECK
+  // ========================================================================
+  
+  /**
+   * Test Gmail access
+   */
+  testConnection() {
+    const results = {
+      connectionOk: false,
+      canListMessages: false,
+      canCreateLabels: false,
+      errors: []
+    };
+    
+    try {
+      // Test listing threads
+      const threads = GmailApp.search('is:unread', 0, 1);
+      results.connectionOk = true;
+      results.canListMessages = true;
+      
+      // Test label creation
+      try {
+        const testLabel = this.getOrCreateLabel('_TEST_LABEL_');
+        results.canCreateLabels = true;
+        
+        // Cleanup
+        try {
+          testLabel.deleteLabel();
+        } catch (e) {
+          // Non-critical
+        }
+      } catch (e) {
+        results.errors.push(`Cannot create labels: ${e.message}`);
+      }
+      
+    } catch (e) {
+      results.errors.push(`Connection error: ${e.message}`);
+    }
+    
+    results.isHealthy = results.connectionOk && results.canListMessages;
+    return results;
+  }
+}
+
+// Factory function
+function createGmailService() {
+  return new GmailService();
+}
+
+// ====================================================================
+// MARKDOWN → HTML (GLOBAL, REQUIRED BY GmailService)
+// Ripristina stile originale: viola + font 20px
+// ====================================================================
+
+function markdownToHtml(text) {
+  if (!text) return '';
+
+  let html = text;
+
+  // Proteggi eventuali code blocks
+  const codeBlocks = [];
+  html = html.replace(/```[\s\S]*?```/g, (match) => {
+    codeBlocks.push(match);
+    return `__CODEBLOCK_${codeBlocks.length - 1}__`;
+  });
+
+  // Headers
+  html = html.replace(/^###\s+(.+)$/gm, '<p style="font-size:16px;font-weight:bold;">$1</p>');
+  html = html.replace(/^##\s+(.+)$/gm, '<p style="font-size:18px;font-weight:bold;">$1</p>');
+  html = html.replace(/^#\s+(.+)$/gm, '<p style="font-size:20px;font-weight:bold;">$1</p>');
+
+  // Bold / Italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '<em>$1</em>');
+
+  // Links
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#351c75;">$1</a>');
+
+  // Restore code blocks
+  codeBlocks.forEach((block, i) => {
+    const code = block.replace(/```/g, '').trim();
+    html = html.replace(
+      `__CODEBLOCK_${i}__`,
+      `<pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-family:monospace;">${code}</pre>`
+    );
+  });
+
+  // Paragraphs and line breaks
+  html = html.replace(/\n\n+/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+
+  // Convert emojis to HTML entities for better email compatibility
+  // Convert all non-ASCII characters (emojis, accents, etc.) to HTML entities
+  html = html.replace(/[^\x00-\x7F]/g, char => {
+    return '&#' + char.codePointAt(0) + ';';
+  });
+
+  // Final wrapper (IDENTITÀ VISIVA ORIGINALE)
+  return `
+    <div style="
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 20px;
+      color: #351c75;
+      line-height: 1.6;
+    ">
+      <p>${html}</p>
+    </div>
+  `;
+}
