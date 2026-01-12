@@ -310,7 +310,8 @@ class MemoryService {
       providedInfo = values[4] ? [values[4]] : [];
     }
     
-    return {
+    // FIX Bug 9: Validate lastUpdated timestamp
+    let obj = {
       threadId: values[0],
       language: values[1] || 'it',
       category: values[2] || null,
@@ -320,7 +321,6 @@ class MemoryService {
       messageCount: parseInt(values[6]) || 0
     };
     
-    // FIX Bug 9: Validate lastUpdated timestamp
     if (obj.lastUpdated && isNaN(new Date(obj.lastUpdated).getTime())) {
       console.warn(`⚠️ Invalid date in memory for thread ${obj.threadId}: ${obj.lastUpdated}`);
       obj.lastUpdated = null;
