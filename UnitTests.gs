@@ -276,17 +276,51 @@ function testBugFixes() {
   }
 
   // Bug #3: XSS in Markdown
-  // markdownToHtml is a global function in GmailService.gs, NOT a method of GmailService class
   if (typeof markdownToHtml === 'function') {
       const maliciousMd = "[Click me](javascript:alert(1))";
-      // We expect the javascript link to be stripped or sanitized to # or similar, NOT rendered as href="javascript:..."
       const html = markdownToHtml(maliciousMd);
       const isSanitized = !html.includes('href="javascript:alert(1)"');
       assertTrue(isSanitized, "Markdown XSS should be sanitized");
   } else {
-      // If verification fails, check if function is available (might be private or named differently)
-      // Based on code review, it IS global.
        assert(false, "markdownToHtml function not found globally");
+  }
+
+  // === NEW BUG FIX VERIFICATIONS (11-14) ===
+
+  // Bug #11: RPD Quotas
+  if (typeof CONFIG !== 'undefined' && CONFIG.GEMINI_MODELS) {
+    const flashRef = CONFIG.GEMINI_MODELS['flash-2.5'];
+    if (flashRef) {
+      assert(flashRef.rpd >= 1000, `Bug #11: RPD should be increased (Current: ${flashRef.rpd})`);
+    } else {
+      console.warn("Bug #11 Test: flash-2.5 model config not found");
+    }
+  }
+
+  // Bug #12: MemoryService Timestamp Validation
+  if (typeof MemoryService !== 'undefined') {
+    const memory = new MemoryService();
+    // Simulate invalid timestamp row
+    const invalidRow = ['t1', 'it', 'cat', 'tone', '[]', 'INVALID_DATE', '0']; 
+    // We need to access private _rowToObject logic. 
+    // Since unit tests in GAS run in same context, we can often access "private" methods if they are just on prototype.
+    if (typeof memory._rowToObject === 'function') {
+      const obj = memory._rowToObject(invalidRow);
+      assertEqual(obj.lastUpdated, null, "Bug #12: Invalid lastUpdated should be null");
+    } else {
+      console.warn("Bug #12 Test: _rowToObject not accessible");
+    }
+  }
+  
+  // Bug #14: Confidence Threshold
+  if (typeof RequestTypeClassifier !== 'undefined') {
+     const classifier = new RequestTypeClassifier();
+     const lowConfHint = { category: 'PASTORAL', confidence: 0.75 };
+     const res = classifier.classify("Subj", "Body", lowConfHint);
+     // Should reject 0.75 and fallback to regex (default technical in this dummy case)
+     // Or regex might classify as something else based on Body. 
+     // "Body" has no pastoral keywords -> Technical regex result.
+     assertEqual(res.source, 'regex', "Bug #14: Low confidence (0.75) should use regex fallback");
   }
 }
 

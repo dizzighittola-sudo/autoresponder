@@ -162,7 +162,7 @@ class RequestTypeClassifier {
     let requestType = 'technical';
     let source = 'regex';
     
-    if (externalHint && externalHint.category && externalHint.confidence >= 0.7) {
+    if (externalHint && externalHint.category && externalHint.confidence >= 0.8) {
       // ✅ Usa classificazione Gemini se disponibile e confidente
       requestType = externalHint.category.toLowerCase();
       source = 'gemini';

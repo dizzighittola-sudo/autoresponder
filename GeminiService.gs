@@ -180,17 +180,47 @@ Output JSON atteso:
     
     const result = JSON.parse(response.getContentText());
     
+    // Default result in case of parsing or safety issues
+    const defaultResult = {
+      shouldRespond: false,
+      language: 'it', // Default to Italian
+      reason: 'quick_check_failed',
+      classification: {
+        category: 'TECHNICAL',
+        topic: 'unknown',
+        confidence: 0.0
+      }
+    };
+
     if (!result.candidates || !result.candidates[0]) {
-      throw new Error('No candidates in response');
+      console.error('❌ No candidates in response from Gemini Quick Check');
+      return defaultResult;
     }
-    
-    const candidate = result.candidates[0];
-    if (candidate.finishReason && ['SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST'].includes(candidate.finishReason)) {
-      throw new Error(`Response blocked: ${candidate.finishReason}`);
-    }
-    
-    const textResponse = candidate.content.parts[0].text;
-    const data = parseGeminiJsonLenient(textResponse);
+        const candidate = result.candidates[0];
+      
+      if (candidate.finishReason && ['SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST'].includes(candidate.finishReason)) {
+        console.warn(`⚠️ Quick check blocked: ${candidate.finishReason}`);
+        return defaultResult;
+      }
+
+      // FIX Bug 13: Robust null checks for response structure
+      if (!candidate.content) {
+        console.error('❌ Invalid response: missing content');
+        return defaultResult;
+      }
+
+      if (!candidate.content.parts || candidate.content.parts.length === 0) {
+        console.error('❌ Invalid response: missing or empty parts array');
+        return defaultResult;
+      }
+
+      if (!candidate.content.parts[0].text) {
+        console.error('❌ Invalid response: missing text in first part');
+        return defaultResult;
+      }
+      
+      const textResponse = candidate.content.parts[0].text;
+      const data = parseGeminiJsonLenient(textResponse);
     
     // Detection locale per fallback lingua
     const detection = this.detectEmailLanguage(emailContent, emailSubject);

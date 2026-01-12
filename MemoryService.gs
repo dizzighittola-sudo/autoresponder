@@ -310,23 +310,25 @@ class MemoryService {
       providedInfo = values[4] ? [values[4]] : [];
     }
     
-    // FIX Bug 9: Validate lastUpdated timestamp
-    let obj = {
+    // FIX Bug 12: Validate timestamp BEFORE object construction
+    let lastUpdated = values[5] || null;
+    if (lastUpdated) {
+      const testDate = new Date(lastUpdated);
+      if (isNaN(testDate.getTime())) {
+        console.warn(`⚠️ Invalid date in memory for thread ${values[0]}: ${lastUpdated}`);
+        lastUpdated = null;
+      }
+    }
+    
+    return {
       threadId: values[0],
       language: values[1] || 'it',
       category: values[2] || null,
       tone: values[3] || 'standard',
       providedInfo: providedInfo,
-      lastUpdated: values[5] || null,
+      lastUpdated: lastUpdated,  // ✅ Already validated
       messageCount: parseInt(values[6]) || 0
     };
-    
-    if (obj.lastUpdated && isNaN(new Date(obj.lastUpdated).getTime())) {
-      console.warn(`⚠️ Invalid date in memory for thread ${obj.threadId}: ${obj.lastUpdated}`);
-      obj.lastUpdated = null;
-    }
-    
-    return obj;
   }
   
   /**

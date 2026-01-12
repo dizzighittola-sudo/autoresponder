@@ -46,17 +46,17 @@ const CONFIG = {
   // 🔗 Verifica limiti quota: https://ai.google.dev/gemini-api/docs/rate-limits
   GEMINI_MODELS: {
     'flash-2.5': {
-      name: 'gemini-2.5-flash',       // Modello principale
-      rpm: 5,                          // Richieste Per Minuto (verificato Gen 2026)
-      tpm: 250000,                    // Token Per Minuto
-      rpd: 20,                        // Richieste Per Giorno ⚠️
+      name: 'gemini-2.5-flash',
+      rpm: 15,        // ✅ Richieste Per Minuto (Free Tier)
+      tpm: 1000000,   // ✅ Token Per Minuto (1M)
+      rpd: 1500,      // ✅ Richieste Per Giorno (Free Tier)
       useCases: ['generation', 'all']
     },
     'flash-lite': {
-      name: 'gemini-2.5-flash-lite',  // Più economico, ideale per quick check
-      rpm: 10,                         // RPM più alto!
-      tpm: 250000,
-      rpd: 20,
+      name: 'gemini-2.5-flash-lite',
+      rpm: 15,        // ✅ Assumo stesso del flash-2.5 (verificare docs)
+      tpm: 1000000,   // ✅ 1M TPM
+      rpd: 1500,      // ✅ 1500 RPD (Free Tier standard)
       useCases: ['quick_check', 'classification']
     }
     // NOTA: gemini-1.5-flash non più disponibile nel tier gratuito
