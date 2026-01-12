@@ -63,12 +63,14 @@ class TerritoryValidator {
   
   extractAddressFromText(text) {
     // Pattern per rilevare indirizzi - FIX Bug 6: Aggiunto apostrofo al pattern
+    // Pattern per rilevare indirizzi - FIX Bug 6 + Bug 18:
+    // Limit repetition {0,10} on word matches to prevent catastrophic backtracking (ReDoS)
     const patterns = [
-      // Pattern 1: "via Rossi 10", "viale Belle Arti n. 5", "via dell'Angelo 3"
-      /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
+      // Pattern 1: "via Rossi 10" (Limited recursion key: use {0,10} instead of *)
+      /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,10}[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
       
-      // Pattern 2: "abito in via Rossi 10", "abito a via Bianchi 3", "abito alle Belle Arti 10"
-      /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+(?:\s+[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)*)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
+      // Pattern 2: "abito in... via Rossi 10"
+      /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,10}[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
     ];
     
     const addresses = [];

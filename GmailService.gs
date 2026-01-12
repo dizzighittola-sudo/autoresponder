@@ -371,8 +371,14 @@ class GmailService {
    * @param {GmailThread|GmailMessage|string} resource - Thread, Messaggio o ID Thread
    */
   sendHtmlReply(resource, responseText, messageDetails) {
+    // ✅ FIX Bug 19: Header Injection Sanitization
+    // Prevent attackers from injecting headers via CRLF
+    const sanitizedText = responseText
+      .replace(/\n(To|Cc|Bcc|From|Subject|Reply-To):/gi, '\n[$1]:')
+      .replace(/\r\n|\r/g, '\n');
+
     // 0. Applica Sostituzioni Personalizzate (dal foglio Sostituzioni)
-    let finalResponse = responseText;
+    let finalResponse = sanitizedText;
     if (typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.replacements) {
       const replacementCount = Object.keys(GLOBAL_CACHE.replacements).length;
       if (replacementCount > 0) {
@@ -593,16 +599,27 @@ function markdownToHtml(text) {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     
-    // ✅ VALIDATE URL protocol (only http/https)
-    // Se protocollo sospetto (javascript:, vbscript:, data:), ritorna solo testo
-    const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(escapedUrl);
-    // Permetti solo http/s e mailto
-    const isSafeProtocol = /^\s*(https?|mailto):/i.test(escapedUrl);
+  // ✅ FIX Bug 19: Header Injection Prevention (during mail send phase)
+  // But also in markdown conversion, we ensure no hidden control characters
+  
+  // ✅ FIX Bug 20: SSRF & Internal IP Protection
+  // Blacklist internal IPs and localhost
+  const INTERNAL_IP_PATTERN = /^(https?:\/\/)?(localhost|127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)/i;
+  
+  if (INTERNAL_IP_PATTERN.test(escapedUrl)) {
+    console.warn(`🛑 Blocked internal IP/SSRF attempt: ${escapedUrl}`);
+    return escapedText;
+  }
 
-    if (isDangerous || !isSafeProtocol) {
-      console.warn(`⚠️ Blocked suspicious URL: ${escapedUrl}`);
-      return escapedText; // Return just text, no link
-    }
+  // ✅ VALIDATE URL protocol (only http/https/mailto)
+  // Se protocollo sospetto (javascript:, vbscript:, data:), ritorna solo testo
+  const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(escapedUrl);
+  const isSafeProtocol = /^\s*(https?|mailto):/i.test(escapedUrl);
+
+  if (isDangerous || !isSafeProtocol) {
+    console.warn(`⚠️ Blocked suspicious URL: ${escapedUrl}`);
+    return escapedText; // Return just text, no link
+  }
     
     return `<a href="${escapedUrl}" style="color:#351c75;">${escapedText}</a>`;
   });

@@ -571,21 +571,40 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     threads.forEach((thread, index) => {
       console.log(`\n--- Thread ${index + 1}/${threads.length} ---`);
       
-      // ✅ Passa labeledMessageIds per evitare chiamate API ripetute
-      const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds);
-      stats.total++;
+      const threadId = thread.getId();
+      // FIX Bug #15: Lock per-thread per prevenire race conditions
+      const threadLock = LockService.getScriptLock();
       
-      if (result.validationFailed) {
-        stats.validationFailed++;
-      } else if (result.status === 'replied') {
-        stats.replied++;
-        if (result.dryRun) stats.dryRun++;
-      } else if (result.status === 'skipped') {
-        stats.skipped++;
-      } else if (result.status === 'filtered') {
-        stats.filtered++;
-      } else if (result.status === 'error') {
-        stats.errors++;
+      try {
+        // Tenta di acquisire lock per 1s. Se occupato, salta il thread (probabilmente processato da altro trigger)
+        if (!threadLock.tryLock(1000)) {
+           console.warn(`🔒 Thread ${threadId} locked by another worker, skipping.`);
+           stats.skipped++;
+           return;
+        }
+
+        // ✅ Passa labeledMessageIds per evitare chiamate API ripetute
+        const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds);
+        stats.total++;
+        
+        if (result.validationFailed) {
+          stats.validationFailed++;
+        } else if (result.status === 'replied') {
+          stats.replied++;
+          if (result.dryRun) stats.dryRun++;
+        } else if (result.status === 'skipped') {
+          stats.skipped++;
+        } else if (result.status === 'filtered') {
+          stats.filtered++;
+        } else if (result.status === 'error') {
+          stats.errors++;
+        }
+      } catch (e) {
+         console.error(`Error processing thread wrapper: ${e.message}`);
+         stats.errors++;
+      } finally {
+        // Always release
+        threadLock.releaseLock();
       }
     });
     

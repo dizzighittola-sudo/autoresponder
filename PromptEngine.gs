@@ -185,13 +185,42 @@ class PromptEngine {
     let prompt = sections.join('\n\n');
     prompt += '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
     
-    // FIX Bug 8: Token estimation and truncation warning
+    // FIX Bug 17: Strict Token Limit Enforcement
+    // Estimate tokens (char count / 4 is a heuristic, but safer than nothing)
     const estimatedTokens = Math.round(prompt.length / 4);
-    const MAX_SAFE_TOKENS = 100000; // Leave buffer for response (Gemini 128k context)
+    const MAX_SAFE_TOKENS = 100000;
     
     if (estimatedTokens > MAX_SAFE_TOKENS) {
-      console.warn(`⚠️ Prompt exceeds safe limit: ~${estimatedTokens} tokens (max: ${MAX_SAFE_TOKENS})`);
-      console.warn('   Consider reducing KB size or increasing selectivity');
+      console.error(`❌ Prompt too large (~${estimatedTokens} tokens > ${MAX_SAFE_TOKENS}). Applying TRUNCATION.`);
+      
+      // Strategy 1: Remove examples
+      if (this._shouldIncludeTemplate('ExamplesTemplate', promptProfile, activeConcerns)) {
+         console.log('truncation: Removing examples section.');
+         sections = sections.filter(s => !s.includes('📚 ESEMPI'));
+         prompt = sections.join('\n\n') + '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
+      }
+      
+      // Re-check size
+      if (Math.round(prompt.length / 4) > MAX_SAFE_TOKENS) {
+         // Strategy 2: Truncate Knowledge Base (aggressive but necessary)
+         console.log('truncation: Truncating Knowledge Base (keeping 50%).');
+         const kbIndex = sections.findIndex(s => s.includes('INFORMAZIONI DI RIFERIMENTO'));
+         if (kbIndex !== -1) {
+             const kbContent = knowledgeBase;
+             // Keep first 25% and last 25% of the *original* KB size relative to budget
+             const budgetChars = MAX_SAFE_TOKENS * 4 * 0.5; // 50% of budget for KB
+             if (kbContent.length > budgetChars) {
+                 const half = Math.floor(budgetChars / 2);
+                 const truncatedKB = kbContent.substring(0, half) + '\n\n... [PARTE CENTRALE OMESSA PER LIMITI LUNGHEZZA] ...\n\n' + kbContent.substring(kbContent.length - half);
+                 sections[kbIndex] = this._renderKnowledgeBase(truncatedKB);
+                 prompt = sections.join('\n\n') + '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
+             }
+         }
+      }
+    } else {
+       if (estimatedTokens > MAX_SAFE_TOKENS * 0.8) {
+          console.warn(`⚠️ Prompt near limit: ~${estimatedTokens} tokens`);
+       }
     }
     
     // 🎯 Log migliorato con info profilo

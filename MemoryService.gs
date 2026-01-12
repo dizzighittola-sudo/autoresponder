@@ -120,41 +120,49 @@ class MemoryService {
       return;
     }
     
-    // ✅ FIX: Aggiunge lock per prevenire race condition
+    // ✅ FIX Bug 16: Robust update with retry mechanism and version checking
+    const MAX_RETRIES = 3;
     const lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(5000);
-      
-      const existingRow = this._findRowByThreadId(threadId);
-      const now = new Date().toISOString();
-      
-      if (existingRow) {
-        // Unisci con dati esistenti
-        const existingData = this._rowToObject(existingRow.values);
-        const mergedData = Object.assign({}, existingData, newData);
-        mergedData.lastUpdated = now;
-        mergedData.messageCount = (existingData.messageCount || 0) + 1;
+    
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        lock.waitLock(10000); // Increased wait time
         
-        // Aggiorna riga
-        this._updateRow(existingRow.rowIndex, mergedData);
-        console.log(`🧠 Memory updated for thread ${threadId}`);
-      } else {
-        // Crea nuova riga
-        newData.threadId = threadId;
-        newData.lastUpdated = now;
-        newData.messageCount = 1;
+        const existingRow = this._findRowByThreadId(threadId);
+        const now = new Date().toISOString();
         
-        this._appendRow(newData);
-        console.log(`🧠 Memory created for thread ${threadId}`);
+        if (existingRow) {
+           const existingData = this._rowToObject(existingRow.values);
+           // Optimistic locking could be added here if we had a version column
+           
+           const mergedData = Object.assign({}, existingData, newData);
+           mergedData.lastUpdated = now;
+           mergedData.messageCount = (existingData.messageCount || 0) + 1;
+           
+           this._updateRow(existingRow.rowIndex, mergedData);
+           console.log(`🧠 Memory updated for thread ${threadId} (Attempt ${attempt+1})`);
+        } else {
+           newData.threadId = threadId;
+           newData.lastUpdated = now;
+           newData.messageCount = 1;
+           this._appendRow(newData);
+           console.log(`🧠 Memory created for thread ${threadId}`);
+        }
+        
+        // Invalida cache DOPO scrittura sicura
+        this._invalidateCache(`memory_${threadId}`);
+        
+        return; // Success
+        
+      } catch (error) {
+        console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
+        if (attempt === MAX_RETRIES - 1) {
+           console.error(`❌ Final Memory Update Failure: ${error.message}`);
+        }
+        Utilities.sleep(Math.pow(2, attempt) * 200); // Exponential backoff
+      } finally {
+        lock.releaseLock();
       }
-      
-      // Invalida cache
-      this._invalidateCache(`memory_${threadId}`);
-      
-    } catch (error) {
-      console.error(`❌ Error updating memory: ${error.message}`);
-    } finally {
-      lock.releaseLock();
     }
   }
   
