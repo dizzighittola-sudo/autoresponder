@@ -256,7 +256,8 @@ function testBugFixes() {
   // If the Validator sees "19.00" it validates against KB times. If "page.19.html" is seen as time "19:00", it might pass or fail depending on KB.
   // But if it's NOT a time, it shouldn't be checked.
   // Let's assume the fix allows "page.19.html" to pass without being treated as a time hallucination.
-  const resFilename = validator.validateResponse("Vedi page.19.html", "it", mockKB, "body", "subject");
+  // FIX: Make string longer (>25 chars) to pass length check
+  const resFilename = validator.validateResponse("Per maggiori dettagli vedi il file page.19.html allegato.", "it", mockKB, "body", "subject");
   assertTrue(resFilename.isValid, "Filename page.19.html should not trigger time hallucination check failure");
 
   CONFIG.VALIDATION_STRICT_MODE = originalStrictMode;
@@ -275,13 +276,17 @@ function testBugFixes() {
   }
 
   // Bug #3: XSS in Markdown
-  if (typeof GmailService !== 'undefined') {
-      const service = new GmailService();
+  // markdownToHtml is a global function in GmailService.gs, NOT a method of GmailService class
+  if (typeof markdownToHtml === 'function') {
       const maliciousMd = "[Click me](javascript:alert(1))";
       // We expect the javascript link to be stripped or sanitized to # or similar, NOT rendered as href="javascript:..."
-      const html = service.markdownToHtml(maliciousMd);
+      const html = markdownToHtml(maliciousMd);
       const isSanitized = !html.includes('href="javascript:alert(1)"');
       assertTrue(isSanitized, "Markdown XSS should be sanitized");
+  } else {
+      // If verification fails, check if function is available (might be private or named differently)
+      // Based on code review, it IS global.
+       assert(false, "markdownToHtml function not found globally");
   }
 }
 
