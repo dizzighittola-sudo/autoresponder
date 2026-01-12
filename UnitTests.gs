@@ -121,7 +121,7 @@ function testClassifier() {
   assertEqual(classifier.classifyEmail("Ok va bene", "Re: Info").shouldReply, false, "Ok va bene should NOT reply");
   
   // Test Greeting Only
-  assertEqual(classifier.classifyEmail("Buongiorno don", "Saluto").shouldReply, false, "Buongiorno don should NOT reply");
+  assertEqual(classifier.classifyEmail("Buongiorno don", "Buongiorno don").shouldReply, false, "Buongiorno don should NOT reply");
   
   // Test Real Questions (Should Process)
   assertEqual(classifier.classifyEmail("A che ora è la messa?", "Orari").shouldReply, true, "Question about mass SHOULD reply");
