@@ -326,6 +326,7 @@ class ResponseValidator {
     const warnings = [];
     let score = 1.0;
     const hallucinations = {};
+    const safeKnowledgeBase = typeof knowledgeBase === 'string' ? knowledgeBase : '';
     
     // Helper normalizzazione orari
     // FIX Bug #5: Sostituisce solo pattern orari validi, evita URL come page.19.html (richiede 2+ caratteri prima/dopo)
@@ -363,7 +364,7 @@ class ResponseValidator {
     // === Controllo 1: Orari ===
     const timePattern = /\b\d{1,2}[:\.]\d{2}\b/g;
     const responseTimesRaw = response.match(timePattern) || [];
-    const kbTimesRaw = knowledgeBase.match(timePattern) || [];
+    const kbTimesRaw = safeKnowledgeBase.match(timePattern) || [];
     
     const responseTimes = new Set(responseTimesRaw.map(normalizeTime));
     const kbTimes = new Set(kbTimesRaw.map(normalizeTime));
@@ -382,7 +383,7 @@ class ResponseValidator {
       (response.match(emailPattern) || []).map(e => e.toLowerCase())
     );
     const kbEmails = new Set(
-      (knowledgeBase.match(emailPattern) || []).map(e => e.toLowerCase())
+      (safeKnowledgeBase.match(emailPattern) || []).map(e => e.toLowerCase())
     );
     const inventedEmails = [...responseEmails].filter(e => !kbEmails.has(e));
     
@@ -396,7 +397,7 @@ class ResponseValidator {
     // FIX: Relax phone pattern to accept international codes and 9-digit numbers (green numbers), and +39
     const phonePattern = /\b(?:\+?\d{1,3}[-.\s]?)?(?:0\d|3\d{2}|8\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
     const responsePhonesRaw = response.match(phonePattern) || [];
-    const kbPhonesRaw = knowledgeBase.match(phonePattern) || [];
+    const kbPhonesRaw = safeKnowledgeBase.match(phonePattern) || [];
     
     // 8+ cifre minimo per evitare falsi positivi
     const responsePhones = new Set(
