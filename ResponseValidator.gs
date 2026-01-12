@@ -328,8 +328,11 @@ class ResponseValidator {
     const hallucinations = {};
     
     // Helper normalizzazione orari
-    // FIX: Sostituisce solo pattern orari validi (0-23:00-59), evita URL
+    // FIX: Sostituisce solo pattern orari validi (0-23:00-59), evita URL come page.19.html
     const normalizeTime = (t) => {
+      // Ignora se sembra parte di un URL o file (es. parole.numeri.parole)
+      if (/[a-z]\.\d{1,2}\.[a-z]/i.test(t)) return t;
+
       t = t.replace(/\b(\d{1,2})\.([0-5]\d)\b/g, (match, h, m) => {
         const hour = parseInt(h, 10);
         // Solo orari validi (0-23), altrimenti lascia invariato
@@ -370,7 +373,8 @@ class ResponseValidator {
     }
     
     // === Controllo 2: Indirizzi Email ===
-    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi;
+    // FIX: Disallow dot at end of domain part and improve pattern
+    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}\b/gi;
     const responseEmails = new Set(
       (response.match(emailPattern) || []).map(e => e.toLowerCase())
     );
@@ -386,8 +390,8 @@ class ResponseValidator {
     }
     
     // === Controllo 3: Numeri di Telefono ===
-    // Pattern telefono e soglia 8+ cifre
-    const phonePattern = /\b(?:0\d|3\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
+    // FIX: Relax phone pattern to accept international codes and 9-digit numbers (green numbers), and +39
+    const phonePattern = /\b(?:\+?\d{1,3}[-.\s]?)?(?:0\d|3\d{2}|8\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
     const responsePhonesRaw = response.match(phonePattern) || [];
     const kbPhonesRaw = knowledgeBase.match(phonePattern) || [];
     

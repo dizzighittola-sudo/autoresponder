@@ -226,11 +226,12 @@ class EmailProcessor {
 
       if (territoryResult.addressFound) {
         const v = territoryResult.verification;
+        const sanitizedStreet = territoryResult.street.replace(/[═─]/g, '-');
         const territoryContext = `
 ════════════════════════════════════════════════════════════════════════
 🎯 VERIFICA TERRITORIO AUTOMATICA (INFORMAZIONE VERIFICATA)
 ════════════════════════════════════════════════════════════════════════
-Indirizzo: ${territoryResult.street} n. ${territoryResult.civic}
+Indirizzo: ${sanitizedStreet} n. ${territoryResult.civic}
 
 Risultato: ${v.inParish ? '✅ RIENTRA' : '❌ NON RIENTRA'}
 

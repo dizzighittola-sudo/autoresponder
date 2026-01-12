@@ -204,17 +204,22 @@ function loadResources() {
 // Giorni in cui il sistema DEVE rispondere (Dipendenti in ferie)
 // Formato: [Mese, Giorno]
 // 1 Gen, 6 Gen, 25 Apr, 1 Mag, 29 Giu, 15 Ago, 1 Nov, 8 Dic, 25 Dic, 26 Dic
+const MONTH = {
+  JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+  JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12
+};
+
 const ALWAYS_OPERATING_DAYS = [
-  [1, 1],    // Capodanno
-  [1, 6],    // Epifania
-  [4, 25],   // Liberazione
-  [5, 1],    // Festa del Lavoro
-  [6, 29],   // SS. Pietro e Paolo
-  [8, 15],   // Assunzione (Ferragosto)
-  [11, 1],   // Ognissanti
-  [12, 8],   // Immacolata
-  [12, 25],  // Natale
-  [12, 26]   // Santo Stefano
+  [MONTH.JAN, 1],    // Capodanno
+  [MONTH.JAN, 6],    // Epifania
+  [MONTH.APR, 25],   // Liberazione
+  [MONTH.MAY, 1],    // Festa del Lavoro
+  [MONTH.JUN, 29],   // SS. Pietro e Paolo
+  [MONTH.AUG, 15],   // Assunzione (Ferragosto)
+  [MONTH.NOV, 1],    // Ognissanti
+  [MONTH.DEC, 8],    // Immacolata
+  [MONTH.DEC, 25],   // Natale
+  [MONTH.DEC, 26]    // Santo Stefano
 ];
 
 const SUSPENSION_HOURS = {

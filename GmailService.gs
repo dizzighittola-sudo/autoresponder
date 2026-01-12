@@ -399,8 +399,13 @@ class GmailService {
     } catch (error) {
       console.error(`❌ Markdown conversion failed: ${error.message}`);
       // Fallback: invia come testo plain
-      mailEntity.reply(finalResponse);
-      console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
+      try {
+        mailEntity.reply(finalResponse);
+        console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
+      } catch (fallbackError) {
+        console.error(`❌ CRITICAL: Fallback reply failed: ${fallbackError.message}`);
+        this.addLabelToMessage(resource.getId(), CONFIG.ERROR_LABEL_NAME);
+      }
     }
   }
 

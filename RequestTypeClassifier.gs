@@ -138,7 +138,7 @@ class RequestTypeClassifier {
    */
   classify(subject, body, externalHint = null) {
     // FIX Bug 9: Limit text length to avoid slow regex on very long emails
-    const MAX_ANALYSIS_LENGTH = 3000;
+    const MAX_ANALYSIS_LENGTH = 2000;
     const fullText = `${subject} ${body}`;
     const text = fullText.length > MAX_ANALYSIS_LENGTH 
       ? fullText.substring(0, MAX_ANALYSIS_LENGTH).toLowerCase()

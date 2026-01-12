@@ -231,33 +231,30 @@ class MemoryService {
        return;
      }
  
+     // ✅ FIX: Strict atomic locking to prevent race conditions with updateMemory
+     const lock = LockService.getScriptLock();
      try {
-      // Acquisisce lock script per evitare race condition
-      const lock = LockService.getScriptLock();
-      lock.waitLock(5000); // wait up to 5 seconds
-      try {
-        const existingRow = this._findRowByThreadId(threadId);
-        if (existingRow) {
-          // Unisci topic senza incrementare messageCount
-          const existingData = this._rowToObject(existingRow.values);
-          const existingTopics = existingData.providedInfo || [];
-          const mergedTopics = [...new Set([...existingTopics, ...topics])];
-          
-          // Aggiorna solo providedInfo, preserva messageCount
-          existingData.providedInfo = mergedTopics;
-          existingData.lastUpdated = new Date().toISOString();
-          // ✅ NON incrementare messageCount qui
-          
-          this._updateRow(existingRow.rowIndex, existingData);
-          this._invalidateCache(`memory_${threadId}`);
-          console.log(`🧠 Memory: Added provided topics ${JSON.stringify(topics)}`);
-        }
-      } finally {
-        lock.releaseLock();
-      }
-    } catch (error) {
-      console.error(`❌ Error adding provided info: ${error.message}`);
-    }
+       lock.waitLock(5000); 
+       
+       const existingRow = this._findRowByThreadId(threadId);
+       if (existingRow) {
+         const existingData = this._rowToObject(existingRow.values);
+         const existingTopics = existingData.providedInfo || [];
+         const mergedTopics = [...new Set([...existingTopics, ...topics])];
+         
+         existingData.providedInfo = mergedTopics;
+         existingData.lastUpdated = new Date().toISOString();
+         // Message count is NOT incremented here (topic-only update)
+         
+         this._updateRow(existingRow.rowIndex, existingData);
+         this._invalidateCache(`memory_${threadId}`);
+         console.log(`🧠 Memory: Atomically added provided topics ${JSON.stringify(topics)}`);
+       }
+     } catch (error) {
+       console.error(`❌ Error adding provided info: ${error.message}`);
+     } finally {
+       lock.releaseLock();
+     }
    }
   
   /**
