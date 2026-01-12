@@ -404,7 +404,14 @@ class GmailService {
         console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
       } catch (fallbackError) {
         console.error(`❌ CRITICAL: Fallback reply failed: ${fallbackError.message}`);
-        this.addLabelToMessage(resource.getId(), CONFIG.ERROR_LABEL_NAME);
+        const errorLabel = CONFIG.ERROR_LABEL_NAME;
+        if (mailEntity && typeof mailEntity.getMessages === 'function') {
+          this.addLabelToThread(mailEntity, errorLabel);
+        } else if (mailEntity && typeof mailEntity.getId === 'function') {
+          this.addLabelToMessage(mailEntity.getId(), errorLabel);
+        } else {
+          console.warn('⚠️ Unable to add error label: mail entity unavailable');
+        }
       }
     }
   }
