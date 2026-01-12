@@ -114,30 +114,16 @@ var GLOBAL_CACHE = {
 // ====================================================================
 
 function loadResources() {
-  // ✅ FIX: Usa LockService per prevenire race condition tra trigger
-  if (GLOBAL_CACHE.loaded) {
-    console.log('📦 Resources already loaded (cached)');
+  // FIX Bug 4: Previene race condition con flag loading
+  if (GLOBAL_CACHE.loading || GLOBAL_CACHE.loaded) {
+    console.log('📦 Resources already loaded or loading (cached)');
     return;
   }
   
-  const lock = LockService.getScriptLock();
-  try {
-    // Attendi max 5 secondi per il lock
-    if (!lock.tryLock(5000)) {
-      console.log('📦 Another process is loading resources, waiting...');
-      // Aspetta e ricontrolla
-      Utilities.sleep(1000);
-      if (GLOBAL_CACHE.loaded) return;
-    }
-    
-    // Double-check dopo aver acquisito il lock
-    if (GLOBAL_CACHE.loaded) {
-      console.log('📦 Resources already loaded (cached)');
-      return;
-    }
-    
-    console.log('📦 Loading resources...');
+  GLOBAL_CACHE.loading = true;
+  console.log('📦 Loading resources...');
   
+  try {
     const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     
     // Carica Knowledge Base (Istruzioni)
@@ -202,16 +188,12 @@ function loadResources() {
     }
     
     GLOBAL_CACHE.loaded = true;
+    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset flag loading
     console.log('✓ All resources loaded successfully');
     
   } catch (error) {
+    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset flag loading in caso di errore
     console.error(`❌ Error loading resources: ${error.message}`);
-  } finally {
-    try {
-      lock.releaseLock();
-    } catch (e) {
-      // Lock potrebbe essere già rilasciato o non acquisito
-    }
   }
 }
 

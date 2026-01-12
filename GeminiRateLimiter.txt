@@ -36,18 +36,18 @@ class GeminiRateLimiter {
       this.models = CONFIG.GEMINI_MODELS;
       console.log('   ✓ Modelli caricati da CONFIG.GEMINI_MODELS');
     } else {
-      // Fallback se CONFIG non disponibile (usa stessi modelli di Main.txt)
+      // Fallback se CONFIG non disponibile
       console.warn('   ⚠️ CONFIG.GEMINI_MODELS non trovato, uso default');
       this.models = {
         'flash-2.5': {
           name: 'gemini-2.5-flash',
-          rpm: 5, tpm: 250000, rpd: 20,
-          useCases: ['generation', 'all']
+          rpm: 15, tpm: 250000, rpd: 250,
+          useCases: ['generation', 'quick_check', 'all']
         },
-        'flash-lite': {
-          name: 'gemini-2.5-flash-lite',
-          rpm: 10, tpm: 250000, rpd: 20,
-          useCases: ['quick_check', 'classification']
+        'flash-1.5': {
+          name: 'gemini-1.5-flash',
+          rpm: 15, tpm: 1000000, rpd: 1500,
+          useCases: ['fallback', 'high_volume']
         }
       };
     }
@@ -57,11 +57,11 @@ class GeminiRateLimiter {
       this.strategies = CONFIG.MODEL_STRATEGY;
       console.log('   ✓ Strategia caricata da CONFIG.MODEL_STRATEGY');
     } else {
-      // Fallback default (stessa strategia di Main.txt)
+      // Fallback default
       this.strategies = {
-        'quick_check': ['flash-lite', 'flash-2.5'],
-        'generation': ['flash-2.5', 'flash-lite'],
-        'fallback': ['flash-lite', 'flash-2.5']
+        'quick_check': ['flash-2.5', 'flash-1.5'],
+        'generation': ['flash-2.5', 'flash-1.5'],
+        'fallback': ['flash-1.5', 'flash-2.5']
       };
     }
     

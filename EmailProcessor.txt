@@ -239,7 +239,7 @@ Dettaglio: ${v.reason}
 ⚠️ Usa ESATTAMENTE queste informazioni verificate programmaticamente.
 ════════════════════════════════════════════════════════════════════════
 `;
-        enrichedKnowledgeBase = territoryContext + '\n\n' + enrichedKnowledgeBase;
+        enrichedKnowledgeBase = territoryContext + '\n\n' + knowledgeBase;
       }
       
       // ═══════════════════════════════════════════════════════════════
