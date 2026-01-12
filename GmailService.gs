@@ -368,8 +368,9 @@ class GmailService {
    * Invia risposta come HTML (per risposte formattate)
    * ✅ Applica safeguard di formattazione (funzionalità legacy)
    * ✅ Applica sostituzioni personalizzate dal foglio Sostituzioni
+   * @param {GmailThread|GmailMessage|string} resource - Thread, Messaggio o ID Thread
    */
-  sendHtmlReply(thread, responseText, messageDetails) {
+  sendHtmlReply(resource, responseText, messageDetails) {
     // 0. Applica Sostituzioni Personalizzate (dal foglio Sostituzioni)
     let finalResponse = responseText;
     if (typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.replacements) {
@@ -385,18 +386,20 @@ class GmailService {
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
     // 2. Converti in HTML e invia
-    const gmailThread = typeof thread === 'string'
-      ? GmailApp.getThreadById(thread)
-      : thread;
+    // Se è stringa, assumiamo sia Thread ID (retro-compatibilità)
+    // Se è oggetto, usiamo duck typing (sia Thread che Message hanno .reply)
+    const mailEntity = typeof resource === 'string'
+      ? GmailApp.getThreadById(resource)
+      : resource;
 
     try {
       const htmlBody = markdownToHtml(finalResponse);
-      gmailThread.reply('', { htmlBody: htmlBody });
+      mailEntity.reply('', { htmlBody: htmlBody });
       console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
     } catch (error) {
       console.error(`❌ Markdown conversion failed: ${error.message}`);
       // Fallback: invia come testo plain
-      gmailThread.reply(finalResponse);
+      mailEntity.reply(finalResponse);
       console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
     }
   }

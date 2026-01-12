@@ -478,7 +478,8 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         console.log(`   📝 Would send: ${response.substring(0, 100)}...`);
         result.dryRun = true;
       } else {
-        this.gmailService.sendHtmlReply(thread, response, messageDetails);
+        // ✅ FIX: Use 'candidate' (Message) instead of 'thread' to force correct In-Reply-To header
+        this.gmailService.sendHtmlReply(candidate, response, messageDetails);
       }
       
       // ═══════════════════════════════════════════════════════════════
