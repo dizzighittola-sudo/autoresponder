@@ -2,6 +2,8 @@
 // RESPONSE VALIDATOR - Validazione risposte AI
 // Controlla qualità e sicurezza delle risposte generate
 // ====================================================================
+// ⚠️ VERSIONE SANITIZZATA: Sostituire "Your Parish Name" con nome reale
+// ====================================================================
 
 /**
  * ResponseValidator - Validatore risposte AI
@@ -65,7 +67,8 @@ class ResponseValidator {
     
     // Pattern firma (case-insensitive) - include varianti di apostrofo:
     // ' (U+0027 ASCII), ' (U+2018 left single quote), ' (U+2019 right single quote)
-    this.signaturePattern = /segreteria\s+parrocchia\s+sant['\u2018\u2019]?eugenio/i;
+    // ⚠️ SOSTITUIRE con nome parrocchia reale
+    this.signaturePattern = /segreteria\s+parrocchia\s+your[\s-]?parish[\s-]?name/i;
     
     console.log('✓ ResponseValidator inizializzato');
     console.log(`   Soglia minima validità: ${this.MIN_VALID_SCORE}`);
@@ -262,7 +265,7 @@ class ResponseValidator {
     
     // Per primo contatto ('full') e riprese dopo pausa ('soft'): firma attesa
     if (!this.signaturePattern.test(response)) {
-      warnings.push("Missing signature 'Segreteria Parrocchia Sant'Eugenio'");
+      warnings.push("Missing signature 'Segreteria Parrocchia Your Parish Name'");
       score = 0.95;
     }
     

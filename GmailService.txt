@@ -1,86 +1,135 @@
 // ====================================================================
-// GMAIL SERVICE - Gestione operazioni Gmail (Allineato a CF)
-// ✅ Reply-To header support
+// GMAIL SERVICE - Gestione operazioni Gmail
+// ✅ Supporto header Reply-To
 // ✅ Label cache per evitare chiamate ripetute
-// ✅ Conversation history builder
+// ✅ Costruttore cronologia conversazione
 // ====================================================================
 
 /**
- * GmailService - Aligned with CF gmail_service.py
+ * GmailService - Servizio gestione Gmail
  * 
- * KEY FEATURES:
- * ✅ Label cache for performance
- * ✅ Reply-To header support for web forms
- * ✅ Conversation history builder
- * ✅ Quote/signature removal
+ * FUNZIONALITÀ PRINCIPALI:
+ * ✅ Label cache per performance
+ * ✅ Supporto header Reply-To per form web
+ * ✅ Costruttore cronologia conversazione
+ * ✅ Rimozione citazioni/firme
  */
 class GmailService {
   constructor() {
-    console.log('📧 Initializing GmailService (CF-aligned)...');
+    console.log('📧 Inizializzazione GmailService...');
     
-    // Label cache to avoid repeated API calls
-    this._labelCache = {};
-    
-    console.log('✓ GmailService initialized with label cache');
+    // Cache etichette per evitare chiamate API ripetute con TTL
+    this._labelCache = new Map(); // Map<labelName, {label: GmailLabel, ts: number}>
+    this._cacheTTL = 60 * 60 * 1000; // TTL 1 ora per etichette in cache
+
+    console.log('✓ GmailService inizializzato con cache etichette (TTL 1h)');
   }
   
   // ========================================================================
-  // LABEL MANAGEMENT (with cache)
+  // GESTIONE ETICHETTE (con cache)
   // ========================================================================
   
   /**
-   * Get or create a Gmail label with caching
-   * ✅ ALIGNED: Label cache from CF get_or_create_label
+   * Ottiene o crea un'etichetta Gmail con caching
    */
   getOrCreateLabel(labelName) {
-    // Check cache first
-    if (this._labelCache[labelName]) {
+    // Verifica prima la cache con validazione TTL
+    const cachedEntry = this._labelCache.get(labelName);
+    const now = Date.now();
+    if (cachedEntry && (now - cachedEntry.ts) < this._cacheTTL) {
       console.log(`📦 Label '${labelName}' found in cache`);
-      return this._labelCache[labelName];
+      return cachedEntry.label;
+    } else if (cachedEntry) {
+      // Voce scaduta, rimuovi
+      this._labelCache.delete(labelName);
     }
-    
-    // Check if label exists
+
+    // Verifica se l'etichetta esiste in Gmail
     const labels = GmailApp.getUserLabels();
     for (const label of labels) {
       if (label.getName() === labelName) {
-        // Cache and return
-        this._labelCache[labelName] = label;
+        // Memorizza in cache con timestamp e ritorna
+        this._labelCache.set(labelName, { label: label, ts: now });
         console.log(`✓ Label '${labelName}' found`);
         return label;
       }
     }
-    
-    // Create new label
+
+    // Crea nuova etichetta
     const newLabel = GmailApp.createLabel(labelName);
-    this._labelCache[labelName] = newLabel;
+    this._labelCache.set(labelName, { label: newLabel, ts: now });
     console.log(`✓ Created new label: ${labelName}`);
     return newLabel;
   }
   
   /**
-   * Clear the label cache
+   * Svuota la cache delle etichette
    */
   clearLabelCache() {
-    this._labelCache = {};
+    this._labelCache.clear();
     console.log('🗑️ Label cache cleared');
   }
   
   /**
-   * Add label to thread
+   * Aggiunge etichetta a un thread
    */
   addLabelToThread(thread, labelName) {
     const label = this.getOrCreateLabel(labelName);
     thread.addLabel(label);
     console.log(`✓ Added label '${labelName}' to thread`);
   }
+
+  /**
+   * Aggiunge etichetta a un messaggio specifico (Gmail API avanzata)
+   * ✅ Permette di etichettare SOLO il messaggio, non l'intero thread
+   * ✅ Richiede "Gmail API" abilitata nei Servizi Avanzati
+   */
+  addLabelToMessage(messageId, labelName) {
+    const label = this.getOrCreateLabel(labelName);
+    const labelId = label.getId();
+    Gmail.Users.Messages.modify({
+      addLabelIds: [labelId],
+      removeLabelIds: []
+    }, 'me', messageId);
+    console.log(`✓ Added label '${labelName}' to message ${messageId}`);
+  }
+
+  /**
+   * Ottiene gli ID di tutti i messaggi con una specifica etichetta (Gmail API avanzata)
+   * ✅ OTTIMIZZATO: Una sola chiamata API invece di N chiamate
+   * @param {string} labelName - Nome dell'etichetta da cercare
+   * @returns {Set<string>} - Set di message IDs che hanno l'etichetta
+   */
+  getMessageIdsWithLabel(labelName) {
+    try {
+      const label = this.getOrCreateLabel(labelName);
+      const labelId = label.getId();
+      
+      // Una sola chiamata API per ottenere tutti i messaggi con questa etichetta
+      const response = Gmail.Users.Messages.list('me', { 
+        labelIds: [labelId], 
+        maxResults: 500  // Dovrebbe essere più che sufficiente
+      });
+      
+      const messageIds = new Set();
+      if (response.messages) {
+        response.messages.forEach(m => messageIds.add(m.id));
+      }
+      
+      console.log(`📦 Found ${messageIds.size} messages with label '${labelName}'`);
+      return messageIds;
+    } catch (e) {
+      console.warn(`⚠️ Could not get messages with label ${labelName}: ${e.message}`);
+      return new Set(); // In caso di errore, ritorna set vuoto
+    }
+  }
   
   // ========================================================================
-  // MESSAGE EXTRACTION (with Reply-To support)
+  // ESTRAZIONE MESSAGGI (con supporto Reply-To)
   // ========================================================================
   
   /**
-   * Extract message details with Reply-To support
-   * ✅ ALIGNED: Reply-To handling from CF extract_message_details
+   * Estrae dettagli messaggio con supporto Reply-To
    */
   extractMessageDetails(message) {
     const subject = message.getSubject();
@@ -89,10 +138,10 @@ class GmailService {
     const body = message.getPlainBody() || this._htmlToPlainText(message.getBody());
     const messageId = message.getId();
     
-    // ✅ NEW: Get Reply-To header
+    // Ottieni header Reply-To
     const replyTo = message.getReplyTo();
     
-    // Use Reply-To if present and valid
+    // Usa Reply-To se presente e valido
     let effectiveSender;
     let hasReplyTo = false;
     
@@ -104,7 +153,7 @@ class GmailService {
       effectiveSender = sender;
     }
     
-    // Extract name and email
+    // Estrai nome ed email
     const senderName = this._extractSenderName(effectiveSender);
     const senderEmail = this._extractEmailAddress(effectiveSender);
     
@@ -122,25 +171,47 @@ class GmailService {
   }
   
   /**
-   * Extract sender name from From field
+   * Estrae il nome del mittente dal campo From
    */
   _extractSenderName(fromField) {
     const match = fromField.match(/^"?(.+?)"?\s*</);
+    let name = null;
+    
     if (match) {
-      return match[1].trim();
+      name = match[1].trim();
+    } else {
+      // Usa prefisso email come fallback
+      const email = this._extractEmailAddress(fromField);
+      if (email) {
+        name = email.split('@')[0];
+      }
     }
     
-    // Use email prefix as fallback
-    const email = this._extractEmailAddress(fromField);
-    if (email) {
-      return email.split('@')[0];
+    // Capitalizza il nome (prima lettera maiuscola per ogni parola)
+    if (name) {
+      return this._capitalizeName(name);
     }
     
     return 'Utente';
   }
   
   /**
-   * Extract email address from From field
+   * Capitalizza un nome proprio (prima lettera maiuscola per ogni parola)
+   */
+  _capitalizeName(name) {
+    if (!name) return name;
+    
+    return name
+      .split(/[\s-]+/)
+      .map(word => {
+        if (word.length === 0) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  }
+  
+  /**
+   * Estrae indirizzo email dal campo From
    */
   _extractEmailAddress(fromField) {
     const match = fromField.match(/<(.+?)>/);
@@ -148,7 +219,7 @@ class GmailService {
       return match[1];
     }
     
-    // If no brackets, check if whole field is email
+    // Se non ci sono parentesi angolari, verifica se l'intero campo è un email
     if (fromField.includes('@')) {
       return fromField.trim();
     }
@@ -157,34 +228,38 @@ class GmailService {
   }
   
   /**
-   * Convert HTML to plain text
+   * Converte HTML in testo semplice
    */
   _htmlToPlainText(html) {
     if (!html) return '';
     
-    // Remove HTML tags
+    // Rimuovi tag HTML
     let text = html.replace(/<[^>]+>/g, ' ');
-    // Decode HTML entities
+    // Decodifica entità HTML
     text = text.replace(/&nbsp;/g, ' ')
                .replace(/&amp;/g, '&')
                .replace(/&lt;/g, '<')
                .replace(/&gt;/g, '>');
-    // Clean up whitespace
+    // Pulisci spazi bianchi
     text = text.replace(/\s+/g, ' ').trim();
     
     return text;
   }
   
   // ========================================================================
-  // CONVERSATION HISTORY
+  // CRONOLOGIA CONVERSAZIONE
   // ========================================================================
   
   /**
-   * Build conversation history from thread messages
-   * ✅ ALIGNED: Same logic as CF build_conversation_history
+   * Costruisce cronologia conversazione da messaggi thread
    */
   buildConversationHistory(messages, maxMessages = 10, ourEmail = '') {
-    // Limit number of messages
+    // Fallback: ottieni nostra email se non fornita
+    if (!ourEmail) {
+      ourEmail = Session.getActiveUser().getEmail();
+    }
+    
+    // Limita numero di messaggi
     if (messages.length > maxMessages) {
       console.warn(`⚠️ Thread with ${messages.length} messages, limiting to last ${maxMessages}`);
       messages = messages.slice(-maxMessages);
@@ -198,7 +273,7 @@ class GmailService {
       
       const prefix = isOurs ? 'Segreteria' : `Utente (${details.senderName})`;
       
-      // Truncate very long messages
+      // Tronca messaggi molto lunghi
       let body = details.body;
       if (body.length > 2000) {
         body = body.substring(0, 2000) + '\n[... messaggio troncato ...]';
@@ -211,12 +286,11 @@ class GmailService {
   }
   
   // ========================================================================
-  // QUOTE/SIGNATURE REMOVAL
+  // RIMOZIONE CITAZIONI/FIRME
   // ========================================================================
   
   /**
-   * Extract main reply content, removing quoted text
-   * ✅ ALIGNED: Same logic as CF extract_main_reply
+   * Estrae contenuto principale risposta, rimuovendo testo citato
    */
   extractMainReply(content) {
     const markers = [
@@ -236,7 +310,7 @@ class GmailService {
       }
     }
     
-    // Remove signatures
+    // Rimuovi firme
     const sigMarkers = [
       /cordiali saluti/i,
       /distinti saluti/i,
@@ -259,19 +333,19 @@ class GmailService {
   }
   
   // ========================================================================
-  // SEND REPLY
+  // INVIO RISPOSTA
   // ========================================================================
   
   /**
-   * Send reply to a thread
-   * ✅ Uses sender_email which includes Reply-To when present
+   * Invia risposta a un thread
+   * ✅ Usa sender_email che include Reply-To quando presente
    */
   sendReply(thread, replyText, messageDetails) {
-    // Get the GmailThread object if it's an ID
+    // Ottieni oggetto GmailThread se è un ID
     const gmailThread = typeof thread === 'string' ? 
                         GmailApp.getThreadById(thread) : thread;
     
-    // Reply to thread (Gmail handles threading automatically)
+    // Rispondi al thread (Gmail gestisce il threading automaticamente)
     gmailThread.reply(replyText);
     
     console.log(`✓ Reply sent to ${messageDetails.senderEmail}`);
@@ -284,73 +358,111 @@ class GmailService {
   }
   
   /**
-   * Send reply as HTML (for formatted responses)
-   * ✅ Applies formatting safeguards (legacy feature)
+   * Invia risposta come HTML (per risposte formattate)
+   * ✅ Applica safeguard di formattazione (funzionalità legacy)
+   * ✅ Applica sostituzioni personalizzate dal foglio Sostituzioni
    */
   sendHtmlReply(thread, responseText, messageDetails) {
-    // 1. Apply Formatting Safeguards (Legacy restoration)
-    let finalResponse = this.fixPunctuation(responseText);
+    // 0. Applica Sostituzioni Personalizzate (dal foglio Sostituzioni)
+    let finalResponse = responseText;
+    if (typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.replacements) {
+      const replacementCount = Object.keys(GLOBAL_CACHE.replacements).length;
+      if (replacementCount > 0) {
+        finalResponse = this.applyReplacements(finalResponse, GLOBAL_CACHE.replacements);
+        console.log(`   ✓ Applied ${replacementCount} replacement rules`);
+      }
+    }
+    
+    // 1. Applica Safeguard di Formattazione
+    finalResponse = this.fixPunctuation(finalResponse, messageDetails.senderName);
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
-    // 2. Convert to HTML
-    const htmlBody = markdownToHtml(finalResponse);
-
+    // 2. Converti in HTML e invia
     const gmailThread = typeof thread === 'string'
       ? GmailApp.getThreadById(thread)
       : thread;
 
-    gmailThread.reply('', {
-      htmlBody: htmlBody
-    });
-
-    console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
+    try {
+      const htmlBody = markdownToHtml(finalResponse);
+      gmailThread.reply('', { htmlBody: htmlBody });
+      console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
+    } catch (error) {
+      console.error(`❌ Markdown conversion failed: ${error.message}`);
+      // Fallback: invia come testo plain
+      gmailThread.reply(finalResponse);
+      console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
+    }
   }
 
   // ========================================================================
-  // FORMATTING SAFEGUARDS (Legacy Features)
+  // SAFEGUARD DI FORMATTAZIONE (Funzionalità Legacy)
   // ========================================================================
 
   /**
-   * Fixes common punctuation errors
-   * e.g., "Buongiorno, Siamo" -> "Buongiorno, siamo"
+   * Corregge errori comuni di punteggiatura
+   * Es. "Buongiorno, Siamo" -> "Buongiorno, siamo"
+   * 
+   * COMPORTAMENTO:
+   * - Corregge maiuscole dopo virgola (es. "Siamo" -> "siamo")
+   * - Eccezioni: titoli (Don, Padre, ecc.) e nome mittente
+   * - ✅ NON tocca parole tra due virgole (vocativo: ", Federica,")
    */
-  fixPunctuation(text) {
+  fixPunctuation(text, senderName = '') {
     if (!text) return text;
     
-    // Regex to find "Word, Capital" and lowercase the capital
-    // Exceptions can be added if needed, but usually after comma we want lowercase 
-    // unless it's a proper noun (which is hard to detect without NLP, but "Siamo", "La", "Vi" are common errors).
+    // Parole che DEVONO rimanere maiuscole dopo virgola
+    const exceptions = ['Don', 'Padre', 'Suor', 'Monsignor', 'Papa', 'Signore', 'Signora'];
     
-    // safe list of words that SHOULD be capitalized after comma (Proper nouns, Titles)
-    // For now, we apply a specific fix for the common "Greeting, We..." pattern logic if generalized is too risky.
-    // Legacy logic was likely simple. Let's fix common Italian errors.
+    // Aggiungi nome mittente alle eccezioni
+    if (senderName) {
+      const nameParts = senderName.split(/\s+/);
+      for (const part of nameParts) {
+        if (part && !exceptions.includes(part)) {
+          exceptions.push(part);
+        }
+      }
+    }
     
-    return text.replace(/(Buongiorno|Buonasera|Salve|Ciao)[,\.]\s+(Siamo|La|Vi|Il|I|Le)\b/g, (match, p1, p2) => {
-      // Keep p1 (Greeting) as is
-      // Lowercase p2 (The following word)
-      return `${p1}, ${p2.toLowerCase()}`;
+    // Fix: minuscola dopo virgola (escluse eccezioni e vocativi tra virgole)
+    return text.replace(/,\s+([A-ZÀÈÉÌÒÙ])([a-zàèéìòù]*)/g, (match, firstLetter, rest, offset) => {
+      const word = firstLetter + rest;
+      
+      // Eccezione 1: titoli e nome mittente
+      if (exceptions.includes(word)) {
+        return match;
+      }
+      
+      // Eccezione 2: vocativo seguito da virgola o punto (es. ", Federica," o ", Marco.")
+      // Controlla se dopo la parola c'è una virgola o un punto (indica nome proprio)
+      const afterMatch = text.substring(offset + match.length);
+      if (afterMatch.match(/^\s*[,.]/)) {
+        // È un nome proprio (vocativo o conclusione frase), non minuscolizzare
+        return match;
+      }
+      
+      return `, ${firstLetter.toLowerCase()}${rest}`;
     });
   }
 
   /**
-   * Ensures there is a blank line after the greeting
+   * Assicura che ci sia una riga vuota dopo il saluto
    */
   ensureGreetingLineBreak(text) {
     if (!text) return text;
 
-    // Pattern: Greeting line (start of string, some words, maybe comma/exclamation, newline)
-    // Followed by immediate text without empty line.
+    // Pattern: Riga saluto (inizio stringa, alcune parole, virgola/esclamativo, a capo)
+    // Seguito da testo immediato senza riga vuota.
     
     // E.g. ^Buongiorno, \nSiamo... -> ^Buongiorno, \n\nSiamo...
     
     const lines = text.split('\n');
     if (lines.length > 1) {
       const firstLine = lines[0].trim();
-      // Check if it looks like a greeting
+      // Verifica se sembra un saluto
       if (/^(Buongiorno|Buonasera|Salve|Gentile|Egregio|Ciao)/i.test(firstLine)) {
-        // Check if second line is NOT empty
+        // Verifica se la seconda riga NON è vuota
         if (lines[1].trim() !== '') {
-            // Insert empty line
+            // Inserisci riga vuota
             lines.splice(1, 0, '');
             return lines.join('\n');
         }
@@ -359,12 +471,29 @@ class GmailService {
     return text;
   }
 
+  /**
+   * Applies custom text replacements from the Sostituzioni sheet
+   * @param {string} text - Text to apply replacements to
+   * @param {Object} replacements - Map of {badText: goodText}
+   */
+  applyReplacements(text, replacements) {
+    if (!text || !replacements) return text;
+    
+    let result = text;
+    for (const [bad, good] of Object.entries(replacements)) {
+      // Sostituzione globale case insensitive
+      const regex = new RegExp(bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      result = result.replace(regex, good);
+    }
+    return result;
+  }
+
   // ========================================================================
-  // HEALTH CHECK
+  // VERIFICA STATO
   // ========================================================================
   
   /**
-   * Test Gmail access
+   * Testa accesso Gmail
    */
   testConnection() {
     const results = {
@@ -375,21 +504,21 @@ class GmailService {
     };
     
     try {
-      // Test listing threads
+      // Testa listing thread
       const threads = GmailApp.search('is:unread', 0, 1);
       results.connectionOk = true;
       results.canListMessages = true;
       
-      // Test label creation
+      // Testa creazione etichette
       try {
         const testLabel = this.getOrCreateLabel('_TEST_LABEL_');
         results.canCreateLabels = true;
         
-        // Cleanup
+        // Pulizia
         try {
           testLabel.deleteLabel();
         } catch (e) {
-          // Non-critical
+          // Non critico
         }
       } catch (e) {
         results.errors.push(`Cannot create labels: ${e.message}`);
@@ -404,7 +533,7 @@ class GmailService {
   }
 }
 
-// Factory function
+// Funzione factory
 function createGmailService() {
   return new GmailService();
 }
@@ -419,45 +548,67 @@ function markdownToHtml(text) {
 
   let html = text;
 
-  // Proteggi eventuali code blocks
+  // ✅ STEP 1: Proteggi code blocks PRIMA di tutto
   const codeBlocks = [];
   html = html.replace(/```[\s\S]*?```/g, (match) => {
     codeBlocks.push(match);
     return `__CODEBLOCK_${codeBlocks.length - 1}__`;
   });
 
-  // Headers
+  // ✅ STEP 2: Converti links PRIMA di escape (preserva URL intatti)
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, (match, linkText, url) => {
+    // Escape solo il testo del link, NON l'URL
+    const escapedText = linkText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return `<a href="${url}" style="color:#351c75;">${escapedText}</a>`;
+  });
+
+  // ✅ STEP 3: Headers (markdown → HTML)
+  // IMPORTANTE: Ordine decrescente (#### prima di ###) per evitare match parziali
+  html = html.replace(/^####\s+(.+)$/gm, '<p style="font-size:14px;font-weight:bold;">$1</p>');
   html = html.replace(/^###\s+(.+)$/gm, '<p style="font-size:16px;font-weight:bold;">$1</p>');
   html = html.replace(/^##\s+(.+)$/gm, '<p style="font-size:18px;font-weight:bold;">$1</p>');
   html = html.replace(/^#\s+(.+)$/gm, '<p style="font-size:20px;font-weight:bold;">$1</p>');
 
-  // Bold / Italic
+  // ✅ STEP 4: Bold / Italic
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '<em>$1</em>');
 
-  // Links
-  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#351c75;">$1</a>');
+  // ✅ STEP 5: Escape testo rimanente (dopo conversione markdown)
+  // Split by HTML tags to escape only text content
+  html = html.replace(/>[^<]+</g, (match) => {
+    return match.slice(0, 1) + 
+           match.slice(1, -1)
+             .replace(/&(?!amp;|lt;|gt;|quot;|#\d+;)/g, '&amp;')
+             .replace(/<(?![^>]*>)/g, '&lt;')
+             .replace(/(?<![^<]*)>/g, '&gt;') + 
+           match.slice(-1);
+  });
 
-  // Restore code blocks
+  // ✅ STEP 6: Restore code blocks (con escape interno)
   codeBlocks.forEach((block, i) => {
-    const code = block.replace(/```/g, '').trim();
+    const code = block.replace(/```/g, '').trim()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
     html = html.replace(
       `__CODEBLOCK_${i}__`,
       `<pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-family:monospace;">${code}</pre>`
     );
   });
 
-  // Paragraphs and line breaks
+  // ✅ STEP 7: Paragraphs and line breaks
   html = html.replace(/\n\n+/g, '</p><p>');
   html = html.replace(/\n/g, '<br>');
 
-  // Convert emojis to HTML entities for better email compatibility
-  // Convert all non-ASCII characters (emojis, accents, etc.) to HTML entities
+  // ✅ STEP 8: Convert emojis to HTML entities
   html = html.replace(/[^\x00-\x7F]/g, char => {
     return '&#' + char.codePointAt(0) + ';';
   });
 
-  // Final wrapper (IDENTITÀ VISIVA ORIGINALE)
+  // Wrapper finale
   return `
     <div style="
       font-family: Arial, Helvetica, sans-serif;

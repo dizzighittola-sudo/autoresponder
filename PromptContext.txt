@@ -20,42 +20,46 @@ class PromptContext {
 
     return {
       language_safety:
-        i.email.detectedLanguage !== 'it' ||
-        i.classification.confidence < 0.8,
+        i.email?.detectedLanguage !== 'it' ||
+        (i.classification?.confidence ?? 1) < 0.8,
 
       hallucination_risk:
-        i.knowledgeBase.length > 800 ||
-        i.temporal.mentionsDates ||
-        i.temporal.mentionsTimes,
+        (i.knowledgeBase?.length ?? 0) > 800 ||
+        i.temporal?.mentionsDates ||
+        i.temporal?.mentionsTimes,
 
       formatting_risk:
-        i.temporal.mentionsTimes ||
-        ['information', 'sacrament'].includes(i.classification.category),
+        i.temporal?.mentionsTimes ||
+        ['information', 'sacrament'].includes(i.classification?.category),
 
       temporal_risk:
-        i.temporal.mentionsDates ||
-        i.knowledgeBase.containsDates,
+        i.temporal?.mentionsDates ||
+        i.knowledgeBase?.containsDates,
 
       discernment_risk:
-        i.requestType.needsDiscernment ||
-        i.territory.addressFound,
+        i.requestType?.needsDiscernment ||
+        i.territory?.addressFound,
 
       emotional_sensitivity:
-        i.requestType.type === 'pastoral' ||
-        i.classification.subIntents.emotional_distress ||
-        i.classification.subIntents.bereavement,
+        i.requestType?.type === 'pastoral' ||
+        i.classification?.subIntents?.emotional_distress ||
+        i.classification?.subIntents?.bereavement,
 
       repetition_risk:
-        i.memory.exists ||
-        i.conversation.messageCount > 1,
+        i.memory?.exists ||
+        (i.conversation?.messageCount ?? 0) > 1,
 
       identity_consistency:
-        !i.email.isReply ||
-        i.requestType.type !== 'technical',
+        !i.email?.isReply ||
+        i.requestType?.type !== 'technical',
 
       response_scope_control:
-        i.email.isReply ||
-        i.classification.confidence < 0.7
+        i.email?.isReply ||
+        (i.classification?.confidence ?? 1) < 0.7,
+
+      // 🧠 Controllo saluto per continuità conversazionale
+      salutation_control:
+        i.salutationMode && i.salutationMode !== 'full'
     };
   }
 
@@ -97,7 +101,7 @@ class PromptContext {
   }
 }
 
-// Factory
+// Funzione Factory
 function createPromptContext(input) {
   return new PromptContext(input);
 }

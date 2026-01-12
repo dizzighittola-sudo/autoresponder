@@ -1,24 +1,24 @@
 // ====================================================================
-// EMAIL PROCESSOR - Orchestratore Pipeline (Allineato a CF)
-// ✅ Clear pipeline: Filter → Classify → Generate → Validate
-// ✅ Modular architecture with dependency injection
+// EMAIL PROCESSOR - Orchestratore Pipeline
+// ✅ Pipeline chiara: Filtra → Classifica → Genera → Valida
+// ✅ Architettura modulare con dependency injection
 // ====================================================================
 
 /**
- * EmailProcessor - Aligned with CF email_processor.py
+ * EmailProcessor - Orchestratore elaborazione email
  * 
  * PIPELINE:
- * 1. FILTER: Should we process this email?
- * 2. CLASSIFY: What type of request is it?
- * 3. GENERATE: Create AI response
- * 4. VALIDATE: Check response quality
- * 5. SEND: Reply to email
+ * 1. FILTRA: Dobbiamo processare questa email?
+ * 2. CLASSIFICA: Che tipo di richiesta è?
+ * 3. GENERA: Crea risposta AI
+ * 4. VALIDA: Controlla qualità risposta
+ * 5. INVIA: Rispondi all'email
  */
 class EmailProcessor {
   constructor(options = {}) {
-    console.log('📬 Initializing EmailProcessor (CF-aligned)...');
+    console.log('📬 Inizializzazione EmailProcessor...');
     
-    // Inject dependencies or create defaults
+    // Inietta dipendenze o crea default
     this.geminiService = options.geminiService || new GeminiService();
     this.classifier = options.classifier || new EmailClassifier();
     this.requestClassifier = options.requestClassifier || new RequestTypeClassifier();
@@ -28,7 +28,7 @@ class EmailProcessor {
     this.promptEngine = options.promptEngine || new PromptEngine();
     this.memoryService = options.memoryService || new MemoryService();
     
-    // Configuration
+    // Configurazione
     this.config = {
       validationEnabled: typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_ENABLED : true,
       dryRun: typeof CONFIG !== 'undefined' ? CONFIG.DRY_RUN : false,
@@ -38,16 +38,16 @@ class EmailProcessor {
       validationErrorLabel: typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_ERROR_LABEL : 'IA_VALIDATION_ERROR'
     };
     
-    console.log('✓ EmailProcessor initialized');
+    console.log('✓ EmailProcessor inizializzato');
     console.log(`   Validation: ${this.config.validationEnabled ? 'ENABLED' : 'DISABLED'}`);
     console.log(`   Dry run: ${this.config.dryRun ? 'YES' : 'NO'}`);
   }
   
   /**
-   * Process a single email thread
-   * ✅ ALIGNED: Same pipeline as CF process_thread
+   * Processa un singolo thread email
+   * @param {Set} labeledMessageIds - Set di ID messaggi già etichettati (passato da processUnreadEmails per evitare chiamate API ripetute)
    */
-  processThread(thread, knowledgeBase, doctrineBase = '') {
+  processThread(thread, knowledgeBase, doctrineBase = '', labeledMessageIds = null) {
     const result = {
       status: 'unknown',
       validationFailed: false,
@@ -55,11 +55,67 @@ class EmailProcessor {
       error: null
     };
     
+    // ═══════════════════════════════════════════════════════════════
+    // ACQUISIZIONE LOCK (previene race condition tra trigger)
+    // ═══════════════════════════════════════════════════════════════
+    const threadId = thread.getId();
+    const lock = LockService.getScriptLock();
+    
+    let candidate = null;
     try {
-      // Get last message in thread
+      // Attendi fino a 30s per lock
+      if (!lock.tryLock(30000)) {
+        console.warn(`⏱️ Could not acquire lock for thread ${threadId}, skipping`);
+        result.status = 'skipped';
+        result.reason = 'lock_timeout';
+        return result;
+      }
+      
+      // Raccogli informazioni su thread e messaggi
+      const currentLabels = thread.getLabels().map(l => l.getName());
+      const hasProcessedLabel = currentLabels.includes(this.config.labelName);
+      
+      // Ottieni ultimo messaggio NON LETTO nel thread
       const messages = thread.getMessages();
-      const lastMessage = messages[messages.length - 1];
-      const messageDetails = this.gmailService.extractMessageDetails(lastMessage);
+      const unreadMessages = messages.filter(m => m.isUnread());
+      
+      const myEmail = Session.getActiveUser().getEmail();
+      
+      // ═══════════════════════════════════════════════════════════════
+      // FILTRO A LIVELLO MESSAGGIO: seleziona messaggi non ancora etichettati
+      // ✅ OTTIMIZZATO: Set passato da processUnreadEmails (una sola chiamata API)
+      // ═══════════════════════════════════════════════════════════════
+      // Se non è stato passato il Set, fallback a chiamata locale (per test/uso standalone)
+      const effectiveLabeledIds = labeledMessageIds || this.gmailService.getMessageIdsWithLabel(this.config.labelName);
+      const unlabeledUnread = unreadMessages.filter(message => {
+        return !effectiveLabeledIds.has(message.getId());
+      });
+
+      // Considera solo messaggi non letti da mittenti esterni
+      const externalUnread = unlabeledUnread.filter(message => {
+        const senderEmail = this.gmailService.extractMessageDetails(message).senderEmail;
+        return senderEmail && senderEmail.toLowerCase() !== myEmail.toLowerCase();
+      });
+      
+      // Se non ci sono messaggi non letti non ancora etichettati → skip
+      if (unlabeledUnread.length === 0) {
+        console.log('   ⊘ Thread already processed (no new unread message)');
+        result.status = 'skipped';
+        result.reason = 'already_labeled_no_new_unread';
+        return result;
+      }
+      
+      // Se non ci sono messaggi da esterni → skip
+      if (externalUnread.length === 0) {
+        console.log('   ⊘ Skipped: no new external unread message');
+        result.status = 'skipped';
+        result.reason = 'no_external_unread';
+        return result;
+      }
+      
+      // Seleziona ultimo messaggio non letto non etichettato da esterni
+      candidate = externalUnread[externalUnread.length - 1];
+      const messageDetails = this.gmailService.extractMessageDetails(candidate);
       
       console.log(`\n📧 Processing: ${messageDetails.subject.substring(0, 50)}...`);
       console.log(`   From: ${messageDetails.senderEmail}`);
@@ -67,10 +123,9 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       // STEP 0: ANTI-SELF-REPLY (mandatory first check)
       // ═══════════════════════════════════════════════════════════════
-      const myEmail = Session.getActiveUser().getEmail();
       if (messageDetails.senderEmail.toLowerCase() === myEmail.toLowerCase()) {
         console.log('   ⊘ Skipped: self-sent message');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'skipped';
         result.reason = 'self_sent';
         return result;
@@ -82,7 +137,7 @@ class EmailProcessor {
       const MAX_THREAD_LENGTH = 10;
       if (messages.length > MAX_THREAD_LENGTH) {
         console.log(`   ⊘ Skipped: thread too long (${messages.length} > ${MAX_THREAD_LENGTH})`);
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'skipped';
         result.reason = 'thread_too_long';
         return result;
@@ -93,7 +148,7 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       if (/no-reply|do-not-reply|noreply/i.test(messageDetails.senderEmail)) {
         console.log('   ⊘ Skipped: no-reply sender');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         result.reason = 'no_reply_sender';
         return result;
@@ -104,7 +159,7 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       if (this._shouldIgnoreEmail(messageDetails)) {
         console.log('   ⊘ Filtered: domain/keyword ignore');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -120,7 +175,7 @@ class EmailProcessor {
       
       if (!classification.shouldReply) {
         console.log(`   ⊘ Filtered by classifier: ${classification.reason}`);
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -135,7 +190,7 @@ class EmailProcessor {
       
       if (!quickCheck.shouldRespond) {
         console.log(`   ⊘ Gemini quick check: no response needed (${quickCheck.reason})`);
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -148,7 +203,8 @@ class EmailProcessor {
       // ═══════════════════════════════════════════════════════════════
       const requestType = this.requestClassifier.classify(
         messageDetails.subject,
-        messageDetails.body
+        messageDetails.body,
+        quickCheck.classification // ✅ Pass Hybrid Hint from Gemini
       );
       
       // ═══════════════════════════════════════════════════════════════
@@ -183,7 +239,54 @@ Dettaglio: ${v.reason}
 ⚠️ Usa ESATTAMENTE queste informazioni verificate programmaticamente.
 ════════════════════════════════════════════════════════════════════════
 `;
-        enrichedKnowledgeBase = territoryContext + '\n\n' + knowledgeBase;
+        enrichedKnowledgeBase = territoryContext + '\n\n' + enrichedKnowledgeBase;
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 5.5: CONDITIONAL KB ENRICHMENT (Based on Request Type Flags)
+      // ═══════════════════════════════════════════════════════════════
+      // Logica: per domande TECNICHE (orari, documenti) → solo Istruzioni
+      //         per domande PASTORALI/DOTTRINALI → caricamento graduato
+      
+      const needsPastoralSupport = requestType.needsDiscernment || requestType.needsDoctrine;
+      
+      // AI_CORE_LITE: solo se c'è componente pastorale o dottrinale
+      if (needsPastoralSupport && typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.aiCoreLite) {
+        const liteSection = `
+════════════════════════════════════════════════════════════════════════
+📋 PRINCIPI PASTORALI FONDAMENTALI (AI_CORE_LITE)
+════════════════════════════════════════════════════════════════════════
+${GLOBAL_CACHE.aiCoreLite}
+════════════════════════════════════════════════════════════════════════
+`;
+        enrichedKnowledgeBase = liteSection + '\n\n' + enrichedKnowledgeBase;
+        console.log('   ✓ AI_CORE_LITE injected (pastoral/doctrinal question)');
+      }
+      
+      // AI_CORE esteso: solo se needsDiscernment = true (accompagnamento personale)
+      if (requestType.needsDiscernment && typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.aiCore) {
+        const coreSection = `
+════════════════════════════════════════════════════════════════════════
+🧭 PRINCIPI PASTORALI ESTESI (AI_CORE) - Accompagnamento Personale
+════════════════════════════════════════════════════════════════════════
+${GLOBAL_CACHE.aiCore}
+════════════════════════════════════════════════════════════════════════
+`;
+        enrichedKnowledgeBase = coreSection + '\n\n' + enrichedKnowledgeBase;
+        console.log('   ✓ AI_CORE injected (needsDiscernment=true)');
+      }
+      
+      // Dottrina: solo se needsDoctrine = true (spiegazione dottrinale esplicita)
+      if (requestType.needsDoctrine && typeof GLOBAL_CACHE !== 'undefined' && GLOBAL_CACHE.doctrineBase) {
+        const doctrineSection = `
+════════════════════════════════════════════════════════════════════════
+📖 BASE DOTTRINALE (Dottrina) - Spiegazione Dottrinale
+════════════════════════════════════════════════════════════════════════
+${GLOBAL_CACHE.doctrineBase}
+════════════════════════════════════════════════════════════════════════
+`;
+        enrichedKnowledgeBase = doctrineSection + '\n\n' + enrichedKnowledgeBase;
+        console.log('   ✓ Doctrine Base injected (needsDoctrine=true)');
       }
       
       // ═══════════════════════════════════════════════════════════════
@@ -191,16 +294,23 @@ Dettaglio: ${v.reason}
       // ═══════════════════════════════════════════════════════════════
       let conversationHistory = '';
       if (messages.length > 1) {
-        conversationHistory = this.gmailService.buildConversationHistory(
-          messages.slice(0, -1), // All except last
-          10 // Max messages
-        );
+        // Escludi il messaggio candidato per evitare duplicazione nel prompt
+        const candidateId = candidate.getId();
+        const historyMessages = messages.filter(m => m.getId() !== candidateId);
+        
+        if (historyMessages.length > 0) {
+          conversationHistory = this.gmailService.buildConversationHistory(
+            historyMessages,
+            10, // Max messaggi
+            myEmail // La nostra email per marcare i nostri messaggi
+          );
+        }
       }
       
       // ═══════════════════════════════════════════════════════════════
       // STEP 6.5: GET MEMORY CONTEXT (avoid repetition)
       // ═══════════════════════════════════════════════════════════════
-      const threadId = thread.getId();
+      // threadId già dichiarato alla linea 60
       const memoryContext = this.memoryService.getMemory(threadId);
       
       if (Object.keys(memoryContext).length > 0) {
@@ -273,30 +383,37 @@ const promptContext = createPromptContext({
   temporal: {
     mentionsDates: /\b(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|\d{1,2}\/\d{1,2})\b/i.test(messageDetails.body),
     mentionsTimes: /\d{1,2}[:.]\d{2}/.test(messageDetails.body)
-  }
+  },
+
+  // 🧠 Modalità saluto per continuità conversazionale
+  salutationMode: salutationMode
 });
 console.log('🧠 PromptContext:', JSON.stringify(promptContext.meta));
 
-// NEW CALL
-const prompt = this.promptEngine.buildPrompt({
-  ...promptContext,
-  emailContent: messageDetails.body,
-  emailSubject: messageDetails.subject,
-  knowledgeBase: enrichedKnowledgeBase,
-  senderName: messageDetails.senderName,
-  senderEmail: messageDetails.senderEmail,
-  conversationHistory: conversationHistory,
-  memoryContext: memoryContext,
-  detectedLanguage: detectedLanguage,
-  currentSeason: this._getCurrentSeason(),
-  currentDate: new Date().toISOString().split('T')[0],
-  salutation: greeting,
-  closing: closing,
-  category: classification.category,
-  subIntents: classification.subIntents || {}
-});
+// 🎯 Passa profilo e concern per filtering dinamico template
+const promptOptions = {
+        emailContent: messageDetails.body,
+        emailSubject: messageDetails.subject,
+        knowledgeBase: enrichedKnowledgeBase, // Use enrichedKnowledgeBase
+        senderName: messageDetails.senderName, // Use messageDetails.senderName
+        senderEmail: messageDetails.senderEmail, // Use messageDetails.senderEmail
+        conversationHistory: conversationHistory,
+        category: classification.category, // Use classification.category
+        topic: quickCheck.classification ? quickCheck.classification.topic : '', // ✅ Pass Topic
+        detectedLanguage: detectedLanguage,
+        currentSeason: this._getCurrentSeason(),
+        currentDate: new Date().toISOString().split('T')[0],
+        salutation: greeting, // Use greeting
+        closing: closing, // Use closing
+        subIntents: classification.subIntents || {}, // Use classification.subIntents
+        memoryContext: memoryContext, // Use memoryContext
+        promptProfile: promptContext.profile, // Use promptContext.profile
+        activeConcerns: promptContext.concerns, // Use promptContext.concerns
+        salutationMode: salutationMode
+      };
+const prompt = this.promptEngine.buildPrompt(promptOptions);
       
-      // Add request type hint
+      // Aggiungi hint tipo richiesta
       const typeHint = this.requestClassifier.getRequestTypeHint(requestType.type);
       const fullPrompt = typeHint + '\n\n' + prompt;
       
@@ -308,15 +425,16 @@ const prompt = this.promptEngine.buildPrompt({
       if (!response) {
         console.error('   ❌ Failed to generate response');
         this._addErrorLabel(thread);
+        this._markMessageAsProcessed(candidate); // Prevent infinite reprocessing
         result.status = 'error';
         result.error = 'Generation failed';
         return result;
       }
       
-      // Check for NO_REPLY marker
-      if (response.trim() === 'NO_REPLY' || response.includes('NO_REPLY')) {
+      // Controlla marcatore NO_REPLY (solo corrispondenza esatta per evitare falsi positivi)
+      if (response.trim() === 'NO_REPLY') {
         console.log('   ⊘ AI returned NO_REPLY');
-        this._markAsProcessed(thread);
+        this._markMessageAsProcessed(candidate);
         result.status = 'filtered';
         return result;
       }
@@ -330,15 +448,23 @@ const prompt = this.promptEngine.buildPrompt({
           detectedLanguage,
           enrichedKnowledgeBase,
           messageDetails.body,
-          messageDetails.subject
+          messageDetails.subject,
+          salutationMode  // Per controllo firma contestuale (opzionale in follow-up)
         );
         
         if (!validation.isValid) {
           console.warn(`   ❌ Validation FAILED (score: ${validation.score.toFixed(2)})`);
           this._addValidationErrorLabel(thread);
+          this._markMessageAsProcessed(candidate); // Prevent infinite reprocessing
           result.status = 'validation_failed';
           result.validationFailed = true;
           return result;
+        }
+        
+        // ✅ Se ci sono WARNING (ma validazione passata), aggiungi etichetta "verifica"
+        if (validation.warnings && validation.warnings.length > 0) {
+          console.log(`   ⚠️ Validation PASSED with ${validation.warnings.length} warning(s) - adding 'verifica' label`);
+          this.gmailService.addLabelToThread(thread, 'verifica');
         }
         
         console.log(`   ✓ Validation PASSED (score: ${validation.score.toFixed(2)})`);
@@ -358,33 +484,43 @@ const prompt = this.promptEngine.buildPrompt({
       // ═══════════════════════════════════════════════════════════════
       // STEP 11: UPDATE MEMORY (for next interaction)
       // ═══════════════════════════════════════════════════════════════
-      this.memoryService.updateMemory(threadId, {
+      // Rileva topic forniti dalla risposta
+      const providedTopics = this._detectProvidedTopics(response);
+      
+      // ✅ Operazione atomica: aggiorna memoria e topic in un singolo lock
+      this.memoryService.updateMemoryAtomic(threadId, {
         language: detectedLanguage,
         category: classification.category || requestType.type
-      });
+      }, providedTopics.length > 0 ? providedTopics : null);
       
-      // Detect provided topics from response
-      const providedTopics = this._detectProvidedTopics(response);
-      if (providedTopics.length > 0) {
-        this.memoryService.addProvidedInfoTopics(threadId, providedTopics);
+      if (candidate) {
+        this._markMessageAsProcessed(candidate);
       }
-      
-      this._markAsProcessed(thread);
       result.status = 'replied';
       return result;
       
     } catch (error) {
       console.error(`   ❌ Error processing thread: ${error.message}`);
       this._addErrorLabel(thread);
+      if (candidate) {
+        this._markMessageAsProcessed(candidate); // Prevent infinite reprocessing loop
+      }
       result.status = 'error';
       result.error = error.message;
       return result;
+    } finally {
+      // Rilascia sempre il lock
+      try {
+        lock.releaseLock();
+      } catch (e) {
+        console.warn('⚠️ Failed to release lock:', e.message);
+      }
     }
   }
   
   /**
-   * Process all unread emails
-   * ✅ ALIGNED: Same as CF process_unread_emails
+   * Processa tutte le email non lette
+   * ✅ OTTIMIZZATO: chiamata API etichette solo se ci sono email non lette
    */
   processUnreadEmails(knowledgeBase, doctrineBase = '') {
     console.log('\n' + '='.repeat(70));
@@ -395,13 +531,16 @@ const prompt = this.promptEngine.buildPrompt({
       console.warn('🔴 DRY_RUN MODE ACTIVE - Emails will NOT be sent!');
     }
     
-    // Search for unread threads
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Cerca thread non letti (SENZA chiamata API avanzata)
+    // ═══════════════════════════════════════════════════════════════
     const threads = GmailApp.search(
-      `is:unread -label:${this.config.labelName}`,
+      'is:unread',
       0,
       this.config.maxEmailsPerRun
     );
     
+    // Se non ci sono email non lette, esci subito (NESSUNA chiamata API)
     if (threads.length === 0) {
       console.log('Nessuna email da processare.');
       return { total: 0, replied: 0, filtered: 0, errors: 0 };
@@ -409,7 +548,13 @@ const prompt = this.promptEngine.buildPrompt({
     
     console.log(`📬 Trovate ${threads.length} email da elaborare`);
     
-    // Stats
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 2: Solo ora, fai UNA SOLA chiamata API per le etichette
+    // ═══════════════════════════════════════════════════════════════
+    const labeledMessageIds = this.gmailService.getMessageIdsWithLabel(this.config.labelName);
+    console.log(`📦 Found ${labeledMessageIds.size} messages with label '${this.config.labelName}'`);
+    
+    // Statistiche
     const stats = {
       total: 0,
       replied: 0,
@@ -420,11 +565,12 @@ const prompt = this.promptEngine.buildPrompt({
       skipped: 0
     };
     
-    // Process each thread
+    // Processa ogni thread, passando il Set già caricato
     threads.forEach((thread, index) => {
       console.log(`\n--- Thread ${index + 1}/${threads.length} ---`);
       
-      const result = this.processThread(thread, knowledgeBase, doctrineBase);
+      // ✅ Passa labeledMessageIds per evitare chiamate API ripetute
+      const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds);
       stats.total++;
       
       if (result.validationFailed) {
@@ -441,7 +587,7 @@ const prompt = this.promptEngine.buildPrompt({
       }
     });
     
-    // Print summary
+    // Stampa riepilogo
     console.log('\n' + '='.repeat(70));
     console.log('📊 RIEPILOGO ELABORAZIONE');
     console.log('='.repeat(70));
@@ -458,11 +604,11 @@ const prompt = this.promptEngine.buildPrompt({
   }
   
   // ========================================================================
-  // HELPER METHODS
+  // METODI HELPER
   // ========================================================================
   
   _shouldIgnoreEmail(messageDetails) {
-    // Get ignore lists from CONFIG or GLOBAL_CACHE with safe fallbacks
+    // Ottieni liste ignore da CONFIG o GLOBAL_CACHE con fallback sicuri
     let ignoreDomains = [];
     let ignoreKeywords = [];
     
@@ -482,7 +628,7 @@ const prompt = this.promptEngine.buildPrompt({
     const subject = messageDetails.subject.toLowerCase();
     const body = messageDetails.body.toLowerCase();
     
-    // Check domains
+    // Controlla domini
     for (const domain of ignoreDomains) {
       if (email.includes(domain.toLowerCase())) {
         console.log(`   Domain ignored: ${domain}`);
@@ -490,7 +636,7 @@ const prompt = this.promptEngine.buildPrompt({
       }
     }
     
-    // Check keywords
+    // Controlla parole chiave
     for (const keyword of ignoreKeywords) {
       if (subject.includes(keyword.toLowerCase()) || body.includes(keyword.toLowerCase())) {
         console.log(`   Keyword ignored: ${keyword}`);
@@ -503,12 +649,17 @@ const prompt = this.promptEngine.buildPrompt({
   
   _getCurrentSeason() {
     const month = new Date().getMonth() + 1; // 1-12
-    // Estivo: June-September, otherwise Invernale
+    // Estivo: Giugno-Settembre, altrimenti Invernale
     return (month >= 6 && month <= 9) ? 'estivo' : 'invernale';
   }
   
-  _markAsProcessed(thread) {
-    this.gmailService.addLabelToThread(thread, this.config.labelName);
+  /**
+   * Marca un messaggio specifico come processato
+   * ✅ Usa etichettatura a livello messaggio per permettere follow-up
+   */
+  _markMessageAsProcessed(message) {
+    // NON segnare come letto - la segreteria vuole vederle!
+    this.gmailService.addLabelToMessage(message.getId(), this.config.labelName);
   }
   
   _addErrorLabel(thread) {
@@ -520,13 +671,13 @@ const prompt = this.promptEngine.buildPrompt({
   }
   
   /**
-   * Detect topics provided in the response (for memory anti-repetition)
+   * Rileva topic forniti nella risposta (per anti-ripetizione memoria)
    */
   _detectProvidedTopics(response) {
     const topics = [];
     const lower = response.toLowerCase();
     
-    // Topic patterns
+    // Pattern topic
     const patterns = {
       'orari_messe': /messe?\b.*\d{1,2}[:.]\d{2}|orari\w*\s+messe/i,
       'contatti': /telefono|email|@|segreteria/i,
@@ -549,18 +700,18 @@ const prompt = this.promptEngine.buildPrompt({
 }
 
 // ====================================================================
-// SALUTATION MODE CALCULATOR
-// Determines greeting mode based on conversation state
+// CALCOLATORE MODALITÀ SALUTO
+// Determina la modalità saluto in base allo stato conversazione
 // ====================================================================
 
 /**
- * Compute salutation mode based on structural signals
- * @param {Object} params - Input parameters
- * @param {boolean} params.isReply - Is this a reply?
- * @param {number} params.messageCount - Number of messages in thread
- * @param {boolean} params.memoryExists - Does memory exist for this thread?
- * @param {string|null} params.lastUpdated - ISO timestamp of last memory update
- * @param {Date} params.now - Current date
+ * Calcola modalità saluto basata su segnali strutturali
+ * @param {Object} params - Parametri di input
+ * @param {boolean} params.isReply - È una risposta?
+ * @param {number} params.messageCount - Numero di messaggi nel thread
+ * @param {boolean} params.memoryExists - Esiste memoria per questo thread?
+ * @param {string|null} params.lastUpdated - Timestamp ISO ultimo aggiornamento memoria
+ * @param {Date} params.now - Data corrente
  * @returns {'full'|'soft'|'none_or_continuity'}
  */
 function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdated, now = new Date() }) {
@@ -576,50 +727,62 @@ function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdate
       return 'none_or_continuity';
     }
 
-    const hoursSinceLast = (now.getTime() - new Date(lastUpdated).getTime()) / (1000 * 60 * 60);
+    const parsedLastUpdated = new Date(lastUpdated);
+    const hoursSinceLast = (now.getTime() - parsedLastUpdated.getTime()) / (1000 * 60 * 60);
+
+    // FIX Bug 7: Se timestamp invalido (NaN), tratta come follow-up recente
+    if (isNaN(hoursSinceLast)) {
+      console.warn('⚠️ computeSalutationMode: Invalid lastUpdated timestamp, defaulting to none_or_continuity');
+      return 'none_or_continuity';
+    }
 
     // 2a️⃣ Follow-up ravvicinato (entro 48h)
     if (hoursSinceLast <= 48) {
       return 'none_or_continuity';
     }
 
-    // 2b️⃣ Conversazione ripresa dopo pausa
-    return 'soft';
+    // 2b️⃣ Conversazione ripresa dopo pausa (48h - 4 giorni)
+    if (hoursSinceLast <= 96) {
+      return 'soft';
+    }
+
+    // 2c️⃣ Troppo tempo passato (> 4 giorni) → tratta come nuovo contatto
+    return 'full';
   }
 
   // Fallback di sicurezza
   return 'full';
 }
 
-// Factory function
+// Funzione factory
 function createEmailProcessor(options) {
   return new EmailProcessor(options);
 }
 
 // ====================================================================
-// MAIN ENTRY POINT - For script trigger
+// ENTRY POINT PRINCIPALE - Per trigger script
 // ====================================================================
 
 function processUnreadEmailsMain() {
   try {
-    // Check suspension time
+    // Controlla orario sospensione
     if (typeof isInSuspensionTime === 'function' && isInSuspensionTime()) {
       console.log('Servizio sospeso per orario di lavoro.');
       return;
     }
     
-    // Load resources
+    // Carica risorse
     if (typeof loadResources === 'function') {
       loadResources();
     }
     
-    // Get knowledge base
+    // Ottieni knowledge base
     const knowledgeBase = typeof GLOBAL_CACHE !== 'undefined' ? 
                           GLOBAL_CACHE.knowledgeBase || '' : '';
     const doctrineBase = typeof GLOBAL_CACHE !== 'undefined' ? 
                          GLOBAL_CACHE.doctrineBase || '' : '';
     
-    // Create processor and run
+    // Crea processore ed esegui
     const processor = new EmailProcessor();
     processor.processUnreadEmails(knowledgeBase, doctrineBase);
     

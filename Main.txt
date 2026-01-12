@@ -1,6 +1,6 @@
 // ====================================================================
-// MAIN.GS - Entry Point Pulito (Gennaio 2026)
-// ✅ Usa solo moduli CF-aligned
+// MAIN.GS - Entry Point Pulito
+// ✅ Gestione moduli e configurazione
 // ✅ Nessun codice legacy
 // ====================================================================
 
@@ -15,7 +15,7 @@ const CONFIG = {
   
   // === Generazione ===
   TEMPERATURE: 0.5,
-  MAX_OUTPUT_TOKENS: 4000,
+  MAX_OUTPUT_TOKENS: 6000,
   
   // === Validazione ===
   VALIDATION_ENABLED: true,
@@ -31,10 +31,44 @@ const CONFIG = {
   // === Knowledge Base ===
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
   KB_SHEET_NAME: 'Istruzioni',
+  AI_CORE_LITE_SHEET: 'AI_CORE_LITE',
+  AI_CORE_SHEET: 'AI_CORE',
+  DOCTRINE_SHEET: 'Dottrina',
+  REPLACEMENTS_SHEET_NAME: 'Sostituzioni',
   MEMORY_SHEET_NAME: 'ConversationMemory',
   
   // === Modalità ===
   DRY_RUN: false,  // Cambia a true per test senza invio email
+  USE_RATE_LIMITER: true,  // ✅ Rate Limiter intelligente ABILITATO
+  
+  // === Modelli Gemini (CENTRALIZZATO - Modifica qui quando cambiano) ===
+  // 📌 AGGIORNA QUESTI VALORI se Google modifica le quote gratuite!
+  // 🔗 Verifica limiti quota: https://ai.google.dev/gemini-api/docs/rate-limits
+  GEMINI_MODELS: {
+    'flash-2.5': {
+      name: 'gemini-2.5-flash',       // Modello principale
+      rpm: 5,                          // Richieste Per Minuto (verificato Gen 2026)
+      tpm: 250000,                    // Token Per Minuto
+      rpd: 20,                        // Richieste Per Giorno ⚠️
+      useCases: ['generation', 'all']
+    },
+    'flash-lite': {
+      name: 'gemini-2.5-flash-lite',  // Più economico, ideale per quick check
+      rpm: 10,                         // RPM più alto!
+      tpm: 250000,
+      rpd: 20,
+      useCases: ['quick_check', 'classification']
+    }
+    // NOTA: gemini-1.5-flash non più disponibile nel tier gratuito
+  },
+  
+  // Strategia selezione modelli per task (ordine = priorità)
+  // ⚠️ Con solo 20 RPD per modello, usiamo flash-lite per quick check
+  MODEL_STRATEGY: {
+    'quick_check': ['flash-lite', 'flash-2.5'],   // Quick check usa flash-lite
+    'generation': ['flash-2.5', 'flash-lite'],    // Generation usa flash-2.5
+    'fallback': ['flash-lite', 'flash-2.5']
+  },
   
   // === Ignore Lists ===
   IGNORE_DOMAINS: [
@@ -47,7 +81,7 @@ const CONFIG = {
 };
 
 // ====================================================================
-// LANGUAGE MARKERS (Shared constant)
+// MARCATORI LINGUA (Costante condivisa)
 // ====================================================================
 
 const LANGUAGE_MARKERS = {
@@ -57,57 +91,137 @@ const LANGUAGE_MARKERS = {
 };
 
 // ====================================================================
-// GLOBAL CACHE (populated by loadResources)
+// CACHE GLOBALE (popolata da loadResources)
 // ====================================================================
 
 var GLOBAL_CACHE = {
   knowledgeBase: '',
+  knowledgeStructured: [], // ✅ Smart Parsing
+  aiCoreLite: '',
+  aiCoreLiteStructured: [], // ✅ Smart Parsing
+  aiCore: '',
+  aiCoreStructured: [], // ✅ Smart Parsing
   doctrineBase: '',
+  doctrineStructured: [], // ✅ Smart Parsing
   ignoreDomains: CONFIG.IGNORE_DOMAINS,
   ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
+  replacements: {},
   loaded: false
 };
 
 // ====================================================================
-// RESOURCE LOADING
+// CARICAMENTO RISORSE
 // ====================================================================
 
 function loadResources() {
+  // ✅ FIX: Usa LockService per prevenire race condition tra trigger
   if (GLOBAL_CACHE.loaded) {
     console.log('📦 Resources already loaded (cached)');
     return;
   }
   
-  console.log('📦 Loading resources...');
-  
+  const lock = LockService.getScriptLock();
   try {
+    // Attendi max 5 secondi per il lock
+    if (!lock.tryLock(5000)) {
+      console.log('📦 Another process is loading resources, waiting...');
+      // Aspetta e ricontrolla
+      Utilities.sleep(1000);
+      if (GLOBAL_CACHE.loaded) return;
+    }
+    
+    // Double-check dopo aver acquisito il lock
+    if (GLOBAL_CACHE.loaded) {
+      console.log('📦 Resources already loaded (cached)');
+      return;
+    }
+    
+    console.log('📦 Loading resources...');
+  
     const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     
-    // Load Knowledge Base
+    // Carica Knowledge Base (Istruzioni)
     const kbSheet = spreadsheet.getSheetByName(CONFIG.KB_SHEET_NAME);
     if (kbSheet) {
       const kbData = kbSheet.getDataRange().getValues();
       GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
-      console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars`);
+      GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData); // ✅ Structured
+      console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
     } else {
       console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
     }
     
+    // Carica AI_CORE_LITE (principi pastorali base)
+    const liteSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_LITE_SHEET);
+    if (liteSheet) {
+      const liteData = liteSheet.getDataRange().getValues();
+      GLOBAL_CACHE.aiCoreLite = liteData.map(row => row.join(' | ')).join('\n');
+      GLOBAL_CACHE.aiCoreLiteStructured = _parseSheetToStructured(liteData); // ✅ Structured
+      console.log(`✓ AI_CORE_LITE loaded: ${GLOBAL_CACHE.aiCoreLite.length} chars`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_LITE_SHEET}' not found`);
+    }
+    
+    // Carica AI_CORE (principi pastorali estesi per discernimento)
+    const coreSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_SHEET);
+    if (coreSheet) {
+      const coreData = coreSheet.getDataRange().getValues();
+      GLOBAL_CACHE.aiCore = coreData.map(row => row.join(' | ')).join('\n');
+      GLOBAL_CACHE.aiCoreStructured = _parseSheetToStructured(coreData); // ✅ Structured
+      console.log(`✓ AI_CORE loaded: ${GLOBAL_CACHE.aiCore.length} chars`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_SHEET}' not found`);
+    }
+    
+    // Carica Dottrina (base dottrinale completa)
+    const doctrineSheet = spreadsheet.getSheetByName(CONFIG.DOCTRINE_SHEET);
+    if (doctrineSheet) {
+      const doctrineData = doctrineSheet.getDataRange().getValues();
+      GLOBAL_CACHE.doctrineBase = doctrineData.map(row => row.join(' | ')).join('\n');
+      GLOBAL_CACHE.doctrineStructured = _parseSheetToStructured(doctrineData); // ✅ Structured
+      console.log(`✓ Doctrine Base loaded: ${GLOBAL_CACHE.doctrineBase.length} chars (${GLOBAL_CACHE.doctrineStructured.length} rows)`);
+    } else {
+      console.warn(`⚠️ Sheet '${CONFIG.DOCTRINE_SHEET}' not found`);
+    }
+    
+    // Carica Sostituzioni
+    try {
+      const replSheet = spreadsheet.getSheetByName(CONFIG.REPLACEMENTS_SHEET_NAME);
+      if (replSheet) {
+        const replData = replSheet.getDataRange().getValues();
+        for (let i = 1; i < replData.length; i++) {
+          const [badText, goodText] = replData[i];
+          if (badText && goodText) {
+            GLOBAL_CACHE.replacements[String(badText).trim()] = String(goodText).trim();
+          }
+        }
+        console.log(`✓ Replacements loaded: ${Object.keys(GLOBAL_CACHE.replacements).length}`);
+      }
+    } catch (replError) {
+      console.warn(`⚠️ Could not load replacements: ${replError.message}`);
+    }
+    
     GLOBAL_CACHE.loaded = true;
-    console.log('✓ Resources loaded successfully');
+    console.log('✓ All resources loaded successfully');
     
   } catch (error) {
     console.error(`❌ Error loading resources: ${error.message}`);
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (e) {
+      // Lock potrebbe essere già rilasciato o non acquisito
+    }
   }
 }
 
 // ====================================================================
-// SUSPENSION TIME CHECK
+// VERIFICA ORARIO SOSPENSIONE
 // ====================================================================
 
-// Days when the system MUST respond (Employees are OFF)
-// Format: [Month, Day]
-// 1 Jan, 6 Jan, 25 Apr, 1 May, 29 Jun, 15 Aug, 1 Nov, 8 Dec, 25 Dec, 26 Dec
+// Giorni in cui il sistema DEVE rispondere (Dipendenti in ferie)
+// Formato: [Mese, Giorno]
+// 1 Gen, 6 Gen, 25 Apr, 1 Mag, 29 Giu, 15 Ago, 1 Nov, 8 Dic, 25 Dic, 26 Dic
 const ALWAYS_OPERATING_DAYS = [
   [1, 1],    // Capodanno
   [1, 6],    // Epifania
@@ -130,7 +244,7 @@ const SUSPENSION_HOURS = {
 };
 
 /**
- * Calculates Easter Sunday for a given year (Western/Gregorian)
+ * Calcola la Domenica di Pasqua per un dato anno (Occidentale/Gregoriano)
  */
 function calculateEaster(year) {
   const a = year % 19;
@@ -151,8 +265,8 @@ function calculateEaster(year) {
 }
 
 /**
- * Checks if a date is within the Ferragosto vacation period
- * Rule: Fixed period from August 15th to August 31st (inclusive)
+ * Verifica se una data è nel periodo vacanze di Ferragosto
+ * Regola: Periodo fisso dal 15 al 31 Agosto (inclusi)
  */
 function isFerragostoFixedPeriod(date) {
   const month = date.getMonth() + 1; // 1-12
@@ -161,10 +275,10 @@ function isFerragostoFixedPeriod(date) {
 }
 
 /**
- * Checks if the system should be SUSPENDED (i.e. Employees are WORKING)
- * Returns TRUE if Suspended (Secretariat working)
- * Returns FALSE if Active (System responding, e.g., Holidays, Night, Weekend)
- * @param {Date} [checkDate] - Optional date to check (defaults to now)
+ * Verifica se il sistema dovrebbe essere SOSPESO (cioè Dipendenti LAVORANO)
+ * Ritorna TRUE se Sospeso (Segreteria lavora)
+ * Ritorna FALSE se Attivo (Sistema risponde, es. Feste, Notte, Weekend)
+ * @param {Date} [checkDate] - Data opzionale da verificare (default: ora)
  */
 function isInSuspensionTime(checkDate = new Date()) {
   const now = checkDate;
@@ -175,24 +289,24 @@ function isInSuspensionTime(checkDate = new Date()) {
   const hour = now.getHours();
 
   // ----------------------------------------------------------
-  // 1. CHECK "ALWAYS OPERATING" DAYS (Priority)
-  // If it's a holiday, the system MUST work (return false)
+  // 1. CONTROLLA GIORNI "SEMPRE OPERATIVI" (Priorità)
+  // Se è un giorno festivo, il sistema DEVE funzionare (ritorna false)
   // ----------------------------------------------------------
 
-  // A. Fixed Holidays
+  // A. Festività Fisse
   for (const [hMonth, hDay] of ALWAYS_OPERATING_DAYS) {
     if (month === hMonth && date === hDay) {
       console.log('📅 Giorno Festivo Fisso (Sistema Attivo)');
       return false; // Active
     }
   }
-  // Special active period: Dec 24 and Dec 31 from 14:00, full day Dec 25-26, Jan 1
+  // Periodo attivo speciale: 24 e 31 Dic dalle 14:00, giorni interi 25-26 Dic, 1 Gen
   if (month === 12 && ((date === 24 && hour >= 14) || date === 25 || date === 26 || (date === 31 && hour >= 14))) {
     console.log('📅 Periodo speciale attivo (Natale/Capodanno)');
     return false; // Active
   }
 
-  // B. Easter Mobile Dates
+  // B. Date Mobili Pasqua
   const easter = calculateEaster(year);
   
   // Pasquetta (Easter + 1 day)
@@ -203,7 +317,7 @@ function isInSuspensionTime(checkDate = new Date()) {
     return false;
   }
 
-  // Holy Saturday (Easter - 1 day)
+  // Sabato Santo (Pasqua - 1 giorno)
   const holySaturday = new Date(easter);
   holySaturday.setDate(easter.getDate() - 1);
   if (month === (holySaturday.getMonth() + 1) && date === holySaturday.getDate()) {
@@ -211,50 +325,50 @@ function isInSuspensionTime(checkDate = new Date()) {
     return false;
   }
 
-  // C. Ferragosto Period (Fixed: August 15-31)
+  // C. Periodo Ferragosto (Fisso: 15-31 Agosto)
   if (isFerragostoFixedPeriod(now)) {
     console.log('📅 Periodo Ferragosto (Sistema Attivo)');
     return false;
   }
 
   // ----------------------------------------------------------
-  // 2. CHECK REGULAR OFFICE HOURS
-  // If not a holiday, check if employees are working
+  // 2. CONTROLLA ORARI UFFICIO REGOLARI
+  // Se non è festivo, controlla se i dipendenti lavorano
   // ----------------------------------------------------------
   if (SUSPENSION_HOURS[day]) {
     for (const [startH, endH] of SUSPENSION_HOURS[day]) {
       if (hour >= startH && hour < endH) {
-        // We are within working hours, and it's NOT a holiday
-        return true; // SUSPENDED
+        // Siamo in orario lavorativo, e NON è un giorno festivo
+        return true; // SOSPESO
       }
     }
   }
 
-  // Default: Not in suspension hours -> Active
+  // Default: Non in orari sospensione -> Attivo
   return false;
 }
 
 // ====================================================================
-// SPECIAL MASS RULES (Legacy Feature Restore)
+// REGOLE MESSE SPECIALI (Ripristino Funzionalità Legacy)
 // ====================================================================
 
 /**
- * Returns a special rule string if today is a special feast day.
- * Rule: On special days (Easter Monday, 25 Apr, 1 May, 2 Jun, 26 Dec),
- * Mass is ONLY at 19:00 (unless it's Sunday).
+ * Ritorna una stringa con regola speciale se oggi è un giorno festivo speciale.
+ * Regola: Nei giorni speciali (Pasquetta, 25 Apr, 1 Mag, 2 Giu, 26 Dic),
+ * la Messa è SOLO alle 19:00 (a meno che non sia Domenica).
  */
 function getSpecialMassTimeRule(date = new Date()) {
   const month = date.getMonth() + 1; // 1-12
   const day = date.getDate();
   const weekDay = date.getDay(); // 0=Sun
   
-  // If it's Sunday, standard Sunday rules usually apply (unless override needed)
-  // Legacy logic implied: "tranne se cadono di domenica" -> if Sunday, standard rules apply.
+  // Se è Domenica, si applicano le regole standard domenicali (a meno di override)
+  // Logica legacy implicava: "tranne se cadono di domenica" -> se Domenica, regole standard.
   if (weekDay === 0) {
     return null; 
   }
 
-  // Special Fixed Days: 25 Apr, 1 May, 2 Jun, 26 Dec
+  // Giorni Fissi Speciali: 25 Apr, 1 Mag, 2 Giu, 26 Dic
   const specialFixed = [
     [4, 25], // Anniversario Liberazione
     [5, 1],  // Festa Lavoro
@@ -264,7 +378,7 @@ function getSpecialMassTimeRule(date = new Date()) {
 
   let isSpecial = false;
   
-  // Check Fixed
+  // Controlla Fissi
   for (const [m, d] of specialFixed) {
     if (month === m && day === d) {
       isSpecial = true;
@@ -272,7 +386,7 @@ function getSpecialMassTimeRule(date = new Date()) {
     }
   }
 
-  // Check Easter Monday (Pasquetta)
+  // Controlla Pasquetta
   if (!isSpecial) {
     const easter = calculateEaster(date.getFullYear());
     const pasquetta = new Date(easter);
@@ -304,8 +418,8 @@ Unico orario valido per OGGI: ore 19:00.
 }
 
 /**
- * Returns a string describing the Ferragosto vacation period.
- * Fixed period: August 15th to August 31st.
+ * Ritorna una stringa che descrive il periodo vacanze di Ferragosto.
+ * Periodo fisso: 15-31 Agosto.
  */
 function getFerragostoPeriodInfo(date = new Date()) {
   const year = date.getFullYear();
@@ -315,7 +429,7 @@ function getFerragostoPeriodInfo(date = new Date()) {
 
 
 // ====================================================================
-// CRITICAL CONFIG ASSERTION (fail-fast)
+// ASSERZIONE CONFIG CRITICA (fail-fast)
 // ====================================================================
 
 function assertCriticalConfig() {
@@ -329,7 +443,7 @@ function assertCriticalConfig() {
 }
 
 // ====================================================================
-// MAIN ENTRY POINT - For Trigger
+// ENTRY POINT PRINCIPALE - Per Trigger
 // ====================================================================
 
 /**
@@ -342,16 +456,16 @@ function main() {
   console.log('═'.repeat(70));
   console.log(`⏰ ${new Date().toLocaleString('it-IT')}`);
   
-  // Fail-fast on missing config
+  // Fail-fast su config mancante
   assertCriticalConfig();
   
-  // Check suspension
+  // Controlla sospensione
   if (isInSuspensionTime()) {
     console.log('⏸️ Servizio sospeso: orario di lavoro segreteria');
     return;
   }
   
-  // Load resources
+  // Carica risorse
   loadResources();
   
   if (!GLOBAL_CACHE.knowledgeBase) {
@@ -359,7 +473,7 @@ function main() {
     return;
   }
   
-  // Create and run processor
+  // Crea ed esegui processore
   try {
     const processor = new EmailProcessor();
     const stats = processor.processUnreadEmails(
@@ -376,7 +490,7 @@ function main() {
 }
 
 // ====================================================================
-// UTILITY FUNCTIONS
+// FUNZIONI UTILITÀ
 // ====================================================================
 
 /**
@@ -454,8 +568,8 @@ function testHolidayLogic() {
   console.log('---------------------------------------------------');
   testCases.forEach(tc => {
     const isSuspended = isInSuspensionTime(tc.d);
-    // expectSuspended: true = Sospeso (Employees working)
-    // expectSuspended: false = Attivo (Employees OFF)
+    // expectSuspended: true = Sospeso (Dipendenti lavorano)
+    // expectSuspended: false = Attivo (Dipendenti in ferie)
     
     const resultStr = isSuspended ? "⛔ SOSPESO (Lavoro)" : "✅ ATTIVO (Bot risponde)";
     const ok = isSuspended === tc.expectSuspended;
@@ -535,6 +649,34 @@ function cleanupMemory() {
 /**
  * Status check completo
  */
+/**
+ * TEST: Verifica flusso ibrido (Gemini + Smart RAG)
+ */
+function testHybridFlow() {
+  loadResources();
+  console.log('🧪 TESTING HYBRID FLOW...');
+  
+  const testSubject = "Richiesta Battesimo";
+  const testBody = "Vorremmo battezzare nostro figlio, ma siamo divorziati. È possibile? Come funziona?";
+  
+  console.log(`📧 Subject: ${testSubject}`);
+  console.log(`📝 Body: ${testBody}`);
+  
+  const gemini = new GeminiService();
+  const quickCheck = gemini.shouldRespondToEmail(testBody, testSubject);
+  
+  console.log('🤖 Gemini Classification:', JSON.stringify(quickCheck, null, 2));
+  
+  if (quickCheck.classification) {
+     const engine = new PromptEngine();
+     const directives = engine._renderDynamicDirectives(
+       quickCheck.classification.topic
+     );
+     console.log('📚 Dynamic Directives (Smart RAG):');
+     console.log(directives || 'NONE');
+  }
+}
+
 function healthCheck() {
   console.log('\n' + '═'.repeat(50));
   console.log('🏥 HEALTH CHECK');
@@ -558,6 +700,7 @@ function healthCheck() {
   // Knowledge Base
   loadResources();
   console.log(`Knowledge Base: ${GLOBAL_CACHE.knowledgeBase ? '✓ OK' : '❌ FAIL'} (${GLOBAL_CACHE.knowledgeBase?.length || 0} chars)`);
+  console.log(`Structured Doctrine: ${GLOBAL_CACHE.doctrineStructured?.length > 0 ? '✓ OK' : '❌ FAIL'} (${GLOBAL_CACHE.doctrineStructured?.length || 0} entries)`);
   
   console.log('═'.repeat(50));
   
@@ -570,7 +713,7 @@ function healthCheck() {
 }
 
 // ====================================================================
-// TRIGGER MANAGEMENT
+// GESTIONE TRIGGER
 // ====================================================================
 
 /**
@@ -601,4 +744,24 @@ function removeTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(trigger => ScriptApp.deleteTrigger(trigger));
   console.log(`✓ Rimossi ${triggers.length} trigger`);
+}
+
+/**
+ * Helper: Converte array 2D da Sheet in Array di Oggetti
+ * Assume che la prima riga sia Header
+ */
+function _parseSheetToStructured(data) {
+  if (!data || data.length < 2) return [];
+  const headers = data[0].map(h => String(h).trim());
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      // FIX Bug 1: Fallback per valori cella undefined/null
+      obj[headers[j]] = row[j] !== undefined && row[j] !== null ? row[j] : '';
+    }
+    rows.push(obj);
+  }
+  return rows;
 }

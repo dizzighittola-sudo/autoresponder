@@ -1,10 +1,10 @@
 // ====================================================================
-// REQUEST TYPE CLASSIFIER - Classificazione Technical/Pastoral/Mixed
-// Porting completo da CF request_classifier.py
+// REQUEST TYPE CLASSIFIER - Classificazione Tecnica/Pastorale/Mista
+// Versione completa con indicatori ponderati
 // ====================================================================
 
 /**
- * RequestTypeClassifier - Aligned with CF version
+ * RequestTypeClassifier - Classificatore tipo richieste
  * 
  * Classifica le richieste in:
  * - TECHNICAL: domande procedurali ("si può", "quanti", "quando")
@@ -12,13 +12,14 @@
  * - MIXED: entrambi gli aspetti
  * 
  * Logica di attivazione KB:
- * - AI-Core Lite: SEMPRE (tono, limiti, tipo risposta)
- * - AI-Core: Solo quando needs_discernment = true
- * - Dottrina: Solo quando needs_doctrine = true
+ * - AI-Core Lite: Solo quando needsDiscernment || needsDoctrine (tono, limiti)
+ * - AI-Core: Solo quando needsDiscernment = true
+ * - Dottrina: Solo quando needsDoctrine = true
+ * (Per richieste puramente tecniche, nessuna KB viene caricata)
  */
 class RequestTypeClassifier {
   constructor() {
-    console.log('📊 Initializing RequestTypeClassifier (CF-aligned)...');
+    console.log('📊 Inizializzazione RequestTypeClassifier...');
     
     // ========================================================================
     // INDICATORI TECNICI
@@ -128,17 +129,22 @@ class RequestTypeClassifier {
       { pattern: /\binsegnamento della chiesa\b/i, weight: 3 }
     ];
     
-    console.log('✓ RequestTypeClassifier initialized');
+    console.log('✓ RequestTypeClassifier inizializzato');
   }
   
   /**
    * Classifica la richiesta email
-   * ✅ ALIGNED: Same logic as CF classify()
+   * ✅ Supporta override da classificazione Gemini (Hybrid approach)
    */
-  classify(subject, body) {
-    const text = `${subject} ${body}`.toLowerCase();
+  classify(subject, body, externalHint = null) {
+    // FIX Bug 9: Limit text length to avoid slow regex on very long emails
+    const MAX_ANALYSIS_LENGTH = 3000;
+    const fullText = `${subject} ${body}`;
+    const text = fullText.length > MAX_ANALYSIS_LENGTH 
+      ? fullText.substring(0, MAX_ANALYSIS_LENGTH).toLowerCase()
+      : fullText.toLowerCase();
     
-    // Calculate scores
+    // Calcola punteggi (backup/validazione basata su Regex)
     const technicalResult = this._calculateScore(text, this.TECHNICAL_INDICATORS);
     const pastoralResult = this._calculateScore(text, this.PASTORAL_INDICATORS);
     const doctrineResult = this._calculateScore(text, this.DOCTRINE_INDICATORS);
@@ -147,24 +153,38 @@ class RequestTypeClassifier {
     const pastoralScore = pastoralResult.score;
     const doctrineScore = doctrineResult.score;
     
-    // Determine type
-    let requestType;
-    if (pastoralScore >= 3 && pastoralScore > technicalScore) {
-      requestType = 'pastoral';
-    } else if (technicalScore >= 2 && pastoralScore <= 1) {
-      requestType = 'technical';
-    } else if (pastoralScore >= 2 && technicalScore >= 2) {
-      requestType = 'mixed';
+    // Determina tipo (Logica Ibrida)
+    let requestType = 'technical';
+    let source = 'regex';
+    
+    if (externalHint && externalHint.category && externalHint.confidence >= 0.7) {
+      // ✅ Usa classificazione Gemini se disponibile e confidente
+      requestType = externalHint.category.toLowerCase();
+      source = 'gemini';
+      console.log(`   🤖 Hybrid Classifier: Using Gemini result (${requestType.toUpperCase()}, conf=${externalHint.confidence})`);
     } else {
-      requestType = 'technical'; // Default for low-signal requests
+      // ⚠️ Fallback a Regex
+      if (pastoralScore >= 3 && pastoralScore > technicalScore) {
+        requestType = 'pastoral';
+      } else if (technicalScore >= 2 && pastoralScore <= 1) {
+        requestType = 'technical';
+      } else if (pastoralScore >= 2 && technicalScore >= 2) {
+        requestType = 'mixed';
+      } else if (doctrineScore >= 3) {
+        requestType = 'doctrinal'; 
+      } else {
+        requestType = 'technical'; // Default
+      }
+      source = 'regex';
     }
     
-    // Determine activation flags
-    const needsDiscernment = pastoralScore >= 2 || requestType === 'pastoral' || requestType === 'mixed';
-    const needsDoctrine = doctrineScore >= 2;
+    // Determina flag di attivazione (sincronizzati con tipo richiesta)
+    const needsDiscernment = requestType === 'pastoral' || requestType === 'mixed';
+    const needsDoctrine = requestType === 'doctrinal' || (doctrineScore >= 2 && requestType !== 'technical');
     
     const result = {
       type: requestType,
+      source: source,
       technicalScore: technicalScore,
       pastoralScore: pastoralScore,
       doctrineScore: doctrineScore,
@@ -177,16 +197,17 @@ class RequestTypeClassifier {
       ]
     };
     
-    console.log(`   📊 Request classification: ${requestType.toUpperCase()}`);
-    console.log(`      Tech=${technicalScore}, Pastor=${pastoralScore}, Doctr=${doctrineScore}`);
+    console.log(`   📊 Request classification: ${requestType.toUpperCase()} (Source: ${source})`);
+    if (source === 'regex') {
+      console.log(`      Tech=${technicalScore}, Pastor=${pastoralScore}, Doctr=${doctrineScore}`);
+    }
     console.log(`      Discernment=${needsDiscernment}, Doctrine=${needsDoctrine}`);
     
     return result;
   }
   
   /**
-   * Calculate weighted score for a set of indicators
-   * ✅ ALIGNED: Same as CF _calculate_score
+   * Calcola punteggio ponderato per set di indicatori
    */
   _calculateScore(text, indicators) {
     let total = 0;
@@ -204,7 +225,7 @@ class RequestTypeClassifier {
   }
   
   /**
-   * Get request type hint for prompt injection
+   * Ottiene suggerimento tipo richiesta per iniezione nel prompt
    */
   getRequestTypeHint(requestType) {
     if (requestType === 'technical') {
@@ -245,14 +266,36 @@ Linee guida per la risposta:
 - Non scivolare nel permissivismo
 - Bilancia informazione e accoglienza
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    } else if (requestType === 'doctrinal') {
+      return `
+🎯 TIPO RICHIESTA RILEVATO: DOTTRINALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Linee guida per la risposta:
+- RISPONDI DIRETTAMENTE alle domande di fede
+- Spiega la dottrina in modo chiaro e accessibile
+- Usa fonti: Catechismo, Magistero, Scrittura
+- NON rimandare al sacerdote per domande informative
+
+📖 REGOLA DOTTRINALE (GAS-02):
+Questa è una richiesta di SPIEGAZIONE dottrinale generale.
+✅ DEVI: Spiegare l'insegnamento della Chiesa
+✅ DEVI: Essere chiaro, fedele, informativo
+❌ NON: Rimandare al sacerdote per domande teoriche
+❌ NON: Evitare di rispondere per "prudenza"
+
+Il rinvio al sacerdote è riservato SOLO a:
+- Situazioni personali concrete
+- Discernimento su stati di vita
+- Accompagnamento spirituale individuale
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     }
     
-    // Default fallback
+    // Fallback predefinito
     return '';
   }
 }
 
-// Factory function
+// Funzione factory
 function createRequestTypeClassifier() {
   return new RequestTypeClassifier();
 }

@@ -1,24 +1,26 @@
 // ====================================================================
-// GEMINI SERVICE - Servizio API Gemini (Allineato a CF)
+// GEMINI SERVICE - Servizio API Gemini
 // ✅ RETRY con exponential backoff
 // ✅ Language detection centralizzata
 // ✅ Quick check per decidere se rispondere
+// ✅ RATE LIMITER integrato (v2.0)
 // ====================================================================
 
 /**
- * GeminiService - Aligned with CF version
+ * GeminiService - Servizio interazione con API Gemini
  * 
  * KEY FEATURES:
- * ✅ Retry with exponential backoff (3 attempts)
- * ✅ Centralized language detection
- * ✅ Quick check for should_respond + language
- * ✅ Adaptive greeting by time and language
+ * ✅ Retry con exponential backoff (3 tentativi)
+ * ✅ Rilevamento lingua centralizzato
+ * ✅ Quick check per should_respond + lingua
+ * ✅ Saluto adattivo per ora e lingua
+ * ✅ Rate Limiter intelligente con quota tracking
  */
 class GeminiService {
   constructor() {
-    console.log('🤖 Initializing GeminiService (CF-aligned)...');
+    console.log('🤖 Inizializzazione GeminiService...');
     
-    // Get config
+    // Ottieni configurazione
     this.apiKey = typeof CONFIG !== 'undefined' ? CONFIG.GEMINI_API_KEY : 
                   PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
     this.modelName = typeof CONFIG !== 'undefined' ? CONFIG.MODEL_NAME : 'gemini-2.5-flash';
@@ -28,32 +30,202 @@ class GeminiService {
       throw new Error('GEMINI_API_KEY non configurata correttamente');
     }
     
-    // Retry configuration (aligned with CF)
+    // Configurazione retry (ottimizzato BUG 13)
     this.maxRetries = 3;
-    this.retryDelay = 5000; // ms (5 seconds - increased for rate limit handling)
-    this.backoffFactor = 2;
+    this.retryDelay = 2000; // ms (2 secondi - bilanciato per UX e rate limit)
+    this.backoffFactor = 1.5; // crescita graduale: 2s → 3s → 4.5s
     
-    console.log(`✓ GeminiService initialized with model: ${this.modelName}`);
+    // ✅ Rate Limiter (abilitato da CONFIG.USE_RATE_LIMITER)
+    this.useRateLimiter = typeof CONFIG !== 'undefined' && CONFIG.USE_RATE_LIMITER === true;
+    if (this.useRateLimiter) {
+      try {
+        this.rateLimiter = new GeminiRateLimiter();
+        console.log('✓ Rate Limiter ENABLED');
+      } catch (e) {
+        console.warn(`⚠️ Rate Limiter init failed: ${e.message}`);
+        this.useRateLimiter = false;
+      }
+    } else {
+      console.log('   Rate Limiter: DISABLED (set CONFIG.USE_RATE_LIMITER = true to enable)');
+    }
+    
+    console.log(`✓ GeminiService inizializzato con modello: ${this.modelName}`);
   }
   
   // ========================================================================
-  // RETRY WRAPPER (Aligned with CF decorator)
+  // RATE LIMITER HELPERS
   // ========================================================================
   
   /**
-   * Execute function with retry and exponential backoff
-   * ✅ ALIGNED: Same logic as CF @retry_on_failure decorator
+   * Stima token da testo (approssimazione: 1 token ≈ 4 caratteri)
+   */
+  _estimateTokens(text) {
+    return Math.ceil((text || '').length / 4);
+  }
+  
+  /**
+   * Genera risposta con modello specifico (per Rate Limiter)
+   * @param {string} prompt - Prompt completo
+   * @param {string} modelName - Nome modello API (es. 'gemini-2.5-flash')
+   * @returns {string|null} Testo generato
+   */
+  _generateWithModel(prompt, modelName) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    const temperature = typeof CONFIG !== 'undefined' ? CONFIG.TEMPERATURE : 0.5;
+    const maxTokens = typeof CONFIG !== 'undefined' ? CONFIG.MAX_OUTPUT_TOKENS : 4000;
+    
+    console.log(`🤖 Calling ${modelName} (prompt: ${prompt.length} chars)...`);
+    
+    const response = UrlFetchApp.fetch(`${url}?key=${this.apiKey}`, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: temperature,
+          maxOutputTokens: maxTokens
+        }
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const responseCode = response.getResponseCode();
+    
+    if (responseCode === 429 || responseCode === 503) {
+      throw new Error(`rate limit or service unavailable: ${responseCode}`);
+    }
+    
+    if (responseCode !== 200) {
+      throw new Error(`API error: ${responseCode} - ${response.getContentText().substring(0, 200)}`);
+    }
+    
+    const result = JSON.parse(response.getContentText());
+    
+    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+      throw new Error('Invalid Gemini response: no candidates');
+    }
+    
+    const generatedText = result.candidates[0].content.parts[0].text;
+    
+    if (!generatedText || generatedText.trim().length === 0) {
+      throw new Error('Gemini returned empty response');
+    }
+    
+    console.log(`✓ Generated ${generatedText.length} chars`);
+    return generatedText;
+  }
+  
+  /**
+   * Quick check con modello specifico (per Rate Limiter)
+   * @param {string} emailContent - Contenuto email
+   * @param {string} emailSubject - Oggetto email
+   * @param {string} modelName - Nome modello API
+   * @returns {Object} Risultato quick check
+   */
+  _quickCheckWithModel(emailContent, emailSubject, modelName) {
+    const prompt = `Analizza questa email.
+Rispondi ESCLUSIVAMENTE con un oggetto JSON.
+
+Email:
+Oggetto: ${emailSubject}
+Testo: ${emailContent.substring(0, 800)}
+
+Compiti:
+1. Decidi se richiede risposta (reply_needed).
+2. Rileva la lingua dell'email (language) - usa codice ISO 639-1 (es: "it", "en", "es", "fr", "de", "pl", "tr", "pt", etc.).
+3. Classifica la richiesta (category) in una di queste:
+   - "TECHNICAL": orari, documenti, procedure, info pratiche, iscrizioni, prenotazioni, cambi camera, pagamenti, aspetti organizzativi
+   - "PASTORAL": richieste di aiuto, sfogo, situazioni personali, lutto, richiesta colloqui personali
+   - "DOCTRINAL": dubbi di fede, domande teologiche, "perché la chiesa..."
+   - "MIXED": mix di tecnica e pastorale (es. cerco info ma sono arrabbiato/triste)
+4. Estrai l'argomento principale (topic) es. "Battesimo", "Messa", "Orari", "Lutto", "Iscrizioni".
+5. Fornisci un breve ragionamento (reason).
+
+Output JSON atteso:
+{
+  "reply_needed": boolean,
+  "language": "string (codice ISO 639-1, es: it, en, es, fr, de, pl, tr...)",
+  "category": "TECHNICAL" | "PASTORAL" | "DOCTRINAL" | "MIXED",
+  "topic": "string",
+  "confidence": number (0.0-1.0),
+  "reason": "string"
+}`;
+    
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    
+    console.log(`🔍 Quick check via ${modelName}...`);
+    
+    const response = UrlFetchApp.fetch(`${url}?key=${this.apiKey}`, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 1024
+        }
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const responseCode = response.getResponseCode();
+    
+    if (responseCode === 429 || responseCode === 503) {
+      throw new Error(`rate limit or service unavailable: ${responseCode}`);
+    }
+    
+    if (responseCode !== 200) {
+      throw new Error(`API error: ${responseCode}`);
+    }
+    
+    const result = JSON.parse(response.getContentText());
+    
+    if (!result.candidates || !result.candidates[0]) {
+      throw new Error('No candidates in response');
+    }
+    
+    const candidate = result.candidates[0];
+    if (candidate.finishReason && ['SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST'].includes(candidate.finishReason)) {
+      throw new Error(`Response blocked: ${candidate.finishReason}`);
+    }
+    
+    const textResponse = candidate.content.parts[0].text;
+    const data = parseGeminiJsonLenient(textResponse);
+    
+    // Detection locale per fallback lingua
+    const detection = this.detectEmailLanguage(emailContent, emailSubject);
+    
+    return {
+      shouldRespond: data.reply_needed === true,
+      language: this._resolveLanguage(data.language, detection.lang, detection.safetyGrade),
+      reason: data.reason || 'quick_check',
+      classification: {
+        category: data.category || 'TECHNICAL',
+        topic: data.topic || '',
+        confidence: data.confidence || 0.8
+      }
+    };
+  }
+
+  
+  // ========================================================================
+  // WRAPPER RETRY
+  // ========================================================================
+  
+  /**
+   * Esegue funzione con retry ed exponential backoff
    */
   _withRetry(fn, context = 'API call') {
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
         return fn();
       } catch (error) {
-        const isRetryable = error.message && (
-          error.message.includes('timeout') ||
-          error.message.includes('503') ||
-          error.message.includes('429') ||
-          error.message.includes('rate limit')
+        const msg = error && error.message ? error.message : '';
+        const isRetryable = msg && (
+          msg.includes('timeout') ||
+          msg.includes('503') ||
+          msg.includes('429') ||
+          msg.includes('rate limit')
         );
         
         if (isRetryable && attempt < this.maxRetries - 1) {
@@ -65,7 +237,7 @@ class GeminiService {
           console.error(`❌ All ${this.maxRetries} ${context} attempts failed`);
           throw error;
         } else {
-          // Non-retryable error
+          // Errore non ritentabile
           throw error;
         }
       }
@@ -73,30 +245,33 @@ class GeminiService {
   }
   
   // ========================================================================
-  // LANGUAGE DETECTION (Centralized - aligned with CF)
+  // RILEVAMENTO LINGUA (Centralizzato)
   // ========================================================================
   
   /**
-   * Detect email language with enhanced detection
-   * ✅ CENTRALIZED: This is the ONLY place for language detection
-   * ✅ ALIGNED: Same keywords and logic as CF _detect_email_language
+   * Rileva lingua email con detection avanzata
+   * ✅ CENTRALIZZATO: Unico punto per rilevamento lingua
+   * ✅ AGGIORNATO: Migliorata logica di scoring e aggiunta lingua tedesca
    */
   detectEmailLanguage(emailContent, emailSubject) {
     const text = `${emailSubject} ${emailContent}`.toLowerCase();
     const originalText = `${emailSubject} ${emailContent}`;
     
-    // Spanish-specific character detection (highly distinctive)
+    // Rilevamento caratteri specifici spagnoli (altamente distintivi)
+    // FIX Bug 5: Peso ridotto per evitare falsi positivi con nomi spagnoli in email italiane
     let spanishCharScore = 0;
     if (originalText.includes('¿') || originalText.includes('¡')) {
-      spanishCharScore = 5;
+      spanishCharScore = 3; // Ridotto da 5 per evitare collisioni
       console.log('   Found Spanish-specific punctuation (¿ or ¡)');
     }
     if (text.includes('ñ')) {
-      spanishCharScore += 3;
+      spanishCharScore += 2; // Ridotto da 3 per evitare collisioni con nomi spagnoli
       console.log('   Found Spanish-specific character (ñ)');
     }
     
-    // ✅ ALIGNED: Same keywords as CF
+
+    
+    // Parole chiave per rilevamento
     const englishUniqueKeywords = [
       'the', 'would', 'could', 'should', 'might',
       'we are', 'you are', 'they are', 'i am', "i'm", "we're", "you're",
@@ -147,16 +322,18 @@ class GeminiService {
       'progetto', 'informazione', 'informazioni', 'vorrei', 'gradirei'
     ];
     
-    // Count matches with word boundaries
+
+    
+    // Conta corrispondenze con limiti di parola
     const countMatches = (keywords, txt, weight = 1) => {
       let count = 0;
       for (const kw of keywords) {
         if (kw.startsWith(' ') || kw.endsWith(' ')) {
-          // Substring match for phrases with explicit spaces
+          // Match sottostringa per frasi con spazi espliciti
           const matches = (txt.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length;
           count += weight * matches;
         } else {
-          // Word boundary match
+          // Match con limiti di parola
           const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const pattern = new RegExp(`\\b${escaped}\\b`, 'gi');
           const matches = (txt.match(pattern) || []).length;
@@ -177,7 +354,7 @@ class GeminiService {
     
     console.log(`   Language scores: EN=${scores['en']}, ES=${scores['es']}, IT=${scores['it']}`);
     
-    // Determine detected language
+    // Determina lingua rilevata
     let detectedLang = 'it';
     let maxScore = 0;
     for (const lang in scores) {
@@ -187,81 +364,162 @@ class GeminiService {
       }
     }
     
-    // Confidence threshold logic (aligned with CF)
-    if (spanishCharScore > 0 && scores['es'] >= scores['it']) {
+    // Logica soglia confidenza
+    if (spanishCharScore > 0 && scores['es'] >= scores['it'] && scores['es'] >= scores['en']) {
       console.log(`   ✓ Detected: SPANISH (score: ${scores['es']}, includes special chars)`);
-      return 'es';
+      return { lang: 'es', confidence: scores['es'], safetyGrade: this._computeSafetyGrade('es', scores['es'], scores) };
     }
+    
+
     
     if (scores['en'] >= 2 && scores['en'] >= scores['it'] && scores['en'] >= scores['es']) {
       console.log(`   ✓ Detected: ENGLISH (score: ${scores['en']})`);
-      return 'en';
+      return { lang: 'en', confidence: scores['en'], safetyGrade: this._computeSafetyGrade('en', scores['en'], scores) };
     }
     
     if (maxScore < 2) {
       console.log('   Low confidence, defaulting to Italian');
-      return 'it';
+      return { lang: 'it', confidence: maxScore, safetyGrade: 0 };
     }
     
     console.log(`   ✓ Detected: ${detectedLang.toUpperCase()} (score: ${maxScore})`);
-    return detectedLang;
+    return { lang: detectedLang, confidence: maxScore, safetyGrade: this._computeSafetyGrade(detectedLang, maxScore, scores) };
   }
   
   // ========================================================================
-  // ADAPTIVE GREETING (Aligned with CF)
+  // SAFETY GRADE E RISOLUZIONE LINGUA
   // ========================================================================
   
   /**
-   * Get greeting and closing adapted to language, time, AND special days
-   * ✅ RESTORED: Full version with liturgical calendar support
+   * Calcola grado di sicurezza (0-5) per la detection locale
+   * Solo IT/EN/ES possono avere grado alto - lingue esotiche → grado 0
+   */
+  _computeSafetyGrade(detectedLang, maxScore, allScores) {
+    const supportedLangs = ['it', 'en', 'es'];
+    if (!supportedLangs.includes(detectedLang)) {
+      return 0; // Lingua non supportata → affidati a Gemini
+    }
+    
+    // Calcola distanza dal secondo classificato
+    const sortedScores = Object.values(allScores).sort((a, b) => b - a);
+    const gap = sortedScores[0] - (sortedScores[1] || 0);
+    
+    // Grado 0-5 basato su score + gap
+    if (maxScore >= 10 && gap >= 5) return 5; // Altamente sicuro
+    if (maxScore >= 7 && gap >= 3) return 4;
+    if (maxScore >= 5 && gap >= 2) return 3;
+    if (maxScore >= 3) return 2;
+    if (maxScore >= 1) return 1;
+    return 0;
+  }
+  
+  /**
+   * Risolvi lingua finale: priorità Gemini per lingue esotiche
+   * @param {string} geminiLang - Lingua rilevata da Gemini
+   * @param {string} localLang - Lingua rilevata localmente
+   * @param {number} localSafetyGrade - Grado sicurezza detection locale (0-5)
+   * @returns {string} Codice lingua finale
+   */
+  _resolveLanguage(geminiLang, localLang, localSafetyGrade) {
+    const normalizedGemini = (geminiLang || '').toLowerCase().trim();
+    const normalizedLocal = (localLang || 'it').toLowerCase();
+    const supportedLangs = ['it', 'en', 'es'];
+    
+    // 1. Se Gemini non ha restituito lingua → usa locale
+    if (!normalizedGemini) {
+      console.log(`   🌍 Language: ${normalizedLocal.toUpperCase()} (Gemini silent, local fallback)`);
+      return normalizedLocal;
+    }
+    
+    // 2. Se Gemini restituisce lingua ESOTICA (non IT/EN/ES) → USA GEMINI
+    if (!supportedLangs.includes(normalizedGemini)) {
+      console.log(`   🌍 Language: ${normalizedGemini.toUpperCase()} (exotic, Gemini authoritative)`);
+      return normalizedGemini;
+    }
+    
+    // 3. Lingua principale: alta sicurezza locale conferma
+    if (localSafetyGrade >= 4 && normalizedLocal === normalizedGemini) {
+      console.log(`   🌍 Language: ${normalizedGemini.toUpperCase()} (confirmed by local, grade ${localSafetyGrade})`);
+      return normalizedGemini;
+    }
+    
+    // 4. Default: fidati di Gemini per le 3 principali
+    console.log(`   🌍 Language: ${normalizedGemini.toUpperCase()} (Gemini primary, local grade ${localSafetyGrade})`);
+    return normalizedGemini;
+  }
+  
+  // ========================================================================
+  // SALUTO ADATTIVO
+  // ========================================================================
+  
+  /**
+   * Ottieni saluto e chiusura adattati a lingua, ora E giorni speciali
+   * ✅ RIPRISTINATO: Versione completa con supporto calendario liturgico
    */
   getAdaptiveGreeting(senderName, language = 'it') {
     const now = new Date();
     const hour = now.getHours();
-    const day = now.getDay(); // 0 = Sunday
+    const day = now.getDay(); // 0 = Domenica
     
     let greeting, closing;
     
-    // ✅ First check for special day greeting (new)
+    // ✅ Prima verifica saluto giorno speciale (nuovo)
     const specialGreeting = this._getSpecialDayGreeting(now, language);
     if (specialGreeting) {
       greeting = specialGreeting;
     } else {
-      // Fall back to standard time-based greeting
+      // Fallback a saluto standard basato sull'ora
+      // Verifica anche i minuti per la fascia notturna 23:30-5:00
+      const minutes = now.getMinutes();
+      const isNightTime = (hour >= 0 && hour < 5) || (hour === 23 && minutes >= 30);
+      
       if (language === 'it') {
-        if (day === 0) {
+        if (isNightTime) {
+          // Fascia notturna (23:30-5:00): saluto neutro con nome
+          greeting = `Gentile ${senderName},`;
+        } else if (day === 0) {
           greeting = 'Buona domenica.';
-        } else if (hour >= 6 && hour < 13) {
+        } else if (hour >= 5 && hour < 13) {
           greeting = 'Buongiorno.';
         } else if (hour >= 13 && hour < 19) {
           greeting = 'Buon pomeriggio.';
         } else {
+          // 19:00-23:29
           greeting = 'Buonasera.';
         }
       } else if (language === 'en') {
-        if (day === 0) {
+        if (isNightTime) {
+          // Fascia notturna (23:30-5:00): saluto neutro con nome
+          greeting = 'Good day,';
+        } else if (day === 0) {
           greeting = 'Happy Sunday,';
-        } else if (hour >= 6 && hour < 12) {
+        } else if (hour >= 5 && hour < 12) {
           greeting = 'Good morning,';
         } else if (hour >= 12 && hour < 18) {
           greeting = 'Good afternoon,';
         } else {
+          // 18:00-23:29
           greeting = 'Good evening,';
         }
       } else if (language === 'es') {
-        if (day === 0) {
+        if (isNightTime) {
+          // Fascia notturna (23:30-5:00): saluto neutro con nome
+          greeting = `Estimado/a ${senderName},`;
+        } else if (day === 0) {
           greeting = 'Feliz domingo,';
-        } else if (hour >= 6 && hour < 13) {
+        } else if (hour >= 5 && hour < 13) {
           greeting = 'Buenos días,';
         } else {
+          // 13:00-23:29
           greeting = 'Buenas tardes,';
         }
       } else {
-        greeting = `Gentile ${senderName},`;
+        // Altre lingue: sempre saluto neutro
+        greeting = 'Good day,';
       }
     }
     
-    // Set closing based on language
+    // Imposta chiusura in base alla lingua
     if (language === 'it') {
       closing = 'Cordiali saluti,';
     } else if (language === 'en') {
@@ -276,108 +534,118 @@ class GeminiService {
   }
   
   // ========================================================================
-  // SPECIAL DAY GREETINGS (RESTORED)
+  // SALUTI GIORNI SPECIALI (RIPRISTINATO)
   // ========================================================================
   
   /**
-   * Get special greeting for liturgical feasts and holidays
-   * ✅ RESTORED: Full liturgical calendar support
+   * Ottieni saluto speciale per feste liturgiche e festività
+   * ✅ RIPRISTINATO: Supporto completo calendario liturgico
    */
   _getSpecialDayGreeting(dateObj, language = 'it') {
     const y = dateObj.getFullYear();
     const m = dateObj.getMonth() + 1;
     const d = dateObj.getDate();
     
-    // ===== FIXED HOLIDAYS =====
+    // ===== FESTIVITÀ FISSE =====
     
-    // New Year
+    // Capodanno
     if (m === 1 && d === 1) {
       if (language === 'en') return 'Happy New Year!';
       if (language === 'es') return '¡Feliz Año Nuevo!';
+      if (language === 'de') return 'Frohes neues Jahr!';
       return 'Buon Capodanno!';
     }
     
-    // Epiphany
+    // Epifania
     if (m === 1 && d === 6) {
       if (language === 'en') return 'Happy Epiphany!';
       if (language === 'es') return '¡Feliz Epifanía!';
+      if (language === 'de') return 'Frohes Dreikönigsfest!';
       return 'Buona Epifania!';
     }
     
-    // Assumption (Aug 15)
+    // Assunzione (15 Agosto)
     if (m === 8 && d === 15) {
       if (language === 'en') return 'Happy Assumption Day!';
       if (language === 'es') return '¡Feliz día de la Asunción!';
+      if (language === 'de') return 'Frohes Mariä Himmelfahrt!';
       return 'Buona festa!';
     }
     
-    // All Saints (Nov 1)
+    // Tutti i Santi (1 Novembre)
     if (m === 11 && d === 1) {
       if (language === 'en') return 'Happy All Saints Day!';
       if (language === 'es') return '¡Feliz día de Todos los Santos!';
+      if (language === 'de') return 'Frohes Allerheiligen!';
       return 'Buona festa di Ognissanti!';
     }
     
-    // Immaculate Conception (Dec 8)
+    // Immacolata Concezione (8 Dicembre)
     if (m === 12 && d === 8) {
       if (language === 'en') return 'Happy Feast of the Immaculate Conception!';
       if (language === 'es') return '¡Feliz día de la Inmaculada!';
+      if (language === 'de') return 'Frohes Fest der Unbefleckten Empfängnis!';
       return 'Buona Immacolata!';
     }
     
-    // Christmas (Dec 25)
+    // Natale (25 Dicembre)
     if (m === 12 && d === 25) {
       if (language === 'en') return 'Merry Christmas!';
       if (language === 'es') return '¡Feliz Navidad!';
+      if (language === 'de') return 'Frohe Weihnachten!';
       return 'Buon Natale!';
     }
     
-    // ===== MOVEABLE FEASTS (Easter-based) =====
+    // ===== FESTE MOBILI (basate sulla Pasqua) =====
     
     const easter = this._getWesternEasterDate(y);
     
-    // Easter octave (Easter Sunday + 7 days)
+    // Ottava di Pasqua (Domenica di Pasqua + 7 giorni)
     const pasquaStart = easter;
     const pasquaEnd = this._addDays(easter, 7);
     if (this._isBetweenInclusive(dateObj, pasquaStart, pasquaEnd)) {
       if (language === 'en') return 'Happy Easter!';
       if (language === 'es') return '¡Feliz Pascua!';
+      if (language === 'de') return 'Frohe Ostern!';
       return 'Buona Pasqua!';
     }
     
-    // Pentecost (Easter + 49 days)
+    // Pentecoste (Pasqua + 49 giorni)
     const pentecoste = this._addDays(easter, 49);
     if (this._isSameDate(dateObj, pentecoste)) {
       if (language === 'en') return 'Happy Pentecost!';
       if (language === 'es') return '¡Feliz Pentecostés!';
+      if (language === 'de') return 'Frohes Pfingsten!';
       return 'Buona Pentecoste!';
     }
     
-    // Corpus Domini (Easter + 63 days in Italy)
+    // Corpus Domini (Pasqua + 63 giorni in Italia)
     const corpusDominiIT = this._addDays(easter, 63);
     if (this._isSameDate(dateObj, corpusDominiIT)) {
       if (language === 'en') return 'Happy Corpus Christi!';
       if (language === 'es') return '¡Feliz Corpus Christi!';
+      if (language === 'de') return 'Frohes Fronleichnam!';
       return 'Buona festa!';
     }
     
-    // Holy Family Sunday (Sunday between Christmas and New Year, or Dec 30 if no Sunday)
+    // Domenica della Sacra Famiglia (domenica tra Natale e Capodanno, o 30 Dic se nessuna domenica)
     const sacraFamiglia = this._getHolyFamilySunday(y);
     if (sacraFamiglia && this._isSameDate(dateObj, sacraFamiglia)) {
       if (language === 'en') return 'Happy Feast of the Holy Family!';
       if (language === 'es') return '¡Feliz Fiesta de la Sagrada Familia!';
+      if (language === 'de') return 'Frohes Fest der Heiligen Familie!';
       return 'Buona Festa della Sacra Famiglia.';
     }
     
-    return null; // No special day
+    return null; // Nessun giorno speciale
   }
   
   // ========================================================================
-  // DATE UTILITIES FOR LITURGICAL CALENDAR
+  // UTILITÀ DATE PER CALENDARIO LITURGICO
   // ========================================================================
   
   /**
-   * Calculate Western Easter date using Anonymous Gregorian algorithm
+   * Calcola la data della Pasqua occidentale usando l'algoritmo Gregoriano anonimo
    */
   _getWesternEasterDate(year) {
     const a = year % 19;
@@ -398,7 +666,7 @@ class GeminiService {
   }
   
   /**
-   * Add days to a date
+   * Aggiunge giorni a una data
    */
   _addDays(date, days) {
     const result = new Date(date);
@@ -407,7 +675,7 @@ class GeminiService {
   }
   
   /**
-   * Check if two dates are the same day
+   * Verifica se due date sono lo stesso giorno
    */
   _isSameDate(date1, date2) {
     return date1.getFullYear() === date2.getFullYear() &&
@@ -416,7 +684,7 @@ class GeminiService {
   }
   
   /**
-   * Check if date is between start and end (inclusive)
+   * Verifica se una data è compresa tra inizio e fine (inclusi)
    */
   _isBetweenInclusive(date, start, end) {
     const d = date.getTime();
@@ -426,30 +694,62 @@ class GeminiService {
   }
   
   /**
-   * Get Holy Family Sunday date
-   * (Sunday between Dec 25 and Jan 1, or Dec 30 if no Sunday)
+   * Ottieni la data della Domenica della Sacra Famiglia
+   * (Domenica tra 25 Dic e 1 Gen, o 30 Dic se nessuna domenica)
    */
   _getHolyFamilySunday(year) {
-    // Check days from Dec 26 to Dec 31
+    // Controlla i giorni dal 26 al 31 Dicembre
     for (let day = 26; day <= 31; day++) {
-      const date = new Date(year, 11, day); // Month 11 = December
-      if (date.getDay() === 0) { // Sunday
+      const date = new Date(year, 11, day); // Mese 11 = Dicembre
+      if (date.getDay() === 0) { // Domenica
         return date;
       }
     }
-    // If no Sunday found, use Dec 30
+    // Se nessuna domenica trovata, usa 30 Dicembre
     return new Date(year, 11, 30);
   }
   
   // ========================================================================
-  // QUICK CHECK (Should respond + Language detection)
+  // QUICK CHECK (Decisione risposta + Rilevamento lingua)
   // ========================================================================
   
   /**
-   * Lightweight Gemini call to decide if email needs response AND detect language
-   * ✅ ALIGNED: Same as CF should_respond_to_email
+   * Chiamata rapida Gemini per decidere se email richiede risposta E rilevare lingua
+   * ✅ AGGIORNATO: Supporto Rate Limiter + fallback originale
    */
   shouldRespondToEmail(emailContent, emailSubject) {
+    // Detection locale per fallback lingua
+    const detection = this.detectEmailLanguage(emailContent, emailSubject);
+    const fallbackLang = detection.lang;
+    const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
+    
+    // ✅ RATE LIMITER PATH
+    if (this.useRateLimiter) {
+      try {
+        const result = this.rateLimiter.executeRequest(
+          'quick_check',
+          (modelName) => this._quickCheckWithModel(emailContent, emailSubject, modelName),
+          {
+            estimatedTokens: 500,
+            preferQuality: false  // Economia > qualità per quick check
+          }
+        );
+        
+        if (result.success) {
+          console.log(`✓ Quick check via Rate Limiter (model: ${result.modelKey})`);
+          return result.result;
+        }
+      } catch (error) {
+        if (error.message && error.message.includes('QUOTA_EXHAUSTED')) {
+          console.error('❌ Quota exhausted, using local detection only');
+          return defaultResult;
+        }
+        console.warn(`⚠️ Rate Limiter quick check failed: ${error.message}`);
+        // Fall through to original implementation
+      }
+    }
+    
+    // ✅ ORIGINAL IMPLEMENTATION (fallback o quando Rate Limiter disabilitato)
     const prompt = `Analizza questa email.
 Rispondi ESCLUSIVAMENTE con un oggetto JSON.
 
@@ -458,25 +758,27 @@ Oggetto: ${emailSubject}
 Testo: ${emailContent.substring(0, 800)}
 
 Compiti:
-1. Decidi se richiede risposta (reply_needed: true/false)
-2. Rileva la lingua (language: codice iso 2 lettere es. 'it', 'en', 'es', 'fr')
-3. Motivo sintetico (reason)
-
-Criteri per reply_needed:
-- FALSE se è solo ringraziamento/conferma ricevuta/saluto generico
-- FALSE se è solo acknowledgment ("ok", "perfetto", "grazie")
-- TRUE se contiene domande, richieste, dubbi, richiesta conferma azione
+1. Decidi se richiede risposta (reply_needed).
+2. Rileva la lingua dell'email (language) - usa codice ISO 639-1 (es: "it", "en", "es", "fr", "de", "pl", "tr", "pt", etc.).
+3. Classifica la richiesta (category) in una di queste:
+   - "TECHNICAL": orari, documenti, procedure, info pratiche
+   - "PASTORAL": richieste di aiuto, sfogo, situazioni personali, lutto, richiesta colloqui personali
+   - "DOCTRINAL": dubbi di fede, domande teologiche, "perché la chiesa..."
+   - "MIXED": mix di tecnica e pastorale (es. cerco info ma sono arrabbiato/triste)
+4. Estrai l'argomento principale (topic) es. "Battesimo", "Messa", "Orari", "Lutto".
+5. Fornisci un breve ragionamento (reason).
 
 Output JSON atteso:
 {
   "reply_needed": boolean,
-  "language": "string",
+  "language": "string (codice ISO 639-1, es: it, en, es, fr, de, pl, tr...)",
+  "category": "TECHNICAL" | "PASTORAL" | "DOCTRINAL" | "MIXED",
+  "topic": "string",
+  "confidence": number (0.0-1.0),
   "reason": "string"
 }`;
 
-    // ✅ FIX: Use local keyword detection as fallback instead of hardcoded 'it'
-    const fallbackLang = this.detectEmailLanguage(emailContent, emailSubject);
-    const defaultResult = { shouldRespond: true, language: fallbackLang, reason: 'failsafe_local_detection' };
+    // NOTA: detection, fallbackLang, defaultResult già dichiarati all'inizio della funzione
     
     try {
       console.log(`🔍 Gemini quick check for: ${emailSubject.substring(0, 40)}...`);
@@ -489,7 +791,7 @@ Output JSON atteso:
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0,
-              maxOutputTokens: 300  // Increased from 200 to ensure complete JSON
+              maxOutputTokens: 1024  // Aumentato per evitare troncamento
             }
           }),
           muteHttpExceptions: true
@@ -500,7 +802,7 @@ Output JSON atteso:
           throw new Error(`rate limit or service unavailable: ${responseCode}`);
         }
         if (responseCode !== 200) {
-          throw new Error(`API error: ${responseCode}`);
+          throw new Error(`API error: ${responseCode} - ${response.getContentText()}`);
         }
         
         return JSON.parse(response.getContentText());
@@ -511,10 +813,16 @@ Output JSON atteso:
         return defaultResult;
       }
       
-      // Check for safety blocks or other issues
+      // Verifica blocchi di sicurezza o altri problemi
       const candidate = result.candidates[0];
       if (candidate.finishReason && candidate.finishReason !== 'STOP') {
         console.warn(`⚠️ Quick check: Unusual finishReason: ${candidate.finishReason}`);
+        // Se bloccato per safety, recitation o altri motivi, usa fallback sicuro
+        // invece di tentare parsing su contenuto potenzialmente vuoto/incompleto
+        if (['SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST'].includes(candidate.finishReason)) {
+          console.warn(`   ⚠️ Response blocked (${candidate.finishReason}), using safe fallback`);
+          return defaultResult;
+        }
       }
       
       try {
@@ -526,14 +834,39 @@ Output JSON atteso:
 
           return {
             shouldRespond: data.reply_needed === true,
-            language: (data.language || fallbackLang).toLowerCase(),
-            reason: data.reason || 'quick_check'
+            language: this._resolveLanguage(data.language, detection.lang, detection.safetyGrade),
+            reason: data.reason || 'quick_check',
+            classification: {
+              category: data.category || 'TECHNICAL',
+              topic: data.topic || '',
+              confidence: data.confidence || 0.8
+            }
           };
 
         } catch (parseError) {
-          console.warn('⚠️ Quick check parse failed, using local detection');
+          console.warn('⚠️ Quick check parse failed, trying regex extraction');
           console.warn(`   Parse error: ${parseError.message}`);
           console.warn(`   Response preview: ${textResponse.substring(0, 100)}...`);
+          
+          // 🔧 FIX: Tenta estrazione lingua da JSON parziale/troncato
+          const langMatch = textResponse.match(/"language"\s*:\s*"([a-z]{2})"/i);
+          if (langMatch && langMatch[1]) {
+            const extractedLang = langMatch[1].toLowerCase();
+            console.log(`   🔧 Extracted language from partial JSON: ${extractedLang.toUpperCase()}`);
+            
+            // Usa _resolveLanguage per gestire lingue esotiche
+            const resolvedLang = this._resolveLanguage(extractedLang, detection.lang, detection.safetyGrade);
+            
+            return {
+              shouldRespond: true, // Assume true se non possiamo parsed
+              language: resolvedLang,
+              reason: 'partial_json_extraction',
+              classification: null
+            };
+          }
+          
+          // Fallback finale se nemmeno regex funziona
+          console.warn('   ❌ Could not extract language, using local fallback');
           return defaultResult;
         }
         
@@ -549,14 +882,43 @@ Output JSON atteso:
   }
   
   // ========================================================================
-  // MAIN RESPONSE GENERATION (with retry)
+  // GENERAZIONE RISPOSTA PRINCIPALE (con retry)
   // ========================================================================
   
   /**
-   * Generate AI response with retry
-   * ✅ ALIGNED: Uses PromptEngine, retry logic from CF
+   * Genera risposta AI con retry
+   * ✅ AGGIORNATO: Supporto Rate Limiter + fallback originale
    */
   generateResponse(prompt) {
+    // ✅ RATE LIMITER PATH
+    if (this.useRateLimiter) {
+      try {
+        const estimatedTokens = this._estimateTokens(prompt);
+        
+        const result = this.rateLimiter.executeRequest(
+          'generation',
+          (modelName) => this._generateWithModel(prompt, modelName),
+          {
+            estimatedTokens: estimatedTokens,
+            preferQuality: true  // Qualità > economia per generation
+          }
+        );
+        
+        if (result.success) {
+          console.log(`✓ Generated via Rate Limiter (model: ${result.modelKey}, tokens: ~${estimatedTokens})`);
+          return result.result;
+        }
+      } catch (error) {
+        if (error.message && error.message.includes('QUOTA_EXHAUSTED')) {
+          console.error('❌ Quota exhausted for generation');
+          return null;
+        }
+        console.warn(`⚠️ Rate Limiter generation failed: ${error.message}`);
+        // Fall through to original implementation
+      }
+    }
+    
+    // ✅ ORIGINAL IMPLEMENTATION (fallback o quando Rate Limiter disabilitato)
     return this._withRetry(() => {
       console.log(`🤖 Calling Gemini API (prompt size: ${prompt.length} chars)...`);
       
@@ -578,7 +940,7 @@ Output JSON atteso:
       
       const responseCode = response.getResponseCode();
       
-      // Handle retryable errors
+      // Gestisci errori ritentabili
       if (responseCode === 429 || responseCode === 503) {
         throw new Error(`rate limit or service unavailable: ${responseCode}`);
       }
@@ -610,14 +972,14 @@ Output JSON atteso:
   }
   
   // ========================================================================
-  // UTILITY METHODS
+  // METODI UTILITÀ
   // ========================================================================
   
-  // NOTE: isOnlyAcknowledgement() removed - use Classifier._isUltraSimpleAcknowledgment()
-  // NOTE: extractMainReply() removed - use GmailService.extractMainReply()
+  // NOTA: isOnlyAcknowledgement() rimossa - usare Classifier._isUltraSimpleAcknowledgment()
+  // NOTA: extractMainReply() rimossa - usare GmailService.extractMainReply()
   
   /**
-   * Test Gemini API connection
+   * Testa connessione API Gemini
    */
   testConnection() {
     const results = {
@@ -664,7 +1026,7 @@ Output JSON atteso:
   }
 }
 
-// Factory function for compatibility
+// Funzione factory per compatibilità
 function createGeminiService() {
   return new GeminiService();
 }
@@ -676,13 +1038,13 @@ function createGeminiService() {
 function parseGeminiJsonLenient(text) {
   if (!text) throw new Error('Empty response');
 
-  // 1. Rimuovi code block markdown
+  // 1. Rimuovi blocchi codice markdown
   let cleaned = text
     .replace(/```json/gi, '')
     .replace(/```/g, '')
     .trim();
 
-  // 2. Isola solo il contenuto tra { }
+  // 2. Isola solo il contenuto tra { e }
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (!match) {
     throw new Error('No JSON object found');
@@ -690,17 +1052,17 @@ function parseGeminiJsonLenient(text) {
 
   cleaned = match[0];
 
-  // 3. Tentativo diretto
+  // 3. Tentativo parsing diretto
   try {
     return JSON.parse(cleaned);
   } catch (e) {
-    // continua
+    // Continua con normalizzazione
   }
 
   // 4. Normalizzazione JS-like → JSON (solo chiavi non quotate)
   // NON modificare i valori per evitare corruzioni di stringhe
   const normalized = cleaned
-    // Quote solo le chiavi non quotate (pattern sicuro)
+    // Quota solo le chiavi non quotate (pattern sicuro)
     .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
 
   return JSON.parse(normalized);
