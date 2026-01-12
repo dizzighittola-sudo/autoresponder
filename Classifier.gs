@@ -92,6 +92,7 @@ class EmailClassifier {
   }
   
   /**
+  /**
    * Classifica email - filtro minimale
    */
   classifyEmail(subject, body, isReply = false) {
@@ -100,9 +101,12 @@ class EmailClassifier {
     // Estrai contenuto principale
     const mainContent = this._extractMainContent(body);
     console.log(`      Main content: ${mainContent.length} chars`);
+
+    // Se il body è vuoto o solo "Re:", usa il subject per i filtri rapidi
+    const contentForQuickChecks = this._isTrivialReplyBody(mainContent) ? subject : mainContent;
     
     // FILTRO 1: Acknowledgment ultra-semplice
-    if (this._isUltraSimpleAcknowledgment(mainContent)) {
+    if (this._isUltraSimpleAcknowledgment(contentForQuickChecks)) {
       console.log('      ✗ Ultra-simple acknowledgment (≤3 words, no question)');
       return {
         shouldReply: false,
@@ -114,7 +118,7 @@ class EmailClassifier {
     }
     
     // FILTRO 2: Solo saluto
-    if (this._isGreetingOnly(mainContent)) {
+    if (this._isGreetingOnly(contentForQuickChecks)) {
       console.log('      ✗ Greeting only (standalone)');
       return {
         shouldReply: false,
@@ -152,70 +156,70 @@ class EmailClassifier {
   // ========================================================================
   
   /**
-   * Estrae contenuto principale, rimuovendo citazioni e firme
-   */
-  _extractMainContent(body) {
-    const quoteMarkers = [
-      /^>.*$/m,
-      /^On .* wrote:.*$/m,
-      /^Il giorno .* ha scritto:.*$/m,
-      /^-{3,}.*Original Message.*$/m
-    ];
-    
-    const lines = body.split('\n');
-    const cleanLines = [];
-    
-    for (const line of lines) {
-      const stripped = line.trim();
-      
-      // Mantieni righe vuote per separazione paragrafi
-      if (stripped === '') {
-        cleanLines.push(line);
-        continue;
-      }
-      
-      // Salta saluti standalone all'inizio
-      if (/^(salve|buongiorno|buonasera|ciao)[\s,!.]*$/i.test(stripped)) {
-        continue;
-      }
-      
-      // Ferma ai marcatori di citazione
-      let isQuote = false;
-      for (const marker of quoteMarkers) {
-        if (marker.test(stripped)) {
-          isQuote = true;
-          break;
-        }
-      }
-      if (isQuote) break;
-      
-      cleanLines.push(line);
-    }
-    
-    let content = cleanLines.join('\n').trim();
-    
-    // Rimuovi firme
-    const signatureMarkers = [
-      /cordiali saluti/i,
-      /distinti saluti/i,
-      /in fede/i,
-      /best regards/i,
-      /sincerely/i,
-      /sent from my iphone/i,
-      /inviato da/i
-    ];
-    
-    for (const marker of signatureMarkers) {
-      const match = content.search(marker);
-      if (match !== -1) {
-        content = content.substring(0, match).trim();
-        break;
-      }
-    }
-    
-    return content;
-  }
-  
+    * Estrae contenuto principale, rimuovendo citazioni e firme
+    */
+   _extractMainContent(body) {
+     const quoteMarkers = [
+       /^>.*$/m,
+       /^On .* wrote:.*$/m,
+       /^Il giorno .* ha scritto:.*$/m,
+       /^-{3,}.*Original Message.*$/m
+     ];
+     
+     const lines = body.split('\n');
+     const cleanLines = [];
+     
+     for (const line of lines) {
+       const stripped = line.trim();
+       
+       // Mantieni righe vuote per separazione paragrafi
+       if (stripped === '') {
+         cleanLines.push(line);
+         continue;
+       }
+       
+       // Salta saluti standalone all'inizio
+       if (/^(salve|buongiorno|buonasera|ciao)[\s,!.]*$/i.test(stripped)) {
+         continue;
+       }
+       
+       // Ferma ai marcatori di citazione
+       let isQuote = false;
+       for (const marker of quoteMarkers) {
+         if (marker.test(stripped)) {
+           isQuote = true;
+           break;
+         }
+       }
+       if (isQuote) break;
+       
+       cleanLines.push(line);
+     }
+     
+     let content = cleanLines.join('\n').trim();
+     
+     // Rimuovi firme
+     const signatureMarkers = [
+       /cordiali saluti/i,
+       /distinti saluti/i,
+       /in fede/i,
+       /best regards/i,
+       /sincerely/i,
+       /sent from my iphone/i,
+       /inviato da/i
+     ];
+     
+     for (const marker of signatureMarkers) {
+       const match = content.search(marker);
+       if (match !== -1) {
+         content = content.substring(0, match).trim();
+         break;
+       }
+     }
+     
+     return content;
+   }
+
   /**
    * Controlla se acknowledgment ultra-semplice (≤3 parole, nessuna domanda)
    */
@@ -249,8 +253,34 @@ class EmailClassifier {
   _isGreetingOnly(text) {
     let normalized = text.toLowerCase().trim();
     normalized = normalized.replace(/[^\w\sàèéìòù]/g, '');
-    
-    return this.greetingOnlyPatterns.some(pattern => pattern.test(normalized));
+
+    if (this.greetingOnlyPatterns.some(pattern => pattern.test(normalized))) {
+      return true;
+    }
+
+    // Permette saluti con titolo/nome breve (es. "Buongiorno don")
+    const words = normalized.split(/\s+/).filter(Boolean);
+    const greetingWord = words[0];
+    const greetingSet = new Set(['buongiorno', 'buonasera', 'salve', 'ciao']);
+
+    return greetingSet.has(greetingWord) && words.length <= 3;
+  }
+
+  /**
+   * Rileva body banale (vuoto o solo "Re:")
+   */
+  _isTrivialReplyBody(text) {
+    if (!text) return true;
+    const normalized = text.toLowerCase().trim();
+    const cleaned = normalized.replace(/[^\w\sàèéìòù:]/g, '');
+    const words = cleaned.split(/\s+/).filter(Boolean);
+
+    if (words.length === 0) return true;
+    if (words[0] === 're' || words[0] === 're:') {
+      return words.length <= 3;
+    }
+
+    return false;
   }
   
   /**

@@ -186,7 +186,7 @@ function testResponseValidator() {
   const validator = new ResponseValidator();
   
   // Mock Config for Strict Mode
-  const originalConfig = CONFIG;
+  const originalStrictMode = CONFIG.VALIDATION_STRICT_MODE;
   CONFIG.VALIDATION_STRICT_MODE = true;
   
   // FIX: validateResponse signature is: (response, detectedLanguage, knowledgeBase, emailContent, emailSubject, salutationMode)
@@ -211,5 +211,5 @@ function testResponseValidator() {
   assertFalse(badComma.isValid, "Capital 'Ma' after greeting comma should be invalid strict mode");
   
   // Restore Config
-  CONFIG = originalConfig;
+  CONFIG.VALIDATION_STRICT_MODE = originalStrictMode;
 }
