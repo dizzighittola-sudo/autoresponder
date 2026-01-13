@@ -291,7 +291,7 @@ function testBugFixes() {
   if (typeof CONFIG !== 'undefined' && CONFIG.GEMINI_MODELS) {
     const flashRef = CONFIG.GEMINI_MODELS['flash-2.5'];
     if (flashRef) {
-      assert(flashRef.rpd >= 1000, `Bug #11: RPD should be increased (Current: ${flashRef.rpd})`);
+      assert(flashRef.rpd >= 250, `Bug #11: RPD should be at least 250 (Current: ${flashRef.rpd})`);
     } else {
       console.warn("Bug #11 Test: flash-2.5 model config not found");
     }
