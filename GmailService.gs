@@ -87,11 +87,17 @@ class GmailService {
   addLabelToMessage(messageId, labelName) {
     const label = this.getOrCreateLabel(labelName);
     const labelId = label.getId();
-    Gmail.Users.Messages.modify({
-      addLabelIds: [labelId],
-      removeLabelIds: []
-    }, 'me', messageId);
-    console.log(`✓ Added label '${labelName}' to message ${messageId}`);
+    try {
+      Gmail.Users.Messages.modify({
+        addLabelIds: [labelId],
+        removeLabelIds: []
+      }, 'me', messageId);
+      console.log(`✓ Added label '${labelName}' to message ${messageId}`);
+    } catch (e) {
+      console.warn(`⚠️ addLabelToMessage failed for message ${messageId} (Label: ${labelName}): ${e.message}`);
+      // Fallback: try labeling the thread if message-level fails?
+      // Optional: this.addLabelToThread(GmailApp.getMessageById(messageId).getThread(), labelName);
+    }
   }
 
   /**
@@ -219,16 +225,19 @@ class GmailService {
   
   /**
    * Estrae indirizzo email dal campo From
+   * FIX: Gestisce formato "Mario Rossi mario@example.com" senza <>
    */
   _extractEmailAddress(fromField) {
-    const match = fromField.match(/<(.+?)>/);
-    if (match) {
-      return match[1];
+    // Format: "Name <email@domain.com>"
+    const angleMatch = fromField.match(/<(.+?)>/);
+    if (angleMatch) {
+      return angleMatch[1];
     }
     
-    // Se non ci sono parentesi angolari, verifica se l'intero campo è un email
-    if (fromField.includes('@')) {
-      return fromField.trim();
+    // FIX: Format "Name email@domain.com" - extract email with regex
+    const emailMatch = fromField.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) {
+      return emailMatch[0];
     }
     
     return '';
@@ -618,10 +627,20 @@ function markdownToHtml(text) {
     return escapedText;
   }
 
+  // ✅ FIX Bug #8: Decode URL and remove control chars BEFORE validation
+  // Prevents bypasses like JAVA%53CRIPT:alert(1) or java\u0009script:
+  let decodedUrl = escapedUrl;
+  try {
+    decodedUrl = decodeURIComponent(escapedUrl);
+  } catch (e) {
+    // Invalid encoding - use as-is
+  }
+  decodedUrl = decodedUrl.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control chars
+
   // ✅ VALIDATE URL protocol (only http/https/mailto)
   // Se protocollo sospetto (javascript:, vbscript:, data:), ritorna solo testo
-  const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(escapedUrl);
-  const isSafeProtocol = /^\s*(https?|mailto):/i.test(escapedUrl);
+  const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(decodedUrl);
+  const isSafeProtocol = /^\s*(https?|mailto):/i.test(decodedUrl);
 
   if (isDangerous || !isSafeProtocol) {
     console.warn(`⚠️ Blocked suspicious URL: ${escapedUrl}`);
@@ -670,9 +689,14 @@ function markdownToHtml(text) {
   html = html.replace(/\n/g, '<br>');
 
   // ✅ STEP 8: Convert emojis to HTML entities
-  html = html.replace(/[^\x00-\x7F]/g, char => {
-    return '&#' + char.codePointAt(0) + ';';
-  });
+  // FIX Bug #31: Use Array.from to handle multi-codepoint emoji correctly
+  html = Array.from(html).map(char => {
+    const codePoint = char.codePointAt(0);
+    if (codePoint > 0x7F) {
+      return '&#' + codePoint + ';';
+    }
+    return char;
+  }).join('');
 
   // Wrapper finale
   return `

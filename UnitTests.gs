@@ -312,12 +312,12 @@ function testBugFixes() {
     }
   }
   
-  // Bug #14: Confidence Threshold
+  // Bug #14: Confidence Threshold (updated: 0.74 triggers regex, 0.75+ goes to Gemini)
   if (typeof RequestTypeClassifier !== 'undefined') {
      const classifier = new RequestTypeClassifier();
-     const lowConfHint = { category: 'PASTORAL', confidence: 0.75 };
+     const lowConfHint = { category: 'PASTORAL', confidence: 0.74 }; // 0.74 < 0.75 threshold
      const res = classifier.classify("Subj", "Body", lowConfHint);
-     assertEqual(res.source, 'regex', "Bug #14: Low confidence (0.75) should use regex fallback");
+     assertEqual(res.source, 'regex', "Bug #14: Low confidence (0.74) should use regex fallback");
   }
 
   // === CRITICAL BUG FIXES (15-20) ===

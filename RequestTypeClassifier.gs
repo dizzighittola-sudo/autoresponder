@@ -162,8 +162,8 @@ class RequestTypeClassifier {
     let requestType = 'technical';
     let source = 'regex';
     
-    if (externalHint && externalHint.category && externalHint.confidence >= 0.8) {
-      // ✅ Usa classificazione Gemini se disponibile e confidente
+    if (externalHint && externalHint.category && externalHint.confidence >= 0.75) {
+      // ✅ Usa classificazione Gemini se disponibile e confidente (lowered from 0.8)
       requestType = externalHint.category.toLowerCase();
       source = 'gemini';
       console.log(`   🤖 Hybrid Classifier: Using Gemini result (${requestType.toUpperCase()}, conf=${externalHint.confidence})`);

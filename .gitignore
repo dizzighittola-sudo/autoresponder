@@ -1,0 +1,14 @@
+# Apps Script specific
+.clasp.json
+.claspignore
+
+# Agent configuration
+.agent/
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+
+# Node modules (if any)
+node_modules/

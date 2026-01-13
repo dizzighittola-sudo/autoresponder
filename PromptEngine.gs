@@ -81,8 +81,8 @@ class PromptEngine {
       emailContent,
       emailSubject,
       knowledgeBase,
-      senderName,
-      senderEmail,
+      senderName = 'Utente',      // FIX Bug #10: Default per evitare undefined
+      senderEmail = '',           // FIX Bug #10: Default per evitare undefined
       conversationHistory = '',
       category = null,
       topic = '', // ✅ Topic per smart retrieval
@@ -102,6 +102,16 @@ class PromptEngine {
     // FIX Bug 23: Allow reassignment for truncation
     let sections = [];
     let skippedCount = 0;
+    
+    // OPT-1: Pre-estimation token budget for KB
+    // Warn early if KB is likely to cause issues (saves wasted processing)
+    const MAX_SAFE_TOKENS = 100000;
+    const KB_TOKEN_BUDGET = MAX_SAFE_TOKENS * 0.5; // 50% budget for KB
+    const kbEstimatedTokens = Math.round((knowledgeBase || '').length / 4);
+    
+    if (kbEstimatedTokens > KB_TOKEN_BUDGET) {
+      console.warn(`⚠️ KB pre-check: ~${kbEstimatedTokens} tokens (>${KB_TOKEN_BUDGET} budget). Will apply truncation.`);
+    }
     
     // Helper per aggiungere template condizionalmente
     const addTemplate = (templateName, content) => {
@@ -188,8 +198,8 @@ class PromptEngine {
     
     // FIX Bug 17: Strict Token Limit Enforcement
     // Estimate tokens (char count / 4 is a heuristic, but safer than nothing)
+    // NOTE: MAX_SAFE_TOKENS already defined in OPT-1 pre-estimation block above
     const estimatedTokens = Math.round(prompt.length / 4);
-    const MAX_SAFE_TOKENS = 100000;
     
     if (estimatedTokens > MAX_SAFE_TOKENS) {
       console.error(`❌ Prompt too large (~${estimatedTokens} tokens > ${MAX_SAFE_TOKENS}). Applying TRUNCATION.`);
@@ -224,8 +234,9 @@ class PromptEngine {
        }
     }
     
-    // 🎯 Log migliorato con info profilo
-    console.log(`📝 Prompt: ${prompt.length} chars (~${estimatedTokens} tokens) | profile=${promptProfile} | skipped=${skippedCount}`);
+    // 🎯 Log migliorato con info profilo (recalculate tokens after any truncation)
+    const finalTokens = Math.round(prompt.length / 4);
+    console.log(`📝 Prompt: ${prompt.length} chars (~${finalTokens} tokens) | profile=${promptProfile} | skipped=${skippedCount}`);
     
     return prompt;
   }
@@ -301,7 +312,7 @@ GIUSTO ✅: "Gentile Anna,"
   // ========================================================================
   
   _renderSystemRole() {
-    return `Sei la segreteria della Parrocchia di Sant'Eugenio a Roma.
+    return `Sei la segreteria della Parrocchia di [NOME PARROCCHIA].
 
 📖 MANDATO DOTTRINALE:
 Quando vengono richieste spiegazioni di carattere dottrinale o canonico in forma generale,
@@ -969,13 +980,13 @@ Buonasera, siamo lieti di fornirle le informazioni sul pellegrinaggio.
 • Programma dettagliato: https://tinyurl.com/cammino26
 
 **📞 Contatti:**
-• Email: info@parrocchiasanteugenio.it
-• Tel: 06 3201923
+• Email: tua@parrocchia.com
+• Tel: 06 12345678
 
 Restiamo a disposizione per qualsiasi chiarimento.
 
 Cordiali saluti,
-Segreteria Parrocchia Sant'Eugenio
+Segreteria Parrocchia [NOME]
 \`\`\`
 
 ❌ VERSIONE SBAGLIATA (DA EVITARE):
@@ -1008,7 +1019,7 @@ Buongiorno, ecco gli orari delle Sante Messe.
 ⏰ 9:30 | 11:00 | 12:15 | 13:15 | 17:30 | 19:00
 
 Cordiali saluti,
-Segreteria Parrocchia Sant'Eugenio
+Segreteria Parrocchia [NOME]
 \`\`\`
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -1035,7 +1046,7 @@ Segreteria Parrocchia Sant'Eugenio
    ${salutation}
    [Concise and relevant body - ✅ USE FORMATTING IF APPROPRIATE]
    ${closing}
-   Parish Secretariat of Sant'Eugenio`;
+   Parish Secretariat of [NAME]`;
       contentSection = `2. **Content:**
    • Answer ONLY what is asked
    • Use ONLY information from the knowledge base
@@ -1055,7 +1066,7 @@ Segreteria Parrocchia Sant'Eugenio
    ${salutation}
    [Cuerpo conciso y pertinente - ✅ USA FORMATO SI ES APROPIADO]
    ${closing}
-   Secretaría Parroquia Sant'Eugenio`;
+   Secretaría Parroquia [NOMBRE]`;
       contentSection = `2. **Contenido:**
    • Responde SOLO lo que se pregunta
    • Usa SOLO información de la base de conocimientos
@@ -1075,7 +1086,7 @@ Segreteria Parrocchia Sant'Eugenio
    ${salutation}
    [Corpo conciso e pertinente - ✅ USA FORMATTAZIONE SE APPROPRIATO]
    ${closing}
-   Segreteria Parrocchia Sant'Eugenio`;
+   Segreteria Parrocchia [NOME]`;
       contentSection = `2. **Contenuto:**
    • Rispondi SOLO a ciò che è chiesto
    • Usa SOLO info dalla knowledge base
@@ -1137,14 +1148,14 @@ ALLORA:
 Esempio di risposta CORRETTA per persona divorziata:
 "Comprendiamo la delicatezza della sua situazione. Per poter valutare insieme 
 il suo caso specifico, le consigliamo di parlare direttamente con un sacerdote.
-Può contattarci per fissare un appuntamento: Tel. 06 323 18 84.
+Può contattarci per fissare un appuntamento: Tel. 06 12345678.
 Restiamo a disposizione."
 
 Esempio SBAGLIATO (da evitare):
 "Per il matrimonio servono: certificato di battesimo, corso prematrimoniale..."
 → Queste info NON vanno date se c'è un impedimento potenziale!
 
-═══════════════════════════════════════════════════════════════════════════`;
+// [CONFIGURAZIONE] Sostituire [NOME] e riferimenti con i dati reali della propria parrocchia
   }
   
   // ========================================================================

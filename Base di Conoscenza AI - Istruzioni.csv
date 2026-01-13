@@ -1,9 +1,9 @@
 Categoria,Chiave di ricerca,Risposta
-Informazioni Generali,Informazioni su nome e indirizzo parrocchia,"Parrocchia Sant'Eugenio | Basilica in Roma, Viale delle Belle Arti 10, 00196 Roma"
+Informazioni Generali,Informazioni su nome e indirizzo parrocchia,"Parrocchia [NOME] | [INDIRIZZO]"
 Informazioni Generali,Motto parrocchia,"""Cercare Dio nella vita quotidiana"""
-Informazioni Generali,Link sito parrocchia,www.parrocchiasanteugenio.it
-Informazioni Generali,Link pagina Facebook parrocchia,fb.com/basilica.santeugenio.9
-Informazioni Generali,Link canale YouTube parrocchia,@santeugenio
+Informazioni Generali,Link sito parrocchia,www.parrocchia.com
+Informazioni Generali,Link pagina Facebook parrocchia,fb.com/parrocchia
+Informazioni Generali,Link canale YouTube parrocchia,@[CANALE]
 Principi generali,Richiesta appuntamenti,Policy: Non fornire date specifiche. Confermare solo che la richiesta è stata annotata.
 Tipologie di email,Email con proposte pastorali o culturali,1. Ringrazia il mittente. 2. Conferma che la proposta sarà esaminata a breve. 3. Comunica che verrà fornita una risposta in tempi rapidi. 4. Individua nel testo ricevuto elementi positivi e inserisci nella risposta un apprezzamento specifico per essi.
 Tipologie di email,Richiesta certificati,Se richiesto un certificato: rispondere che sarà prodotto al più presto. Se e solo se viene specificato l’invio via email: rispondere che sarà inviato via email nel più breve tempo possibile. Se non viene indicata la preferenza per l’invio via email: rispondere che il richiedente sarà avvisato quando il certificato sarà pronto.
@@ -16,7 +16,7 @@ Tipologie di email,Richiesta di celebrazione di una Messa o più Messe per una i
 Tipologie di email,Richiesta informazioni celebrazione battesimo di bambini,"Celebriamo il battesimo preferibilmente il sabato sera o nel giorno di domenica, all'interno della Messa. Prepariamo i genitori e i padrini al sacramento in un incontro della durata di circa un'ora da fissare col sacerdote celebrante, nei giorni anteriori al Battesimo. Se e solo se l'interlocutore avanza richieste particolari (celebrazione in un altro giorno, senza la Messa, con un sacerdote esterno...) invitare a contattare direttamente il parroco."
 Tipologie di email,Richiesta di fissare la data per un matrimonio o un battesimo o un funerale,Rispondere che la segreteria esaminerà se è possibile accontentare la richiesta e farà sapere al più presto.
 Tipologia di email,Richiesta celebrazione battesimo,A chi chiede che i propri figli vengano battezzati nella nostra parrocchia rispondere che siamo lieti di poterlo fare. Ci metteremo al più presto in contatto con il richiedente per stabilire data e altr dettagli.
-Contatti,Contatti parrocchia,Tel: 06 320 19 23. Email: info@parrocchiasanteugenio.it
+Contatti,Contatti parrocchia,Tel: [TELEFONO PARROCCHIA]. Email: [EMAIL PARROCCHIA]
 Contatti,Orari apertura segreteria,"Dal lunedì al venerdì, 8:00-12:00"
 Orari Basilica,Orari basilica invernali,8:00-12:00 e 16:00-20:00
 Orari Basilica,Orari basilica estivi,8:00-12:00 e 17:00-20:00
@@ -51,15 +51,15 @@ Preparazione alla cresima adulti: primo corso,Data inizio catechesi,10/10/2026 a
 Preparazione alla cresima adulti: secondo corso,Data inizio catechesi,14/03/2026 alle ore 16.30
 Preparazione alla cresima adulti,Date incontri primo corso,"11/10/2025, 18/10/2025, 25/10/2025; 08/11/2025, 15/11/2025, 22/11/2025 29/11/2025; 13/12/2025"
 Preparazione alla cresima adulti,Date incontri secondo corso,"14/03/2026, 21/03/2026, 28/03/2026; 11/04/2026, 18/04/2026; 09/05/2026, 16/05/2026, 23/05/2026"
-Catechesi,Orari lezioni catechesi adulti,"Lezioni di teologia tenuti dai sacerdoti della Parrocchia di S. Eugenio. Don Miquel Delgado, domenica alle ore 10,00 - Don Miquel Delgado, giovedì ore 19,30 - Don Raimondo Sanfilippo, mercoledì alle ore 19,30: Lettere di San Paolo: Efesini, Filippesi, Colossesi"
+Catechesi,Orari lezioni catechesi adulti,"Lezioni di teologia tenuti dai sacerdoti della Parrocchia. Don [NOME] - Don [NOME], giovedì ore 19,30 - Don [NOME], mercoledì alle ore 19,30: Lettere di San Paolo: Efesini, Filippesi, Colossesi"
 Catechesi,Informazioni catechesi Buon Pastore,"Esperienza formativa per bambini dai 3 agli 8 anni che si ispira alla pedagogia di Maria Montessori. Si svolge domenica alle 10:00. Motto: ""Far conoscere le parole di Gesù anche ai più piccoli"". Gli incontri avvengono in un ambiente appositamente allestito, chiamato “atrio” dove i bambini hanno la possibilità di esplorare materiali didattici e simbolici. I catechisti, appositamente formati, accompagnano i bambini in questo percorso di approfondimento. Fin dall’inizio della catechesi, i bambini vengono introdotti ai primi elementi della fede cristiana, come la figura del Buon Pastore, il simbolismo del Battesimo, l’Eucarestia e altri misteri della vita di Cristo. La catechesi del Buon Pastore riconosce l’importanza dell’ascolto delle parabole, del lavoro con gli oggetti e del silenzio come strumenti efficaci per far comprendere ai bambini il messaggio del Valgelo in modo concreto e significativo."
 Catechesi,Iscrizioni catechesi Buon Pastore,"Contattare la segreteria e consegnare l'apposito modulo, scaricabile dal sito (vedi collegamento). 21 settembre per frequentanti. I nuovi iscritti della catechesi del Buon Pastore (3-8 anni) iniziano il 19 ottobre."
 Catechesi,Informazioni catechesi Prima Comunione,Per bambini di 3ª e 4ª elementare. Domenica ore 10:00. Richiesta presenza di almeno un genitore alla catechesi parallela e partecipazione alla S. Messa delle 11:00
 Catechesi,Iscrizioni catechesi Prima Comunione,"Modulo presso segreteria o online + Certificato di Battesimo (se non ricevuto a S. Eugenio, scrivere ""battezzato/a a S. Eugenio"" nelle osservazioni)"
 Catechesi,Informazioni catechesi Cresima Ragazzi,"Per ragazzi di 5ª elementare, 1ª e 2ª media. Domenica ore 10:00. Percorso di due anni. Richiesta presenza genitori alla catechesi e Messa"
 Catechesi,Iscrizioni catechesi Cresima Ragazzi,Modulo (anche online) + Certificato di Battesimo + successivamente Certificato di Idoneità del Padrino/Madrina
-Catechesi,Orari incontri formazione adolescenti,La seconda e la quarta domenica del mese alle ore 10 con con Don Juan Rego
-Catechesi,Orari incontri formazione giovani,Martedì ore 21:00 con Don Michele Delgado e Don Juan Rego
+Catechesi,Orari incontri formazione adolescenti,La seconda e la quarta domenica del mese alle ore 10 con con Don [NOME]
+Catechesi,Orari incontri formazione giovani,Martedì ore 21:00 con Don [NOME] e Don [NOME]
 Catechesi,Informazioni catechesi Cresima Adulti,"Due possibilità lungo l'anno di partecipare a un corso (8 incontri). A partire dal secondo sabato di ottobre oppure dal secondo sabato di marzo. Si svolgono sempre di sabato, alle ore 16:30."
 Buon Pastore,Link modulo iscrizione catechesi,tinyurl.com/buonpastore
 Prima comunione,Link modulo iscrizione catechesi,tinyurl.com/cateche
@@ -77,42 +77,20 @@ Matrimoni di stranieri,Documenti necessari per matrimonio di stranieri,"SE E SOL
 SOLO PER STRANIERI (cittadini non italiani):
 1. Rallegrarsi per la loro decisione di sposarsi e di aver scelto la nostra parrocchia romana, come luogo delle nozze. 
 2. USARE NELLA RISPOSTA LA STESSA LINGUA IN CUI HANNO SCRITTO 
-3. Informarli di quanto segue: Se sono stranieri e vivono all'estero e hanno scelto di sposarsi presso la nostra parrocchia, la prima cosa che devono fare (se non lo hanno già fatto) è recarsi nella chiesa più vicina al luogo dove abitano per chiedere informazioni al parroco al fine di frequentare il corso prematrimoniale: il corso li aiuterà a scoprire/approfondire la bellezza del matrimonio cristiano. Poiché vivono all'estero, il loro parroco è, di fatto, quello della parrocchia nella cui circoscrizione è situata la loro abitazione: devono parlare con lui per ricevere tutte le informazioni sulle pratiche burocratiche. Devono tenere però presente che in alcuni periodi dell'anno a Roma è vietato celebrare matrimoni, per esempio in Quaresima. Dopo il corso prematrimoniale devono realizzare, con il loro parroco, la pratica prematrimoniale, che è l'indagine (con la contestuale raccolta dei documenti religiosi) con cui il parroco, a nome della Chiesa, li accoglie e li autorizza a celebrare le nozze. Questa pratica prematrimoniale deve iniziare non prima di sei mesi rispetto alla data delle nozze. Conclusa la pratica prematrimoniale, il parroco chiederà che il Vescovo locale firmi il Nulla Osta e invii al Vicariato di Roma tutta la documentazione per posta urgente o può consegnarla a loro, perché loro stessi la inviino. Il Vicariato di Roma provvederà a compilare il Documento Finale chiamato ""modello quattordici"" (modello quattordici), e la consegnerà a loro o a un delegato munito di regolare procura, perché possano portarlo, prima della celebrazione, alla nostra chiesa, per le nozze. Attenzione: in Italia è necessario che i matrimoni religiosi abbiano conseguenze civili (matrimonio concordatario) o che il matrimonio civile preceda quello religioso. Per questo il Vicariato darà il suddetto Documento Finale ""modello quattordici"" solamente dopo aver ricevuto la certificazione di matrimonio civile (se sono già coniugi civili), o il ""Nulla Osta Consolare"" del loro Consolato qui a Roma (se vogliono celebrare un matrimonio concordatario). Per maggiori informazioni sul modello di Nulla Osta Consolare che lo Stato Italiano richiede per le celebrazioni delle nozze conviene consultare la pagina web del Ministero degli Affari Esteri (https://www.esteri.it/mae/en/servizi/italiani-all-estero/stato-civile/matrimonio_0.html). A volte il Vicariato di Roma consiglia di celebrare il matrimonio civile nel proprio paese e inviare la certificazione di matrimonio civile al Vicariato in modo da celebrare a Roma solamente il matrimonio religioso. Per qualsiasi dubbio o problema non esitino a domandarci. Viva i futuri sposi!"
-Catechesi,Informazioni percorso 12 Ceste,"Per single mai sposati di età 34-55 anni. Percorso di crescita spirituale e umana attraverso catechesi e anche altri momenti di incontro (gite, passeggiate, attività caritative). Incontri domenicali una volta al mese: ore 15:00 Catechesi, ore 16:00 Condivisione, ore 17:30 S. Messa. Calendario consultabile sul sito. Maggiori informazioni sono rinvenibili presso il sito delle 12 Ceste: www.12ceste.it"
-Catechesi,Date incontri 12 Ceste,19/10/2025 - 16/11/2025 - 21/12/2025 - 18/01/2026 - 15/02/2026 - 15/03/2026 - 19/04/2026 - 17/05/2026
-Catechesi,Orari incontri giovani coppie,"Terzo sabato del mese, dalle 17:30 alle 19."
-Sacramenti,Orari confessioni sacerdoti,"Don Michele Delgado:   martedì ore 17,00 – 19,30   mercoledì ore 9,30 – 12,00   sabato ore 18,45 – 19,30 | Don Raimondo Sanfilippo:  lunedì ore 17,30 – 19,30  mercoledì ore 8,30 – 9,30  giovedì ore 8,30/12.00 – 18.45/19,30 | Don Juan Rego: lunedì 9,00 – 12,00  domenica 10,30/13,30 – 17,30/19,00  | Altri confessori tutti i giorni feriali 10,00/12,00 – 17,30/19,30"
-Offerta di collaborazione volontaria,Richiesta collaborazione volontaria,"Persone disponibili a: dedicarsi all’ascolto dei bisognosi il mercoledì mattina (dispensario indumenti e alimenti, ore 8:30–11:00);  aiutare i catechisti nella preparazione alla Prima Comunione;  coprire qualche turno di segreteria (centralino, prima accoglienza, distribuzione di piccole elemosine, custodia);  collaborare nell’organizzazione di attività (pellegrinaggi, cineforum, iniziative culturali)."
-Attività,Servizi Caritas parrocchiale,"Distribuzione indumenti e generi alimentari, servizio di ascolto, piccoli sussidi economici. Mercoledì mattina 8:30-10:30, accesso dal campetto a sinistra della Basilica"
-Attività,Ricerca di lavoro,"Centro di ascolto per persone bisognose e in cerca di lavoro. Mercoledì mattina tra le 8:30 e le 11, oppure chiedendo un appuntamento inviando una email a: lavoro@parrocchiasanteugenio.it"
-Attività,Raccolta indumenti Caritas,"Indumenti usati in buone condizioni. Consegna dal lunedì al venerdì durante orari di segreteria (8:00-12:00 e 16:00-19:00), avvisando il personale. Solo giacconi e scarpe da uomo."
-Attività,Attività volontariato giovani,"Prima domenica di ogni mese, dalle 15:00 alle 18:00. Contattare don Juan Rego per maggiori dettagli. Email di don Juan Rego:  rego@pusc.it"
-Attività,Informazioni Tiber Club,Attraverso il Tiber Club si offre un percorso educativo per bambini/ragazzi basato su valori cristiani e metodo collaborativo. Consulta il sito Tiber Club: https://tiberclub.org/
-Attività,Informazioni Arcogrande,"Attraverso il Club Arcogrande, si offre un percorso educativo per bambine/ragazze basato su valori cristiani e metodo collaborativo. Consulta il sito Arcogrande: https://www.arcogrande.org/index.html"
-Attività,Informazioni coro parrocchiale,Anima le celebrazioni liturgiche dellla domenica e quelle più importanti nel corso dell'anno. Canto corale il giovedì dalle ore 20:00 alle 22:00
-Chi Siamo,Nome parroco,Don Miquel Delgado
-Chi Siamo,Nome vicario parrocchiale (viceparroco),Don Raimondo Sanfilippo
-Chi Siamo,Nome collaboratore parrocchiale,Don Juan Rego
-Chi Siamo,Descrizione artistica esterno basilica,"Facciata in travertino ispirata al tardo '500 romano, sculture di A. Monteleone e F. Nagni, campanile di 33 metri con 8 campane. Dettagli sul sito."
-Chi Siamo,Descrizione artistica interno basilica,"Pianta a croce latina a tre navate, sei cappelle laterali, undici altari. Opere di Francesco Messina, Venanzo Crocetti, Pericle Fazzini, G. Prini, Vico Consorti. Via Crucis in bronzo (opere vari artisti tra cui Manzù), vetrate istoriate. Dettagli qui: https://www.parrocchiasanteugenio.it/cenni-artistici/"
-Territorio,Confini territoriali parrocchia,• Via Adolfo Cancani – 00197 ROMA • Via Antonio Allegri da Correggio – 00196 ROMA • Via Antonio Gramsci – 00197 ROMA • Via Armando Spadini – 00197 ROMA  • Via Bartolomeo Ammannati – 00197 ROMA • Piazzale delle Belle Arti – 00196 ROMA • Viale delle Belle Arti – 00196 ROMA • Viale Bruno Buozzi – 00197 ROMA (solo numeri dispari dal 109/A in poi) • Viale Bruno Buozzi – 00197 ROMA (solo numeri pari dal 90 in poi) • Via Cardinal De Luca – 00196 ROMA • Via Carlo Dolci – 00197 ROMA • Via Cesare Fracassini – 00196 ROMA (solo numeri dispari) • Via Cimabue – 00196 ROMA • Via Domenico Alberto Azuni – 00196 ROMA (solo numeri pari) • Piazzale Don Giovanni Minzoni – 00197 ROMA • Via Enrico Chiaradia – 00196 ROMA • Via Enrico Pessina – 00196 ROMA • Via Filippo Lippi – 00197 ROMA • Via Flaminia – 00196 ROMA (solo numeri dispari dal 109 al 217) • Via Flaminia – 00196 ROMA (solo numeri pari dal 158 al 162) • Lungotevere Flaminio – 00196 ROMA (tutti i numeri dal 16 al 38) • Via Francesco Jacovacci – 00197 ROMA • Via Giovanni Vincenzo Gravina – 00196 ROMA • Via Giuseppe Ceracchi – 00197 ROMA • Via Giuseppe De Notaris – 00197 ROMA • Via Giuseppe Mangili – 00197 ROMA (solo numeri dispari) • Via Jacopo da Ponte – 00197 ROMA • Via Luigi Canina – 00196 ROMA • Piazzale Manila – 00196 ROMA • Piazza Marina – 00196 ROMA (tutti i numeri dal 24 al 35) • Piazza della Marina – 00121 ROMA (tutti i numeri dal 24 al 35) • Piazzale Miguel Cervantes – 00197 ROMA • Largo dei Monti Parioli – 00197 ROMA • Via Monti Parioli – 00197 ROMA (solo numeri dispari dall’1 al 33) • Via Monti Parioli – 00197 ROMA (solo numeri pari dal 4 al 62) • Lungotevere delle Navi – 00196 ROMA • Via Omero – 00197 ROMA (solo numeri dispari) • Via Paolo Bartolini – 00197 ROMA • Salita dei Parioli – 00197 ROMA (solo numeri pari) • Via Pietro da Cortona – 00196 ROMA • Via Pietro Paolo Rubens – 00197 ROMA (solo numeri pari) • Via Pomarancio – 00197 ROMA • Via Sandro Botticelli – 00196 ROMA • Via Sassoferrato – 00197 ROMA • Via Sebastiano Conca – 00197 ROMA • Viale Tiziano – 00196 ROMA • Via Ulisse Aldrovandi – 00197 ROMA (solo numeri dispari dall’1 al 9) • Via Valmichi – 00197 ROMA (solo numeri dispari) • Via di Villa Giulia – 00196 ROMA • Piazzale di Villa Giulia – 00196 ROMA
-Territorio,Istruzioni per verifica indirizzi - IMPORTANTE	,"Quando verifichi se un indirizzo è in parrocchia, devi controllare ESATTAMENTE i criteri. Per ogni via, rispetta STRETTAMENTE i numeri civici indicati: se dice ""dal 109 al 217 dispari"" accetta SOLO i numeri dispari tra 109 e 217 (111, 113, 115... 215, 217). Se il numero è fuori range, NEGA. In caso di dubbio, consiglia di contattare la segreteria.
-"
-Territorio,Luoghi sussidiari culto parrocchia,Chiesa Rettoria Sant’Andrea del Vignola Via Flaminia 194 – 00196 ROMA. Viene celebrata una Messa per i copti cattolici ogni domenica nel pomeriggio. Gli orari sono affissi alla porta della chiesa. Arco Oscuro – Cappella della Divina Provvidenza – Viale Belle Arti rif. ingresso Museo Etrusco. Viene aperta a richiesta. Celebrazione della Messa il giovedì mattina alle 13.15 durante il mese di maggio.
-Territorio parrocchiale,Enti presenti nel territorio parrocchia,• Chiesa Rettoria Sant’Andrea del Vignola • Arco Oscuro – Cappella della Divina Provvidenza • Casa Generalizia «Villa San Francesco» (Serve di Gesù della Carità (S.d.J.) • Casa di Cura «Valle Giulia» • Casa di Riposo «Villa San Francesco» • Ambasciata d’Italia presso la Santa Sede
+Territorio parrocchiale,Enti presenti nel territorio parrocchia,• [ELENCO ENTI PRESENTI NEL TERRITORIO]
 Chi Siamo,Tipo edificio parrocchia,Basilica minore
 Donazioni,Modalità donazione,"Donazioni tramite sito web con carta di credito, PayPal, Satispay, Tinaba o Bonifico Bancario"
-Donazioni,Dati bonifico bancario,"Beneficiario: Parrocchia Sant'Eugenio. IBAN: IT 77 U 030 6909 6061 0000 0125 525. Causale: ""CONTRIBUTO PER LE ATTIVITÀ PASTORALI"""
+Donazioni,Dati bonifico bancario,"Beneficiario: Parrocchia [NOME]. IBAN: [INSERIRE IBAN]. Causale: ""CONTRIBUTO PER LE ATTIVITÀ PASTORALI"""
 Informazioni generali,Informazioni su adempimenti finanziari,La segreteria si occupa anche del pagamento di ciò che è dovuto a terzi.
 Attività parrocchiale,Prossimo appuntamento del Cineforum,Domenica 26 ottobre 2025 alle ore 16. Film: Io sono ancora qui. Scheda: bit.ly/cineugenio
-Attività parrocchiali,Mostra permanente della Sindone,"Sabato 29/11/2025 ore 11.00 - Appuntamento all'ATENEO PONTIFICIO REGINA APOSTOLORUM - APRA - Via degli Aldobrandeschi 190 (RM) - posti limitati, Max 40 persone. Per adesioni info@parrocchiasanteugenio.it"
+Attività parrocchiali,Mostra permanente della Sindone,"[DATA E LUOGO EVENTO]. Per adesioni tua@parrocchia.com"
 Attività parrocchiali,Informazioni pellegrinaggio Sette Chiese,Sabato 30/05/2026 - Orari: 8:30-17:30. Appuntamento presso la fermata metro Ottaviano
 Attività parrocchiali,Visita alla mostra permanente sulla sindone,"Sabato 22 novembre, ore 11. Presso il Pontificio Ateneo Regina Apostolorum, via degli Aldobrandeschi, 190, Roma"
-Attività parrocchiali,Raccolta alimentare,Presso Coop Colli Aniene. Sabato 13 dicembre dalle 9 alle 19. Coordina don Raimondo Sanfilippo: rasanfil@gmail.com
+Attività parrocchiali,Raccolta alimentare,Presso [LUOGO]. [DATA E ORA]. Coordina Don [NOME]: email@esempio.com
 Attività parrocchiali,Informazioni cineforum,"Ultima domenica del mese da ottobre a maggio, alle ore 16:00. Schede film qui: bit.ly/cineugenio"
 Attività parrocchiali,Date cineforum,"26.X, 30.XI, 28.XII 2025. 25.I, 22.II, 29.III, 26.IV e 31.V 2026"
-Attività parrocchiali,Informazioni spazio poesia,Invio contributi a: poesia@parrocchiasanteugenio.it. Poesie meritevoli esposte settimanalmente in parrocchia e pubblicate in una pagina web dedicata: bit.ly/spaziopoesia.
-Attività parrocchiali,Raccolta alimentare a S. Eugenio,Domenica 14 e 21 dicembre dalle ore 9-13 e dalle 17-20. Si prega di donare solo cibi a lunga conservazione. La raccolta verrà effettuata sotto i portici del cortile della parrocchia in viale delle Belle Arti 10 
+Attività parrocchiali,Informazioni spazio poesia,Invio contributi a: poesia@parrocchia.com. Poesie meritevoli esposte settimanalmente in parrocchia e pubblicate in una pagina web dedicata: [LINK].
+Attività parrocchiali,Raccolta alimentare,Domenica 14 e 21 dicembre dalle ore 9-13 e dalle 17-20. Si prega di donare solo cibi a lunga conservazione. La raccolta verrà effettuata sotto i portici del cortile della parrocchia in [INDIRIZZO] 
 Attività parrocchiali,Mercatino di Natale - Dicembre solidale,Sabato 13 e domenica 14 - sabato 20 e domenica 21 dicembre. Dalle ore 10.30/13.30 e dalle 17/20. Vendita di oggettistica e gastronomia a beneficio degli assistiti. L'esposizione si terrà nei locali parrocchiali 
 Attività Parrocchiali,Concerto di Natale,"Domenica 14 dicembre alle ore 19 dirige il Maestro Ida Piccolantonio. Saranno eseguite musiche natalizie tradizionali, antiche e moderne, e per la prima volta lo spiritual ""Tell me Lord"" del Maestro Andrea Foscarini - INGRESSO LIBERO"
 Attività parrocchiali,Corso di danza,"Per bambine dai 5 anni e ragazze dagli 11 anni fino ai 15. Inizio giovedì 23 ottobre 2025, ore 16.30"
@@ -201,14 +179,14 @@ Annullamento negli ultimi 30 giorni prima della partenza: penalità pari al 50% 
 
 
 Modalità: in contanti in segreteria parrocchiale oppure tramite bonifico
-Intestazione: PARROCCHIA S. EUGENIO
-IBAN: IT77U0306909606100000125525
+Intestazione: PARROCCHIA [NOME]
+IBAN: [INSERIRE IBAN]
 Causale: Cammino di Santiago 2026
 ℹ️ PROGRAMMA COMPLETO: tinyurl.com/cammino26
    (Pagina parrocchiale con dettagli e itinerario)
 
-📧 CONTATTI: info@parrocchiasanteugenio.it
-📞 Telefono: 06 3201923 (orari segreteria)
+📧 CONTATTI: tua@parrocchia.com
+📞 Telefono: 06 12345678 (orari segreteria)
 
 ───────────────────────────────────────────────────────────────
 🎒 PREPARAZIONE E CONSIGLI PRATICI

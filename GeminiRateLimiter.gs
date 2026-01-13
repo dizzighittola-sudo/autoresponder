@@ -601,13 +601,12 @@ class GeminiRateLimiter {
     const now = new Date();
     const hour = parseInt(Utilities.formatDate(now, 'Europe/Rome', 'HH'));
     
-    if (hour < 9) {
-      // Reset oggi alle 9:00
-      return 'oggi alle 9:00 AM';
-    } else {
-      // Reset domani alle 9:00
-      return 'domani alle 9:00 AM';
+    const resetTime = new Date(now);
+    if (hour >= 9) {
+      resetTime.setDate(resetTime.getDate() + 1);
     }
+    resetTime.setHours(9, 0, 0, 0);
+    return resetTime.toISOString(); // e.g., "2024-05-20T09:00:00.000Z"
   }
 }
 

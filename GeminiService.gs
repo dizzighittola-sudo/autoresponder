@@ -57,10 +57,14 @@ class GeminiService {
   // ========================================================================
   
   /**
-   * Stima token da testo (approssimazione: 1 token ≈ 4 caratteri)
+   * Stima token da testo
+   * FIX Bug #32: ASCII = 0.25 token, non-ASCII (CJK/emoji) = 1 token
    */
   _estimateTokens(text) {
-    return Math.ceil((text || '').length / 4);
+    if (!text) return 0;
+    const asciiCount = (text.match(/[\x00-\x7F]/g) || []).length;
+    const nonAsciiCount = text.length - asciiCount;
+    return Math.ceil(asciiCount / 4 + nonAsciiCount);
   }
   
   /**
@@ -101,17 +105,26 @@ class GeminiService {
     
     const result = JSON.parse(response.getContentText());
     
-    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+    if (!result.candidates || !result.candidates[0]) {
       throw new Error('Invalid Gemini response: no candidates');
     }
+
+    const candidate = result.candidates[0];
+
+    // Check for safety blocking
+    if (candidate.finishReason && ['SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST'].includes(candidate.finishReason)) {
+      throw new Error(`Gemini blocked response: ${candidate.finishReason}`);
+    }
+
+    // Robust content extraction
+    const parts = candidate.content?.parts || [];
+    const generatedText = parts.map(p => p.text || '').join('').trim();
     
-    const generatedText = result.candidates[0].content.parts[0].text;
-    
-    if (!generatedText || generatedText.trim().length === 0) {
-      throw new Error('Gemini returned empty response');
+    if (!generatedText) {
+      throw new Error('Gemini returned empty text response');
     }
     
-    console.log(`✓ Generated ${generatedText.length} chars`);
+    console.log(`✓ Generated ${generatedText.length} chars (from ${parts.length} parts)`);
     return generatedText;
   }
   
@@ -203,24 +216,23 @@ Output JSON atteso:
         return defaultResult;
       }
 
-      // FIX Bug 13: Robust null checks for response structure
-      if (!candidate.content) {
-        console.error('❌ Invalid response: missing content');
-        return defaultResult;
-      }
+      // Robust content extraction
+      const parts = candidate.content?.parts || [];
+      const textResponse = parts.map(p => p.text || '').join('').trim();
 
-      if (!candidate.content.parts || candidate.content.parts.length === 0) {
-        console.error('❌ Invalid response: missing or empty parts array');
-        return defaultResult;
-      }
-
-      if (!candidate.content.parts[0].text) {
-        console.error('❌ Invalid response: missing text in first part');
+      if (!textResponse) {
+        console.error('❌ Invalid response: empty text content');
         return defaultResult;
       }
       
-      const textResponse = candidate.content.parts[0].text;
-      const data = parseGeminiJsonLenient(textResponse);
+      // FIX Bug B: Wrap JSON parsing in try-catch
+      let data;
+      try {
+        data = parseGeminiJsonLenient(textResponse);
+      } catch (parseError) {
+        console.warn(`⚠️ parseGeminiJsonLenient failed: ${parseError.message}`);
+        return defaultResult;
+      }
     
     // Detection locale per fallback lingua
     const detection = this.detectEmailLanguage(emailContent, emailSubject);
@@ -753,7 +765,7 @@ Output JSON atteso:
         );
         
         if (result.success) {
-          console.log(`✓ Quick check via Rate Limiter (model: ${result.modelKey})`);
+          console.log(`✓ Quick check via Rate Limiter (model: ${result.modelUsed})`); // FIX BUG-3: modelKey → modelUsed
           return result.result;
         }
       } catch (error) {
@@ -975,7 +987,16 @@ Output JSON atteso:
         return null;
       }
       
-      const generatedText = result.candidates[0].content.parts[0].text;
+      const candidate = result.candidates[0];
+      
+      // FIX Bug A: Check for truncation due to token limit
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        console.warn('⚠️ Response truncated due to MAX_TOKENS limit');
+      }
+      
+      // FIX Bug D: Safe access to parts array
+      const parts = candidate.content?.parts || [];
+      const generatedText = parts[0]?.text || '';
       
       if (!generatedText || generatedText.trim().length === 0) {
         console.error('❌ Gemini returned empty response');

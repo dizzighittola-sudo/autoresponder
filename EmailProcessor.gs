@@ -99,7 +99,10 @@ class EmailProcessor {
       // ✅ OTTIMIZZATO: Set passato da processUnreadEmails (una sola chiamata API)
       // ═══════════════════════════════════════════════════════════════
       // Se non è stato passato il Set, fallback a chiamata locale (per test/uso standalone)
-      const effectiveLabeledIds = labeledMessageIds || this.gmailService.getMessageIdsWithLabel(this.config.labelName);
+      // FIX: Check size > 0 invece di truthy (empty Set è truthy!)
+      const effectiveLabeledIds = (labeledMessageIds && labeledMessageIds.size > 0) 
+        ? labeledMessageIds 
+        : this.gmailService.getMessageIdsWithLabel(this.config.labelName);
       const unlabeledUnread = unreadMessages.filter(message => {
         return !effectiveLabeledIds.has(message.getId());
       });
@@ -147,15 +150,36 @@ class EmailProcessor {
       }
       
       // ═══════════════════════════════════════════════════════════════
-      // STEP 0.5: ANTI-LOOP (thread too long = possible infinite loop)
+      // STEP 0.5: ANTI-LOOP (smart detection)
+      // OPT-3: Distinguish legitimate long threads from actual loops
       // ═══════════════════════════════════════════════════════════════
       const MAX_THREAD_LENGTH = 10;
+      const MAX_CONSECUTIVE_EXTERNAL = 5; // 5+ consecutive external = likely loop
+      
       if (messages.length > MAX_THREAD_LENGTH) {
-        console.log(`   ⊘ Skipped: thread too long (${messages.length} > ${MAX_THREAD_LENGTH})`);
-        this._markMessageAsProcessed(candidate);
-        result.status = 'skipped';
-        result.reason = 'thread_too_long';
-        return result;
+        // Smart check: count consecutive external messages at end
+        const ourEmail = Session.getActiveUser().getEmail().toLowerCase();
+        let consecutiveExternal = 0;
+        
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msgFrom = messages[i].getFrom().toLowerCase();
+          if (!msgFrom.includes(ourEmail)) {
+            consecutiveExternal++;
+          } else {
+            break; // Stop counting when we find our own message
+          }
+        }
+        
+        if (consecutiveExternal >= MAX_CONSECUTIVE_EXTERNAL) {
+          console.log(`   ⊘ Skipped: likely email loop (${consecutiveExternal} consecutive external)`);
+          this._markMessageAsProcessed(candidate);
+          result.status = 'skipped';
+          result.reason = 'email_loop_detected';
+          return result;
+        }
+        
+        // Long but not a loop - just warn and continue
+        console.warn(`   ⚠️ Long thread (${messages.length} messages) but not a loop - processing`);
       }
       
       // ═══════════════════════════════════════════════════════════════
@@ -255,7 +279,8 @@ Dettaglio: ${v.reason}
 ⚠️ Usa ESATTAMENTE queste informazioni verificate programmaticamente.
 ════════════════════════════════════════════════════════════════════════
 `;
-        enrichedKnowledgeBase = territoryContext + '\n\n' + knowledgeBase;
+        // FIX: Use enrichedKnowledgeBase to preserve previous enrichments (e.g., specialMassRule)
+        enrichedKnowledgeBase = territoryContext + '\n\n' + enrichedKnowledgeBase;
       }
       
       // ═══════════════════════════════════════════════════════════════
@@ -526,11 +551,14 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       result.error = error.message;
       return result;
     } finally {
-      // Rilascia sempre il lock
-      try {
-        lock.releaseLock();
-      } catch (e) {
-        console.warn('⚠️ Failed to release lock:', e.message);
+      // Rilascia lock solo se acquisito (skipLock=false)
+      // FIX BUG-1: Null-safe check to prevent error when skipLock=true
+      if (lock) {
+        try {
+          lock.releaseLock();
+        } catch (e) {
+          console.warn('⚠️ Failed to release lock:', e.message);
+        }
       }
     }
   }
@@ -552,7 +580,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     // STEP 1: Cerca thread non letti (SENZA chiamata API avanzata)
     // ═══════════════════════════════════════════════════════════════
     const threads = GmailApp.search(
-      'is:unread',
+      'in:inbox is:unread -from:me',
       0,
       this.config.maxEmailsPerRun
     );
@@ -587,8 +615,12 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       console.log(`\n--- Thread ${index + 1}/${threads.length} ---`);
       
       const threadId = thread.getId();
-      // FIX Bug #15: Lock per-thread per prevenire race conditions
+      // FIX Bug #15: Lock per prevenire race conditions tra trigger paralleli
+      // NOTA BUG-2: LockService.getScriptLock() è globale (by design in GAS). 
+      // Questo previene due trigger paralleli dal processare qualsiasi thread simultaneamente.
+      // Per un sistema con volumi più alti, considerare lock document-based (Sheet row lock).
       const threadLock = LockService.getScriptLock();
+      let lockAcquired = false; // FIX: Track lock acquisition state
       
       try {
         // Tenta di acquisire lock per 1s. Se occupato, salta il thread (probabilmente processato da altro trigger)
@@ -597,6 +629,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
            stats.skipped++;
            return;
         }
+        lockAcquired = true; // FIX: Mark lock as acquired
 
         // Processa il thread (con lock mantenuto dal ciclo esterno)
         // Passiamo skipLock=true perché il lock è già acquisito qui sopra
@@ -619,8 +652,10 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
          console.error(`Error processing thread wrapper: ${e.message}`);
          stats.errors++;
       } finally {
-        // Always release
-        threadLock.releaseLock();
+        // FIX: Only release if actually acquired
+        if (lockAcquired) {
+          threadLock.releaseLock();
+        }
       }
     });
     
@@ -767,10 +802,11 @@ function computeSalutationMode({ isReply, messageCount, memoryExists, lastUpdate
     const parsedLastUpdated = new Date(lastUpdated);
     const hoursSinceLast = (now.getTime() - parsedLastUpdated.getTime()) / (1000 * 60 * 60);
 
-    // FIX Bug 7: Se timestamp invalido (NaN), tratta come follow-up recente
+    // FIX Bug #6: Se timestamp invalido (NaN), tratta come NUOVO contatto (full greeting)
+    // Dato corrotto non deve impedire saluto completo
     if (isNaN(hoursSinceLast)) {
-      console.warn('⚠️ computeSalutationMode: Invalid lastUpdated timestamp, defaulting to none_or_continuity');
-      return 'none_or_continuity';
+      console.warn('⚠️ computeSalutationMode: Invalid lastUpdated timestamp, defaulting to FULL greeting');
+      return 'full';
     }
 
     // 2a️⃣ Follow-up ravvicinato (entro 48h)

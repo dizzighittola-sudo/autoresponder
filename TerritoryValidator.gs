@@ -6,53 +6,29 @@ class TerritoryValidator {
   constructor() {
     // Database territorio con vie e numeri civici accettati
     this.territory = {
-      'via adolfo cancani': {tutti: true},
-      'via antonio allegri da correggio': {tutti: true},
-      'via antonio gramsci': {tutti: true},
-      'via armando spadini': {tutti: true},
-      'via bartolomeo ammannati': {tutti: true},
-      'piazzale delle belle arti': {tutti: true},
-      'viale delle belle arti': {tutti: true},
-      'viale bruno buozzi': {dispari: [109, null], pari: [90, null]},
-      'via cardinal de luca': {tutti: true},
-      'via carlo dolci': {tutti: true},
-      'via cesare fracassini': {dispari: [1, null]},
-      'via cimabue': {tutti: true},
-      'via domenico alberto azuni': {dispari: [1, null]},
-      'piazzale don giovanni minzoni': {tutti: true},
-      'via enrico chiaradia': {tutti: true},
-      'via enrico pessina': {tutti: true},
-      'via filippo lippi': {tutti: true},
-      'via flaminia': {dispari: [109, 217], pari: [158, 162]},
-      'lungotevere flaminio': {tutti: [16, 38]},
-      'via francesco jacovacci': {tutti: true},
-      'via giovanni vincenzo gravina': {tutti: true},
-      'via giuseppe ceracchi': {tutti: true},
-      'via giuseppe de notaris': {tutti: true},
-      'via giuseppe mangili': {dispari: [1, null]},
-      'via jacopo da ponte': {tutti: true},
-      'via luigi canina': {tutti: true},
-      'piazzale manila': {tutti: true},
-      'piazza marina': {tutti: [24, 35]},
-      'piazza della marina': {tutti: [24, 35]},
-      'piazzale miguel cervantes': {tutti: true},
-      'largo dei monti parioli': {tutti: true},
-      'via monti parioli': {dispari: [1, 33], pari: [4, 62]},
-      'lungotevere delle navi': {tutti: true},
-      'via omero': {dispari: [1, null]},
-      'via paolo bartolini': {tutti: true},
-      'salita dei parioli': {dispari: [1, null]},
-      'via pietro da cortona': {tutti: true},
-      'via pietro paolo rubens': {pari: [2, null]},
-      'via pomarancio': {tutti: true},
-      'via sandro botticelli': {tutti: true},
-      'via sassoferrato': {tutti: true},
-      'via sebastiano conca': {tutti: true},
-      'viale tiziano': {tutti: true},
-      'via ulisse aldrovandi': {dispari: [1, 9]},
-      'via valmichi': {dispari: [1, null]},
-      'via di villa giulia': {tutti: true},
-      'piazzale di villa giulia': {tutti: true}
+      // ESEMPI DI CONFIGURAZIONE - Sostituire con le vie reali della parrocchia
+      'via roma': {tutti: true},
+      'piazza italia': {tutti: true},
+      'corso garibaldi': {dispari: [1, 50], pari: [2, 48]},
+      'via dante alighieri': {tutti: [10, 100]},
+      // Aggiungere qui le altre vie...
+      /*
+      FORMATO CONFIGURAZIONE:
+      'nome via': rule
+
+      TIPI DI REGOLE:
+      1. Tutta la via è nel territorio:
+         {tutti: true}
+      
+      2. Range specifico (tutti i numeri in quel range):
+         {tutti: [min, max]}  (max può essere null per "in poi")
+
+      3. Numeri pari/dispari differenziati:
+         {
+           dispari: [min, max],
+           pari: [min, max]
+         }
+      */
     };
   }
   

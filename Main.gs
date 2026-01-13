@@ -42,32 +42,41 @@ const CONFIG = {
   USE_RATE_LIMITER: true,  // ✅ Rate Limiter intelligente ABILITATO
   
   // === Modelli Gemini (CENTRALIZZATO - Modifica qui quando cambiano) ===
-  // 📌 AGGIORNA QUESTI VALORI se Google modifica le quote gratuite!
+  // 📌 AGGIORNATO: 13 Gennaio 2026 (basato su ricerca quote ufficiali)
   // 🔗 Verifica limiti quota: https://ai.google.dev/gemini-api/docs/rate-limits
   GEMINI_MODELS: {
+    // 🥇 PREMIUM: Qualità massima per generazione risposte
     'flash-2.5': {
       name: 'gemini-2.5-flash',
-      rpm: 15,        // ✅ Richieste Per Minuto (Free Tier)
-      tpm: 1000000,   // ✅ Token Per Minuto (1M)
-      rpd: 1500,      // ✅ Richieste Per Giorno (Free Tier)
-      useCases: ['generation', 'all']
+      rpm: 10,        // ✅ Richieste Per Minuto (Free Tier - Gen 2026)
+      tpm: 250000,    // ✅ Token Per Minuto (250K)
+      rpd: 250,       // ✅ Richieste Per Giorno (Free Tier - ridotto)
+      useCases: ['generation']
     },
+    // 🥈 WORKHORSE: Quick check e fallback (quota più generosa)
     'flash-lite': {
       name: 'gemini-2.5-flash-lite',
-      rpm: 15,        // ✅ Assumo stesso del flash-2.5 (verificare docs)
-      tpm: 1000000,   // ✅ 1M TPM
-      rpd: 1500,      // ✅ 1500 RPD (Free Tier standard)
-      useCases: ['quick_check', 'classification']
+      rpm: 15,        // ✅ RPM più alto
+      tpm: 250000,    // ✅ 250K TPM
+      rpd: 1000,      // ✅ Quota più generosa per automazioni
+      useCases: ['quick_check', 'classification', 'fallback']
+    },
+    // 🥉 LEGACY: Backup se tutto esaurito
+    'flash-2.0': {
+      name: 'gemini-2.0-flash',
+      rpm: 5,         // ⚠️ RPM ridotto per favorire 2.5
+      tpm: 250000,    // ✅ 250K TPM
+      rpd: 100,       // ⚠️ Quota ridotta (deprecazione marzo 2026)
+      useCases: ['fallback']
     }
-    // NOTA: gemini-1.5-flash non più disponibile nel tier gratuito
   },
   
   // Strategia selezione modelli per task (ordine = priorità)
-  // ⚠️ Con solo 20 RPD per modello, usiamo flash-lite per quick check
+  // ✅ AGGIORNATO: 2.5 Flash per qualità, Flash-Lite per volume
   MODEL_STRATEGY: {
-    'quick_check': ['flash-lite', 'flash-2.5'],   // Quick check usa flash-lite
-    'generation': ['flash-2.5', 'flash-lite'],    // Generation usa flash-2.5
-    'fallback': ['flash-lite', 'flash-2.5']
+    'quick_check': ['flash-lite', 'flash-2.0'],           // Quick check usa Flash-Lite (1000 RPD)
+    'generation': ['flash-2.5', 'flash-lite', 'flash-2.0'], // Generation usa 2.5 Flash (qualità), poi fallback
+    'fallback': ['flash-lite', 'flash-2.0']               // Fallback generico
   },
   
   // === Ignore Lists ===
@@ -114,16 +123,25 @@ var GLOBAL_CACHE = {
 // ====================================================================
 
 function loadResources() {
-  // FIX Bug 4: Previene race condition con flag loading
-  if (GLOBAL_CACHE.loading || GLOBAL_CACHE.loaded) {
-    console.log('📦 Resources already loaded or loading (cached)');
-    return;
-  }
-  
-  GLOBAL_CACHE.loading = true;
-  console.log('📦 Loading resources...');
+  // FIX Bug 4: Previene race condition reali tra esecuzioni parallele
+  const lock = LockService.getScriptLock();
   
   try {
+    // FIX Bug #24: Tenta di acquisire lock per 10 secondi - ESCI se fallisce
+    if (!lock.tryLock(10000)) {
+      console.warn('⚠️ Could not acquire lock for loadResources, using stale cache');
+      return; // ✅ Non procedere se lock fallito
+    }
+    
+    // Check double-checked locking pattern
+    if (GLOBAL_CACHE.loaded) {
+      // console.log('📦 Resources already loaded (cached)'); // Riduci rumore
+      return;
+    }
+    
+    GLOBAL_CACHE.loading = true;
+    console.log('📦 Loading resources...');
+    
     const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     
     // Carica Knowledge Base (Istruzioni)
@@ -188,12 +206,18 @@ function loadResources() {
     }
     
     GLOBAL_CACHE.loaded = true;
-    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset flag loading
+    GLOBAL_CACHE.loading = false;
     console.log('✓ All resources loaded successfully');
     
   } catch (error) {
-    GLOBAL_CACHE.loading = false; // FIX Bug 4: Reset flag loading in caso di errore
+    GLOBAL_CACHE.loading = false;
     console.error(`❌ Error loading resources: ${error.message}`);
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch(e) {
+      // Ignora errori di rilascio lock
+    }
   }
 }
 
@@ -756,8 +780,16 @@ function _parseSheetToStructured(data) {
     const row = data[i];
     const obj = {};
     for (let j = 0; j < headers.length; j++) {
-      // FIX Bug 1: Fallback per valori cella undefined/null
-      obj[headers[j]] = row[j] !== undefined && row[j] !== null ? row[j] : '';
+      // FIX Bug #25: Handle Date objects + undefined/null + whitespace
+      let cellVal = row[j];
+      if (cellVal === undefined || cellVal === null) {
+        cellVal = '';
+      } else if (cellVal instanceof Date) {
+        cellVal = cellVal.toISOString(); // Convert Date to string
+      } else if (typeof cellVal !== 'string') {
+        cellVal = String(cellVal); // Convert numbers/booleans
+      }
+      obj[headers[j]] = typeof cellVal === 'string' ? cellVal.trim() : cellVal;
     }
     rows.push(obj);
   }

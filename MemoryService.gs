@@ -164,11 +164,8 @@ class MemoryService {
         
       } catch (error) {
         if (error.message === 'VERSION_MISMATCH') {
-            // For simple version mismatches in a highly concurrent env, 
-            // if we are just merging data, we might want to reload fresh data and retry loop automatically.
-            // But if specific version was required, we might stop. 
-            // Here we assume standard merge retry.
-             console.warn(`⚠️ Version mismatch, retrying... (Attempt ${attempt+1})`);
+            // FIX Bug #3: Refresh fresh data before retry to prevent stale merge
+            console.warn(`⚠️ Version mismatch, refreshing fresh data and retrying... (Attempt ${attempt+1})`);
         } else {
              console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
         }
@@ -178,7 +175,12 @@ class MemoryService {
         }
         Utilities.sleep(Math.pow(2, attempt) * 200); // Exponential backoff
       } finally {
-        lock.releaseLock();
+        // FIX: Only release if acquired (waitLock succeeded)
+        try {
+          lock.releaseLock();
+        } catch (e) {
+          // Ignore - lock may not have been acquired
+        }
       }
     }
   }

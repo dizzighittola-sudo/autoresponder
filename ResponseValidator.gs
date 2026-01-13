@@ -65,7 +65,7 @@ class ResponseValidator {
     
     // Pattern firma (case-insensitive) - include varianti di apostrofo:
     // ' (U+0027 ASCII), ' (U+2018 left single quote), ' (U+2019 right single quote)
-    this.signaturePattern = /segreteria\s+parrocchia\s+sant['\u2018\u2019]?eugenio/i;
+    this.signaturePattern = /segreteria\s+parrocchia/i;
     
     console.log('✓ ResponseValidator inizializzato');
     console.log(`   Soglia minima validità: ${this.MIN_VALID_SCORE}`);
@@ -262,7 +262,7 @@ class ResponseValidator {
     
     // Per primo contatto ('full') e riprese dopo pausa ('soft'): firma attesa
     if (!this.signaturePattern.test(response)) {
-      warnings.push("Missing signature 'Segreteria Parrocchia Sant'Eugenio'");
+      warnings.push("Missing signature 'Segreteria Parrocchia [NOME]'");
       score = 0.95;
     }
     
@@ -362,7 +362,9 @@ class ResponseValidator {
     const normalizePhone = (p) => p.replace(/\D/g, '');
     
     // === Controllo 1: Orari ===
-    const timePattern = /\b\d{1,2}[:\.]\d{2}\b/g;
+    // OPT-2: Improved pattern to avoid filename false positives (e.g., page.19.html)
+    // Requires digit NOT preceded by letter+dot and NOT followed by dot+letter
+    const timePattern = /(?<![a-z]\.)\b\d{1,2}[:.]\d{2}\b(?!\.[a-z])/gi;
     const responseTimesRaw = response.match(timePattern) || [];
     const kbTimesRaw = safeKnowledgeBase.match(timePattern) || [];
     
@@ -377,8 +379,8 @@ class ResponseValidator {
     }
     
     // === Controllo 2: Indirizzi Email ===
-    // FIX: Disallow dot at end of domain part and improve pattern
-    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}\b/gi;
+    // FIX BUG-6: Require local-part to start with alphanumeric (prevent .@domain.com)
+    const emailPattern = /\b[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9-]+\.[A-Za-z]{2,}\b/gi;
     const responseEmails = new Set(
       (response.match(emailPattern) || []).map(e => e.toLowerCase())
     );
