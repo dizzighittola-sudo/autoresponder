@@ -121,6 +121,8 @@ class EmailProcessor {
       // Se non ci sono messaggi da esterni → skip
       if (externalUnread.length === 0) {
         console.log('   ⊘ Skipped: no new external unread message');
+        // Evita reprocessing infinito: etichetta i messaggi non letti interni
+        unlabeledUnread.forEach(message => this._markMessageAsProcessed(message));
         result.status = 'skipped';
         result.reason = 'no_external_unread';
         return result;
