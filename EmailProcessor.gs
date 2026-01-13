@@ -44,10 +44,37 @@ class EmailProcessor {
   }
   
   /**
-   * Processa un singolo thread email
-   * @param {Set} labeledMessageIds - Set di ID messaggi già etichettati (passato da processUnreadEmails per evitare chiamate API ripetute)
+   * Elabora il singolo thread (analisi, categorizzazione, generazione risposta, invio)
+   * @param {GmailThread} thread 
+   * @param {string} knowledgeBase - KB testo semplice
+   * @param {Array} doctrineBase - KB strutturata
+   * @param {Set} labeledMessageIds - ID messaggi già etichettati (opzionale)
+   * @param {boolean} skipLock - Se true, salta acquisizione lock (usato se chiamante ha già lock)
    */
-  processThread(thread, knowledgeBase, doctrineBase = '', labeledMessageIds = null) {
+  processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds = new Set(), skipLock = false) {
+    const threadId = thread.getId();
+    
+    // ═══════════════════════════════════════════════════════════════
+    // ACQUISIZIONE LOCK (previene race condition tra trigger)
+    // ═══════════════════════════════════════════════════════════════
+    let lock = null;
+    if (!skipLock) {
+      lock = LockService.getScriptLock();
+      console.log(`🔒 Acquiring lock for thread ${threadId}...`);
+      try {
+        // Attendi fino a 30s per lock
+        if (!lock.tryLock(30000)) {
+          console.warn(`⏱️ Could not acquire lock for thread ${threadId}, skipping`);
+          return { status: 'skipped', reason: 'lock_timeout' };
+        }
+      } catch (e) {
+         console.warn(`⚠️ Lock error: ${e.message}`);
+         return { status: 'skipped', reason: 'lock_error' };
+      }
+    } else {
+      console.log(`🔒 Lock skipped for thread ${threadId} (managed by caller)`);
+    }
+
     const result = {
       status: 'unknown',
       validationFailed: false,
@@ -55,22 +82,8 @@ class EmailProcessor {
       error: null
     };
     
-    // ═══════════════════════════════════════════════════════════════
-    // ACQUISIZIONE LOCK (previene race condition tra trigger)
-    // ═══════════════════════════════════════════════════════════════
-    const threadId = thread.getId();
-    const lock = LockService.getScriptLock();
-    
     let candidate = null;
     try {
-      // Attendi fino a 30s per lock
-      if (!lock.tryLock(30000)) {
-        console.warn(`⏱️ Could not acquire lock for thread ${threadId}, skipping`);
-        result.status = 'skipped';
-        result.reason = 'lock_timeout';
-        return result;
-      }
-      
       // Raccogli informazioni su thread e messaggi
       const currentLabels = thread.getLabels().map(l => l.getName());
       const hasProcessedLabel = currentLabels.includes(this.config.labelName);
@@ -583,8 +596,9 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
            return;
         }
 
-        // ✅ Passa labeledMessageIds per evitare chiamate API ripetute
-        const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds);
+        // Processa il thread (con lock mantenuto dal ciclo esterno)
+        // Passiamo skipLock=true perché il lock è già acquisito qui sopra
+        const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds, true);
         stats.total++;
         
         if (result.validationFailed) {

@@ -99,7 +99,8 @@ class PromptEngine {
       salutationMode = 'full'
     } = options;
     
-    const sections = [];
+    // FIX Bug 23: Allow reassignment for truncation
+    let sections = [];
     let skippedCount = 0;
     
     // Helper per aggiungere template condizionalmente
@@ -413,7 +414,7 @@ This is MANDATORY. The sender may not understand Italian.
   _renderMemoryContext(memoryContext) {
     if (!memoryContext || Object.keys(memoryContext).length === 0) return null;
     
-    const sections = [];
+    let sections = [];
     
     if (memoryContext.language) {
       sections.push(`• LINGUA STABILITA: ${memoryContext.language.toUpperCase()}`);

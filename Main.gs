@@ -272,9 +272,16 @@ function isFerragostoFixedPeriod(date) {
  * @param {Date} [checkDate] - Data opzionale da verificare (default: ora)
  */
 function isInSuspensionTime(checkDate = new Date()) {
+  /* 
+   * FIX Bug #21: Month Index Logic Mismatch
+   * JS uses 0-11 for months. Our constants (MONTH.JAN) are 0-11.
+   * But logic below used month+1 (1-12).
+   * Solution: Use consistent variables.
+   */
   const now = checkDate;
   const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const monthIndex = now.getMonth(); // 0-based (0=Jan)
+  const month1Based = monthIndex + 1; // 1-based (1=Jan)
   const date = now.getDate();
   const day = now.getDay();
   const hour = now.getHours();
@@ -286,13 +293,13 @@ function isInSuspensionTime(checkDate = new Date()) {
 
   // A. Festività Fisse
   for (const [hMonth, hDay] of ALWAYS_OPERATING_DAYS) {
-    if (month === hMonth && date === hDay) {
+    if (monthIndex === hMonth && date === hDay) { // ✅ Use 0-based monthIndex
       console.log('📅 Giorno Festivo Fisso (Sistema Attivo)');
       return false; // Active
     }
   }
   // Periodo attivo speciale: 24 e 31 Dic dalle 14:00, giorni interi 25-26 Dic, 1 Gen
-  if (month === 12 && ((date === 24 && hour >= 14) || date === 25 || date === 26 || (date === 31 && hour >= 14))) {
+  if (month1Based === 12 && ((date === 24 && hour >= 14) || date === 25 || date === 26 || (date === 31 && hour >= 14))) {
     console.log('📅 Periodo speciale attivo (Natale/Capodanno)');
     return false; // Active
   }
@@ -303,7 +310,7 @@ function isInSuspensionTime(checkDate = new Date()) {
   // Pasquetta (Easter + 1 day)
   const pasquetta = new Date(easter);
   pasquetta.setDate(easter.getDate() + 1);
-  if (month === (pasquetta.getMonth() + 1) && date === pasquetta.getDate()) {
+  if (month1Based === (pasquetta.getMonth() + 1) && date === pasquetta.getDate()) {
     console.log('📅 Pasquetta (Sistema Attivo)');
     return false;
   }
@@ -311,7 +318,7 @@ function isInSuspensionTime(checkDate = new Date()) {
   // Sabato Santo (Pasqua - 1 giorno)
   const holySaturday = new Date(easter);
   holySaturday.setDate(easter.getDate() - 1);
-  if (month === (holySaturday.getMonth() + 1) && date === holySaturday.getDate()) {
+  if (month1Based === (holySaturday.getMonth() + 1) && date === holySaturday.getDate()) {
     console.log('📅 Sabato Santo (Sistema Attivo)');
     return false;
   }

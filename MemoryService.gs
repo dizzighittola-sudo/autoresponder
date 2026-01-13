@@ -56,11 +56,11 @@ class MemoryService {
       if (!this._sheet) {
         // Crea nuovo foglio con intestazioni
         this._sheet = spreadsheet.insertSheet(this.sheetName);
-        this._sheet.getRange('A1:G1').setValues([[
+        this._sheet.getRange('A1:H1').setValues([[
           'threadId', 'language', 'category', 'tone', 
-          'providedInfo', 'lastUpdated', 'messageCount'
+          'providedInfo', 'lastUpdated', 'messageCount', 'version'
         ]]);
-        this._sheet.getRange('A1:G1').setFontWeight('bold');
+        this._sheet.getRange('A1:H1').setFontWeight('bold');
         this._sheet.setFrozenRows(1);
         console.log(`✓ Created new sheet: ${this.sheetName}`);
       }
