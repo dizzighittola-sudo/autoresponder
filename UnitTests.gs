@@ -324,11 +324,19 @@ function testBugFixes() {
 
   // Bug #19 & #20: Header Injection & SSRF in Markdown
   if (typeof markdownToHtml === 'function') {
-      // Test 1: Header Injection (Bcc check) - This is mostly handled in sendHtmlReply but we check if markdownToHtml does anything weird
-      const injectionAttempt = "Hello\nBcc: attacker@evil.com";
-      const html = markdownToHtml(injectionAttempt);
-      // markdownToHtml shouldn't strip it (GmailService.sendHtmlReply does), but let's check basic sanity
-      assert(html.length > 0, "Markdown conversion should work");
+      // Test 1: Header Injection (Bcc check) - Test actual service logic
+      if (typeof GmailService !== 'undefined') {
+         const service = new GmailService();
+         const injectionAttempt = "Hello\nBcc: attacker@evil.com";
+         // Use the exposed helper for testing
+         if (typeof service._sanitizeHeaders === 'function') {
+             const sanitized = service._sanitizeHeaders(injectionAttempt);
+             assertFalse(sanitized.includes('\nBcc:'), "Bug #19: 'Bcc:' header should be escaped to '[Bcc]:'");
+             assert(sanitized.includes('[Bcc]:'), "Bug #19: Should contain escaped header");
+         } else {
+             console.warn("Bug #19 Test: _sanitizeHeaders not found");
+         }
+      }
       
       // Test 2: SSRF / Internal IP
       const internalLink = "[Link](http://192.168.1.1/admin)";

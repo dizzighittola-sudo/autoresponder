@@ -371,11 +371,8 @@ class GmailService {
    * @param {GmailThread|GmailMessage|string} resource - Thread, Messaggio o ID Thread
    */
   sendHtmlReply(resource, responseText, messageDetails) {
-    // ✅ FIX Bug 19: Header Injection Sanitization
-    // Prevent attackers from injecting headers via CRLF
-    const sanitizedText = responseText
-      .replace(/\n(To|Cc|Bcc|From|Subject|Reply-To):/gi, '\n[$1]:')
-      .replace(/\r\n|\r/g, '\n');
+    // ✅ FIX Bug 19: Header Injection Sanitization (Refactored for testing)
+    const sanitizedText = this._sanitizeHeaders(responseText);
 
     // 0. Applica Sostituzioni Personalizzate (dal foglio Sostituzioni)
     let finalResponse = sanitizedText;
@@ -514,6 +511,16 @@ class GmailService {
       result = result.replace(regex, good);
     }
     return result;
+  }
+
+  /**
+   * Sanitizes text to prevent header injection
+   */
+  _sanitizeHeaders(text) {
+    if (!text) return '';
+    return text
+      .replace(/\n(To|Cc|Bcc|From|Subject|Reply-To):/gi, '\n[$1]:')
+      .replace(/\r\n|\r/g, '\n');
   }
 
   // ========================================================================
