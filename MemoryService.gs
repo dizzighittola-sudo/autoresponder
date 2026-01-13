@@ -133,20 +133,28 @@ class MemoryService {
         
         if (existingRow) {
            const existingData = this._rowToObject(existingRow.values);
-           // Optimistic locking could be added here if we had a version column
+           const currentVersion = existingData.version || 0;
+
+           // ✅ OPTIMISTIC LOCKING CHECK
+           if (newData._expectedVersion !== undefined && newData._expectedVersion !== currentVersion) {
+              console.warn(`🔒 Optimistic Lock Mismatch for thread ${threadId}: expected ${newData._expectedVersion}, got ${currentVersion}`);
+              throw new Error('VERSION_MISMATCH'); // Will trigger retry (or fail if logic dictates)
+           }
            
            const mergedData = Object.assign({}, existingData, newData);
            mergedData.lastUpdated = now;
            mergedData.messageCount = (existingData.messageCount || 0) + 1;
+           mergedData.version = currentVersion + 1; // Increment version
            
            this._updateRow(existingRow.rowIndex, mergedData);
-           console.log(`🧠 Memory updated for thread ${threadId} (Attempt ${attempt+1})`);
+           console.log(`🧠 Memory updated for thread ${threadId} (v${mergedData.version}, Attempt ${attempt+1})`);
         } else {
            newData.threadId = threadId;
            newData.lastUpdated = now;
            newData.messageCount = 1;
+           newData.version = 1; // Init version
            this._appendRow(newData);
-           console.log(`🧠 Memory created for thread ${threadId}`);
+           console.log(`🧠 Memory created for thread ${threadId} (v1)`);
         }
         
         // Invalida cache DOPO scrittura sicura
@@ -155,7 +163,16 @@ class MemoryService {
         return; // Success
         
       } catch (error) {
-        console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
+        if (error.message === 'VERSION_MISMATCH') {
+            // For simple version mismatches in a highly concurrent env, 
+            // if we are just merging data, we might want to reload fresh data and retry loop automatically.
+            // But if specific version was required, we might stop. 
+            // Here we assume standard merge retry.
+             console.warn(`⚠️ Version mismatch, retrying... (Attempt ${attempt+1})`);
+        } else {
+             console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
+        }
+        
         if (attempt === MAX_RETRIES - 1) {
            console.error(`❌ Final Memory Update Failure: ${error.message}`);
         }
@@ -190,9 +207,12 @@ class MemoryService {
       if (existingRow) {
         // Unisci con dati esistenti
         const existingData = this._rowToObject(existingRow.values);
+        const currentVersion = existingData.version || 0;
+        
         const mergedData = Object.assign({}, existingData, newData);
         mergedData.lastUpdated = now;
         mergedData.messageCount = (existingData.messageCount || 0) + 1;
+        mergedData.version = currentVersion + 1; // Increment version
         
         // ✅ Unisci topic nello stesso lock (operazione atomica)
         if (providedTopics && providedTopics.length > 0) {
@@ -203,19 +223,20 @@ class MemoryService {
         
         // Aggiorna riga
         this._updateRow(existingRow.rowIndex, mergedData);
-        console.log(`🧠 Memory atomically updated for thread ${threadId}`);
+        console.log(`🧠 Memory atomically updated for thread ${threadId} (v${mergedData.version})`);
       } else {
         // Crea nuova riga con eventualmente i topic
         newData.threadId = threadId;
         newData.lastUpdated = now;
         newData.messageCount = 1;
+        newData.version = 1; // Init version
         
         if (providedTopics && providedTopics.length > 0) {
           newData.providedInfo = providedTopics;
         }
         
         this._appendRow(newData);
-        console.log(`🧠 Memory atomically created for thread ${threadId}`);
+        console.log(`🧠 Memory atomically created for thread ${threadId} (v1)`);
       }
       
       // Invalida cache
@@ -335,7 +356,8 @@ class MemoryService {
       tone: values[3] || 'standard',
       providedInfo: providedInfo,
       lastUpdated: lastUpdated,  // ✅ Already validated
-      messageCount: parseInt(values[6]) || 0
+      messageCount: parseInt(values[6]) || 0,
+      version: parseInt(values[7]) || 0 // ✅ Read Version
     };
   }
   
@@ -345,14 +367,15 @@ class MemoryService {
   _updateRow(rowIndex, data) {
     const providedInfoJson = JSON.stringify(data.providedInfo || []);
     
-    this._sheet.getRange(rowIndex, 1, 1, 7).setValues([[
+    this._sheet.getRange(rowIndex, 1, 1, 8).setValues([[
       data.threadId,
       data.language || 'it',
       data.category || '',
       data.tone || 'standard',
       providedInfoJson,
       data.lastUpdated,
-      data.messageCount || 1
+      data.messageCount || 1,
+      data.version || 1 // ✅ Write Version
     ]]);
   }
   
@@ -369,7 +392,8 @@ class MemoryService {
       data.tone || 'standard',
       providedInfoJson,
       data.lastUpdated,
-      data.messageCount || 1
+      data.messageCount || 1,
+      data.version || 1 // ✅ Write Version
     ]);
   }
   
