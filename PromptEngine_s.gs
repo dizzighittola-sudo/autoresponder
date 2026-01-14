@@ -343,6 +343,13 @@ Quindi:
   cerca l'informazione nella knowledge base usando termini simili
 - NON usare MAI placeholder come [...] o <...> nella risposta
 
+📛 IDENTIFICAZIONE CORRETTA DEL NOME:
+Il campo "Da:" mostra il nome dell'account email, ma NON sempre chi sta scrivendo.
+SE nel TESTO dell'email c'è una FIRMA esplicita (es. "Mario e Giulia", "Romualdo", "Cordiali saluti, Anna"):
+→ USA il nome dalla FIRMA nel testo, NON il nome dell'header "Da:"
+→ Se firmano in due ("Marco e Lucia"), rivolgiti a entrambi
+→ Ignora il nome dell'account se diverso dalla firma
+
 NON sei un chatbot freddo - sei una persona reale della segreteria che vuole aiutare.`;
   }
   
