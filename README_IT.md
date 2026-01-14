@@ -66,7 +66,7 @@ Le segreterie parrocchiali ricevono centinaia di email su orari delle messe, pre
 npm install -g @google/clasp
 
 # 2. Clona questo repository
-git clone https://github.com/YOUR_USERNAME/parish-autoresponder.git
+git clone https://github.com/dizzighittola/parish-autoresponder.git
 cd parish-autoresponder
 
 # 3. Login a Google Apps Script
@@ -94,7 +94,7 @@ clasp push
      - `SPREADSHEET_ID`: ID spreadsheet knowledge base
 
 3. **Crea Knowledge Base**
-   - Copia [questo template](docs/KNOWLEDGE_BASE_TEMPLATE.md)
+   - Copia [questo template](KNOWLEDGE_BASE_TEMPLATE_IT.md)
    - Compila con informazioni parrocchia
    - Salva ID spreadsheet in Script Properties
 
@@ -259,11 +259,10 @@ Esegui queste dall'Apps Script Editor:
 
 ## 📖 Documentazione
 
-- **[Guida Setup](docs/SETUP_IT.md)** — Installazione passo-passo
-- **[Riferimento Configurazione](docs/CONFIGURATION_IT.md)** — Tutte le opzioni spiegate
-- **[Guida Knowledge Base](docs/KNOWLEDGE_BASE_IT.md)** — Creare contenuti di qualità
-- **[Troubleshooting](docs/TROUBLESHOOTING_IT.md)** — Problemi comuni e soluzioni
-- **[Riferimento API](docs/API_IT.md)** — Documentazione moduli
+- **[Guida Setup](SETUP_IT.md)** — Installazione passo-passo
+- **[Riferimento Configurazione](CONFIGURATION_IT.md)** — Tutte le opzioni spiegate
+- **[Guida Knowledge Base](KNOWLEDGE_BASE_TEMPLATE_IT.md)** — Creare contenuti di qualità
+- **[Troubleshooting](TROUBLESHOOTING_IT.md)** — Problemi comuni e soluzioni
 - **[Contribuire](CONTRIBUTING_IT.md)** — Come contribuire
 
 ---
@@ -344,7 +343,7 @@ R: **Gratuito** se rimani entro il tier gratuito Gemini (1.500 richieste/giorno)
 
 ## 📄 Licenza
 
-MIT License - Vedi file [LICENSE](LICENSE)
+MIT License - Vedi file [LICENSE](LICENSE) (originale inglese) o [LICENSE_IT](LICENSE_IT) (traduzione italiana)
 
 Copyright (c) 2025 Contributori Parish Autoresponder
 
@@ -352,9 +351,9 @@ Copyright (c) 2025 Contributori Parish Autoresponder
 
 ## 📞 Supporto e Comunità
 
-- **Problemi:** [GitHub Issues](https://github.com/YOUR_USERNAME/parish-autoresponder/issues)
-- **Discussioni:** [GitHub Discussions](https://github.com/YOUR_USERNAME/parish-autoresponder/discussions)
-- **Email:** your-email@example.com
+- **Problemi:** [GitHub Issues](https://github.com/dizzighittola/parish-autoresponder/issues)
+- **Discussioni:** [GitHub Discussions](https://github.com/dizzighittola/parish-autoresponder/discussions)
+- **Email:** dizzighittola@gmail.com
 
 ---
 

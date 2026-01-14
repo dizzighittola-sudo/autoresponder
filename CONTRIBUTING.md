@@ -55,7 +55,7 @@ Violations may result in:
 2. Temporary ban
 3. Permanent ban
 
-Report violations to: [your-email@example.com]
+Report violations to: [dizzighittola@gmail.com]
 
 ---
 
@@ -64,9 +64,9 @@ Report violations to: [your-email@example.com]
 ### 🐛 Reporting Bugs
 
 **Before submitting:**
-1. Check [existing issues](https://github.com/YOUR_USERNAME/parish-autoresponder/issues)
+1. Check [existing issues](https://github.com/dizzighittola/parish-autoresponder/issues)
 2. Run `healthCheck()` to verify system status
-3. Review [troubleshooting guide](docs/TROUBLESHOOTING.md)
+3. Review [troubleshooting guide](TROUBLESHOOTING.md)
 
 **When reporting:**
 - Use bug report template
@@ -130,7 +130,7 @@ See [Development Setup](#development-setup) below.
 
 ```bash
 # Fork repository on GitHub first, then:
-git clone https://github.com/YOUR_USERNAME/parish-autoresponder.git
+git clone https://github.com/dizzighittola/parish-autoresponder.git
 cd parish-autoresponder
 
 # Add upstream remote
@@ -506,8 +506,8 @@ Contributors are recognized in:
 
 ## Questions?
 
-- **Documentation:** [Main README](../README.md)
-- **Discussions:** [GitHub Discussions](https://github.com/YOUR_USERNAME/parish-autoresponder/discussions)
-- **Email:** your-email@example.com
+- **Documentation:** [Main README](README.md)
+- **Discussions:** [GitHub Discussions](https://github.com/dizzighittola/parish-autoresponder/discussions)
+- **Email:** dizzighittola@gmail.com
 
 Thank you for contributing to this project! 🙏

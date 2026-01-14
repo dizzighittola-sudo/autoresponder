@@ -91,7 +91,7 @@ clasp --version
 ### 3.1 Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/parish-autoresponder.git
+git clone https://github.com/dizzighittola/parish-autoresponder.git
 cd parish-autoresponder
 ```
 
@@ -375,9 +375,9 @@ Once setup is complete:
 
 If you encounter issues not covered here:
 
-- **Documentation:** [Full docs](../README.md)
-- **Issues:** [GitHub Issues](https://github.com/YOUR_USERNAME/parish-autoresponder/issues)
-- **Community:** [Discussions](https://github.com/YOUR_USERNAME/parish-autoresponder/discussions)
+- **Documentation:** [Full docs](README.md)
+- **Issues:** [GitHub Issues](https://github.com/dizzighittola/parish-autoresponder/issues)
+- **Community:** [Discussions](https://github.com/dizzighittola/parish-autoresponder/discussions)
 
 ---
 

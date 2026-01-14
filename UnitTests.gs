@@ -25,6 +25,7 @@ function runAllTests() {
     testTerritoryValidator();
     testResponseValidator();
     testBugFixes(); // ✅ New Bug Fix Tests
+    testPromptContext(); // ✅ PromptContext Tests
     // testUtils(); // Decommentare se si aggiungono test per utils
     
   } catch (e) {
@@ -384,5 +385,36 @@ function testBugFixes() {
 }
 
 // Add call to testBugFixes in runAllTests
-// (See modified runAllTests below)
+
+/**
+ * Test per PromptContext.gs
+ */
+function testPromptContext() {
+  console.log("\n🧪 Testing PromptContext...");
+
+  if (typeof PromptContext === 'undefined') {
+    TEST_RESULTS.errors.push("PromptContext class not found!");
+    TEST_RESULTS.failed++;
+    return;
+  }
+
+  const input = {
+    email: { subject: 'Re: Orari messe', body: 'Quali sono gli orari?', isReply: true, detectedLanguage: 'it' },
+    classification: { category: 'information', subIntents: {}, confidence: 0.9 },
+    requestType: { type: 'technical' },
+    memory: { exists: false, providedInfoCount: 0 },
+    conversation: { messageCount: 1 },
+    territory: { addressFound: false },
+    knowledgeBase: { length: 0, containsDates: false },
+    temporal: { mentionsDates: false, mentionsTimes: false }
+  };
+  
+  const pc = new PromptContext(input);
+  const concerns = pc.concerns;
+  
+  assertFalse(concerns.language_safety, "language_safety should be false");
+  assertTrue(concerns.formatting_risk, "formatting_risk should be true for category 'information'");
+  assertFalse(concerns.temporal_risk, "temporal_risk should be false");
+}
+
 

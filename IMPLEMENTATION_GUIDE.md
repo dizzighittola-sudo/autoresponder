@@ -31,7 +31,7 @@ This document explains the complete documentation package created for your GitHu
    - Migration guides between versions
    - Bug fix tracking
 
-### Detailed Guides (/docs directory recommended)
+### Detailed Guides
 
 5. **SETUP.md** (8.5KB) - Complete installation guide
    - Prerequisites checklist
@@ -97,16 +97,16 @@ This document explains the complete documentation package created for your GitHu
    LICENSE
    CHANGELOG.md
    CONTRIBUTING.md
-   
-   # Create docs/ directory for detailed guides
-   mkdir docs
-   mv SETUP.md KNOWLEDGE_BASE_TEMPLATE.md TROUBLESHOOTING.md \
-      CONFIGURATION.md ARCHITECTURE.md docs/
+   SETUP.md
+   KNOWLEDGE_BASE_TEMPLATE.md
+   TROUBLESHOOTING.md
+   CONFIGURATION.md
+   ARCHITECTURE.md
    ```
 
 2. **Update placeholders:**
-   - Replace `YOUR_USERNAME` with your GitHub username
-   - Replace `your-email@example.com` with your contact email
+   - Replace `dizzighittola` with your GitHub username (if forking)
+   - Replace `dizzighittola@gmail.com` with your contact email
    - Update any URLs to match your repository
 
 3. **Verify links:**
@@ -146,7 +146,7 @@ This document explains the complete documentation package created for your GitHu
 Before publishing, customize these sections:
 
 ### README.md & README_IT.md
-- [ ] Replace `YOUR_USERNAME` in all GitHub links
+- [ ] Replace `dizzighittola` in all GitHub links
 - [ ] Update contact email
 - [ ] Add real-world testimonials (if available)
 - [ ] Update FAQ with your parish-specific questions

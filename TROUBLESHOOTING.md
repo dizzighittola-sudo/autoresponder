@@ -613,13 +613,13 @@ daysOld = 14  // Reduce from 30 days
    - Sample problematic email (anonymized)
 
 3. **Report Issue**
-   - [GitHub Issues](https://github.com/YOUR_USERNAME/parish-autoresponder/issues)
+   - [GitHub Issues](https://github.com/dizzighittola/parish-autoresponder/issues)
    - Include all debug information
    - Describe expected vs actual behavior
    - Steps to reproduce
 
 4. **Community Help**
-   - [GitHub Discussions](https://github.com/YOUR_USERNAME/parish-autoresponder/discussions)
+   - [GitHub Discussions](https://github.com/dizzighittola/parish-autoresponder/discussions)
    - Search existing discussions
    - Share your use case
 
@@ -647,6 +647,6 @@ daysOld = 14  // Reduce from 30 days
 ---
 
 **Documentation:**
-- [Main README](../README.md)
+- [Main README](README.md)
 - [Setup Guide](SETUP.md)
 - [Configuration Reference](CONFIGURATION.md)

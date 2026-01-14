@@ -66,7 +66,7 @@ Parish secretariats receive hundreds of emails asking about mass times, sacramen
 npm install -g @google/clasp
 
 # 2. Clone this repository
-git clone https://github.com/YOUR_USERNAME/parish-autoresponder.git
+git clone https://github.com/dizzighittola/parish-autoresponder.git
 cd parish-autoresponder
 
 # 3. Login to Google Apps Script
@@ -94,7 +94,7 @@ clasp push
      - `SPREADSHEET_ID`: Your knowledge base spreadsheet ID
 
 3. **Create Knowledge Base**
-   - Copy [this template](docs/KNOWLEDGE_BASE_TEMPLATE.md)
+   - Copy [this template](KNOWLEDGE_BASE_TEMPLATE.md)
    - Fill with your parish information
    - Save spreadsheet ID to Script Properties
 
@@ -259,11 +259,10 @@ Run these from the Apps Script Editor:
 
 ## 📖 Documentation
 
-- **[Setup Guide](docs/SETUP.md)** — Step-by-step installation
-- **[Configuration Reference](docs/CONFIGURATION.md)** — All options explained
-- **[Knowledge Base Guide](docs/KNOWLEDGE_BASE.md)** — Creating quality content
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Common issues & solutions
-- **[API Reference](docs/API.md)** — Module documentation
+- **[Setup Guide](SETUP.md)** — Step-by-step installation
+- **[Configuration Reference](CONFIGURATION.md)** — All options explained
+- **[Knowledge Base Guide](KNOWLEDGE_BASE_TEMPLATE.md)** — Creating quality content
+- **[Troubleshooting](TROUBLESHOOTING.md)** — Common issues & solutions
 - **[Contributing](CONTRIBUTING.md)** — How to contribute
 
 ---
@@ -352,9 +351,9 @@ Copyright (c) 2025 Parish Autoresponder Contributors
 
 ## 📞 Support & Community
 
-- **Issues:** [GitHub Issues](https://github.com/YOUR_USERNAME/parish-autoresponder/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/YOUR_USERNAME/parish-autoresponder/discussions)
-- **Email:** your-email@example.com
+- **Issues:** [GitHub Issues](https://github.com/dizzighittola/parish-autoresponder/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/dizzighittola/parish-autoresponder/discussions)
+- **Email:** dizzighittola@gmail.com
 
 ---
 

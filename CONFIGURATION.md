@@ -730,10 +730,10 @@ Logger.log('CONFIG:', JSON.stringify(CONFIG, null, 2));
 
 - [Setup Guide](SETUP.md) - Initial configuration
 - [Troubleshooting](TROUBLESHOOTING.md) - Common issues
-- [Main README](../README.md) - Overview
+- [Main README](README.md) - Overview
 
 ---
 
 **Questions about configuration?**
-- [GitHub Discussions](https://github.com/YOUR_USERNAME/parish-autoresponder/discussions)
-- [GitHub Issues](https://github.com/YOUR_USERNAME/parish-autoresponder/issues)
+- [GitHub Discussions](https://github.com/dizzighittola/parish-autoresponder/discussions)
+- [GitHub Issues](https://github.com/dizzighittola/parish-autoresponder/issues)

@@ -788,8 +788,10 @@ AI: "Phone: 06 123456. By the way, mass times are..."  ← Repetitive!
 
 1. **Unit Tests** (`UnitTests.gs`)
    - Classifier logic
+   - Prompt Context logic
    - Territory validation
    - Response validator
+   - Regression tests for recent bug fixes
    - Utility functions
 
 2. **Integration Tests**
