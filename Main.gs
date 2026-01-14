@@ -284,6 +284,11 @@ function calculateEaster(year) {
  * Regola: Periodo fisso dal 15 al 31 Agosto (inclusi)
  */
 function isFerragostoFixedPeriod(date) {
+  // FIX Bug #27: Validate date parameter
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    console.warn('⚠️ Invalid date passed to isFerragostoFixedPeriod');
+    return false;
+  }
   const month = date.getMonth() + 1; // 1-12
   const day = date.getDate();
   return month === 8 && day >= 15 && day <= 31;
@@ -380,6 +385,11 @@ function isInSuspensionTime(checkDate = new Date()) {
  * la Messa è SOLO alle 19:00 (a meno che non sia Domenica).
  */
 function getSpecialMassTimeRule(date = new Date()) {
+  // FIX Bug #27: Validate date parameter
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    console.warn('⚠️ Invalid date passed to getSpecialMassTimeRule');
+    return null;
+  }
   const month = date.getMonth() + 1; // 1-12
   const day = date.getDate();
   const weekDay = date.getDay(); // 0=Sun
