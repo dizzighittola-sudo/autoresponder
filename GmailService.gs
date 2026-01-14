@@ -467,10 +467,15 @@ class GmailService {
       }
       
       // Eccezione 2: vocativo seguito da virgola o punto (es. ", Federica," o ", Marco.")
-      // Controlla se dopo la parola c'è una virgola o un punto (indica nome proprio)
+      // Eccezione 2b: vocativo doppio (es. ", Mario e Giulia," o ", Romualdo e Gigliela.")
+      // Controlla se dopo la parola c'è una virgola/punto OPPURE "e NomePropio,/."
       const afterMatch = text.substring(offset + match.length);
-      if (afterMatch.match(/^\s*[,.]/)) {
-        // È un nome proprio (vocativo o conclusione frase), non minuscolizzare
+      
+      // Pattern 1: virgola/punto diretto (vocativo singolo)
+      // Pattern 2: "e NomeProprio" seguito da virgola/punto (vocativo doppio)
+      if (afterMatch.match(/^\s*[,.]/) || 
+          afterMatch.match(/^\s+e\s+[A-ZÀÈÉÌÒÙ][a-zàèéìòù]*\s*[,.]/)) {
+        // È un nome proprio (vocativo singolo o doppio), non minuscolizzare
         return match;
       }
       
