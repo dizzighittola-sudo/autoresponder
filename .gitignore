@@ -16,6 +16,7 @@ node_modules/
 # Sensitive files (real parish data) - use _s.gs versions for GitHub
 TerritoryValidator.gs
 ResponseValidator.gs
+PromptEngine.gs
 
 # Backup folder (contains real data)
 BACKUP/
