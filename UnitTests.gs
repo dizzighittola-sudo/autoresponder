@@ -266,13 +266,13 @@ function testBugFixes() {
   // Bug #7: Rate Limiter Timezone
   if (typeof GeminiRateLimiter !== 'undefined') {
      const limiter = new GeminiRateLimiter();
-     // Test _isAfterPacificReset method logic (needs to handle LA timezone)
-     // Since we can't easily mock Date inside the class without dependency injection, we just verify the method exists and runs without error.
+     // Test _getPacificDate method (used for quota reset alignment)
+     // Verify it returns a valid YYYY-MM-DD string
       try {
-        const check = limiter._isAfterPacificReset();
-        assert(typeof check === 'boolean', "_isAfterPacificReset should return boolean");
+        const pacificDate = limiter._getPacificDate();
+        assert(typeof pacificDate === 'string' && pacificDate.match(/^\d{4}-\d{2}-\d{2}$/), "_getPacificDate should return YYYY-MM-DD format");
       } catch (e) {
-        assert(false, "GeminiRateLimiter._isAfterPacificReset threw error: " + e.message);
+        assert(false, "GeminiRateLimiter._getPacificDate threw error: " + e.message);
       }
   }
 

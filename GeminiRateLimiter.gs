@@ -44,10 +44,10 @@ class GeminiRateLimiter {
           rpm: 15, tpm: 250000, rpd: 250,
           useCases: ['generation', 'quick_check', 'all']
         },
-        'flash-1.5': {
-          name: 'gemini-1.5-flash',
-          rpm: 15, tpm: 1000000, rpd: 1500,
-          useCases: ['fallback', 'high_volume']
+        'flash-lite': {
+          name: 'gemini-2.5-flash-lite',
+          rpm: 30, tpm: 1000000, rpd: 1000,
+          useCases: ['fallback', 'high_volume', 'quick_check']
         }
       };
     }
@@ -59,9 +59,9 @@ class GeminiRateLimiter {
     } else {
       // Fallback default
       this.strategies = {
-        'quick_check': ['flash-2.5', 'flash-1.5'],
-        'generation': ['flash-2.5', 'flash-1.5'],
-        'fallback': ['flash-1.5', 'flash-2.5']
+        'quick_check': ['flash-lite', 'flash-2.5'],
+        'generation': ['flash-2.5', 'flash-lite'],
+        'fallback': ['flash-lite', 'flash-2.5']
       };
     }
     
@@ -165,24 +165,7 @@ class GeminiRateLimiter {
     return pacificDate;
   }
   
-  /**
-   * Check se siamo dopo il reset (Mezzanotte Pacifico)
-   * FIX Bug #7: Usa direttamente l'ora di Los Angeles per gestire PST/PDT automaticamente
-   */
-  _isAfterPacificReset() {
-    const now = new Date();
-    // Ottieni ora corrente di Los Angeles (0-23)
-    const laHour = parseInt(Utilities.formatDate(now, 'America/Los_Angeles', 'H'));
-    
-    // Il reset avviene a mezzanotte LA (0:00).
-    // Se l'ora LA è >= 0 (sempre vero), siamo nel nuovo giorno Pacifico?
-    // In realtà la logica deve essere: ha senso controllare l'ora italiana per sapere se il reset è avvenuto?
-    // No, meglio affidarsi al cambio data _getPacificDate() già implementato in _initializeCounters.
-    // Questa funzione serve solo per log/debug o logica intra-day.
-    // Se laHour è piccolo (es. 0, 1, 2...), il reset è appena avvenuto.
-    
-    return laHour >= 0; // Sempre true tecnicamente, ma la logica vera è nel cambio data
-  }
+  // NOTE: _isAfterPacificReset() removed - redundant with _initializeCounters() date change logic
   
   // ================================================================
   // MODEL SELECTION (Sincrono)
