@@ -120,28 +120,42 @@ class MemoryService {
       return;
     }
     
-    // ✅ FIX Bug 16: Robust update with retry mechanism and version checking
+    // ✅ FIX Bug 16 + BUG-1: Robust update with retry mechanism, version checking,
+    // AND fresh data re-merge on each retry to prevent stale writes
     const MAX_RETRIES = 3;
     const lock = LockService.getScriptLock();
+    
+    // Store original newData fields (excluding internal fields like _expectedVersion)
+    const originalNewData = {};
+    for (const key in newData) {
+      if (!key.startsWith('_')) {
+        originalNewData[key] = newData[key];
+      }
+    }
     
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         lock.waitLock(10000); // Increased wait time
         
+        // ✅ BUG-1 FIX: Re-read fresh data on EACH attempt (not just first)
         const existingRow = this._findRowByThreadId(threadId);
         const now = new Date().toISOString();
         
         if (existingRow) {
+           // ✅ Always get fresh data from sheet (critical for retry after VERSION_MISMATCH)
            const existingData = this._rowToObject(existingRow.values);
            const currentVersion = existingData.version || 0;
 
-           // ✅ OPTIMISTIC LOCKING CHECK
+           // ✅ OPTIMISTIC LOCKING CHECK (only if caller provided expected version)
            if (newData._expectedVersion !== undefined && newData._expectedVersion !== currentVersion) {
               console.warn(`🔒 Optimistic Lock Mismatch for thread ${threadId}: expected ${newData._expectedVersion}, got ${currentVersion}`);
-              throw new Error('VERSION_MISMATCH'); // Will trigger retry (or fail if logic dictates)
+              // Update expected version for next retry
+              newData._expectedVersion = currentVersion;
+              throw new Error('VERSION_MISMATCH');
            }
            
-           const mergedData = Object.assign({}, existingData, newData);
+           // ✅ BUG-1 FIX: Merge originalNewData with FRESH existingData
+           const mergedData = Object.assign({}, existingData, originalNewData);
            mergedData.lastUpdated = now;
            mergedData.messageCount = (existingData.messageCount || 0) + 1;
            mergedData.version = currentVersion + 1; // Increment version
@@ -149,11 +163,12 @@ class MemoryService {
            this._updateRow(existingRow.rowIndex, mergedData);
            console.log(`🧠 Memory updated for thread ${threadId} (v${mergedData.version}, Attempt ${attempt+1})`);
         } else {
-           newData.threadId = threadId;
-           newData.lastUpdated = now;
-           newData.messageCount = 1;
-           newData.version = 1; // Init version
-           this._appendRow(newData);
+           const insertData = Object.assign({}, originalNewData);
+           insertData.threadId = threadId;
+           insertData.lastUpdated = now;
+           insertData.messageCount = 1;
+           insertData.version = 1; // Init version
+           this._appendRow(insertData);
            console.log(`🧠 Memory created for thread ${threadId} (v1)`);
         }
         
@@ -164,8 +179,8 @@ class MemoryService {
         
       } catch (error) {
         if (error.message === 'VERSION_MISMATCH') {
-            // FIX Bug #3: Refresh fresh data before retry to prevent stale merge
-            console.warn(`⚠️ Version mismatch, refreshing fresh data and retrying... (Attempt ${attempt+1})`);
+            // BUG-1 FIX: Log and continue - fresh data will be re-read on next iteration
+            console.warn(`⚠️ Version mismatch, will re-read fresh data on retry... (Attempt ${attempt+1})`);
         } else {
              console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
         }
@@ -184,6 +199,7 @@ class MemoryService {
       }
     }
   }
+
   
   /**
    * Aggiorna memoria E topic in un'unica operazione atomica

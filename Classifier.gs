@@ -156,16 +156,40 @@ class EmailClassifier {
   
   /**
     * Estrae contenuto principale, rimuovendo citazioni e firme
+    * ✅ BUG-4 FIX: Enhanced to handle HTML blockquotes and various email client formats
     */
    _extractMainContent(body) {
+     // ✅ BUG-4 FIX: Pre-process - strip HTML blockquotes before text processing
+     let processedBody = body;
+     
+     // Remove <blockquote> tags and their content (common in HTML emails)
+     processedBody = processedBody.replace(/<blockquote[^>]*>[\s\S]*?<\/blockquote>/gi, '');
+     
+     // Remove div.gmail_quote and similar (Gmail-specific)
+     processedBody = processedBody.replace(/<div\s+class=["']gmail_quote["'][^>]*>[\s\S]*?<\/div>/gi, '');
+     
+     // Remove outlook-style quotes
+     processedBody = processedBody.replace(/<div\s+id=["']?divRplyFwdMsg["']?[^>]*>[\s\S]*?$/gi, '');
+     
+     // ✅ BUG-4 FIX: Enhanced quote markers for various email clients
      const quoteMarkers = [
-       /^>.*$/m,
-       /^On .* wrote:.*$/m,
-       /^Il giorno .* ha scritto:.*$/m,
-       /^-{3,}.*Original Message.*$/m
+       /^>.*$/m,                                      // Standard > prefix
+       /^On .* wrote:.*$/m,                          // English Gmail/Outlook
+       /^Il giorno .* ha scritto:.*$/m,              // Italian Gmail
+       /^Il .* alle .* .* ha scritto:.*$/m,          // Italian Apple Mail
+       /^Da:.*$/m,                                   // Italian forward header
+       /^From:.*Sent:.*$/m,                          // Outlook forward
+       /^-{3,}.*Original Message.*$/m,               // Outlook separator
+       /^-{3,}.*Messaggio originale.*$/m,            // Italian Outlook separator
+       /^_{3,}$/m,                                   // Thunderbird separator
+       /^Begin forwarded message:.*$/m,              // Apple Mail forward
+       /^Inizio messaggio inoltrato:.*$/m,           // Italian Apple Mail forward
+       /^-------- Forwarded Message --------$/m,    // Thunderbird forward
+       /^\*From:\*.*$/m,                             // Bold markdown-style quote
+       /^Le .* à .* .* a écrit.*$/m                 // French Gmail
      ];
      
-     const lines = body.split('\n');
+     const lines = processedBody.split('\n');
      const cleanLines = [];
      
      for (const line of lines) {
@@ -218,6 +242,7 @@ class EmailClassifier {
      
      return content;
    }
+
 
   /**
    * Controlla se acknowledgment ultra-semplice (≤3 parole, nessuna domanda)
