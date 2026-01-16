@@ -24,8 +24,8 @@ const CONFIG = {
   
   // === Gmail ===
   LABEL_NAME: 'IA',
-  ERROR_LABEL_NAME: 'IA-Error',
-  VALIDATION_ERROR_LABEL: 'IA_VALIDATION_ERROR',
+  ERROR_LABEL_NAME: 'Errore',             // Richiesto da utente: "Errore"
+  VALIDATION_ERROR_LABEL: 'Verifica',     // Richiesto da utente: "Verifica"
   MAX_EMAILS_PER_RUN: 10,
   GMAIL_LABEL_CACHE_TTL: 3600000, // 1 Hour (ms)
   MAX_HISTORY_MESSAGES: 10,       // Max messaggi in cronologia (thread context)
