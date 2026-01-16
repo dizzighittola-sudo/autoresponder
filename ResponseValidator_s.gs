@@ -65,9 +65,9 @@ class ResponseValidator {
     
     // Pattern firma (case-insensitive) - supporta Multilingua
     this.signaturePatterns = [
-      /segreteria\s+parrocchia/i,                                        // IT (Sanitizzato)
-      /parish\s+secretariat/i,                                           // EN (Sanitizzato)
-      /secretar[ií]a\s+parroquial/i                                     // ES (Sanitizzato)
+      /segreteria\s+parrocchia\s+\[NOME\]/i,         // IT
+      /parish\s+secretariat\s+(of\s+)?\[NOME\]/i,    // EN
+      /secretar[ií]a\s+parroquial/i                  // ES
     ];
     
     console.log('✓ ResponseValidator inizializzato');
@@ -268,7 +268,7 @@ class ResponseValidator {
     const hasValidSignature = this.signaturePatterns.some(pattern => pattern.test(response));
     
     if (!hasValidSignature) {
-      warnings.push("Missing valid signature (e.g. 'Segreteria Parrocchia [NOME]')");
+      warnings.push("Missing valid signature (e.g. 'Segreteria Parrocchia [NOME PARROCCHIA]')");
       score = 0.95;
     }
     

@@ -213,19 +213,14 @@ class PromptEngine {
       
       // Re-check size
       if (Math.round(prompt.length / 4) > MAX_SAFE_TOKENS) {
-         // Strategy 2: Truncate Knowledge Base (aggressive but necessary)
-         console.log('truncation: Truncating Knowledge Base (keeping 50%).');
+         // Strategy 2: Truncate Knowledge Base (semantic paragraph-based)
+         // ✅ BUG-5 FIX: Use paragraph-based truncation to preserve context
+         console.log('truncation: Truncating Knowledge Base semantically.');
          const kbIndex = sections.findIndex(s => s.includes('INFORMAZIONI DI RIFERIMENTO'));
          if (kbIndex !== -1) {
-             const kbContent = knowledgeBase;
-             // Keep first 25% and last 25% of the *original* KB size relative to budget
-             const budgetChars = MAX_SAFE_TOKENS * 4 * 0.5; // 50% of budget for KB
-             if (kbContent.length > budgetChars) {
-                 const half = Math.floor(budgetChars / 2);
-                 const truncatedKB = kbContent.substring(0, half) + '\n\n... [PARTE CENTRALE OMESSA PER LIMITI LUNGHEZZA] ...\n\n' + kbContent.substring(kbContent.length - half);
-                 sections[kbIndex] = this._renderKnowledgeBase(truncatedKB);
-                 prompt = sections.join('\n\n') + '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
-             }
+             const truncatedKB = this._truncateKbSemantically(knowledgeBase, MAX_SAFE_TOKENS);
+             sections[kbIndex] = this._renderKnowledgeBase(truncatedKB);
+             prompt = sections.join('\n\n') + '\n\n**Genera la risposta completa seguendo le linee guida sopra:**';
          }
       }
     } else {
@@ -269,18 +264,18 @@ GIUSTO ✅: "Grazie, vi contatteremo..."
 ❌ ERRORE #2: LINK CON URL RIPETUTO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-SBAGLIATO ❌: [tinyurl.com/santiago26](https://tinyurl.com/santiago26)
-SBAGLIATO ❌: [https://tinyurl.com/santiago26](https://tinyurl.com/santiago26)
-SBAGLIATO ❌: [tinyurl.com/cammino26](tinyurl.com/cammino26)
+SBAGLIATO ❌: [[LINK_PELLEGRINAGGIO]](https://[LINK_PELLEGRINAGGIO])
+SBAGLIATO ❌: [https://[LINK_PELLEGRINAGGIO]](https://[LINK_PELLEGRINAGGIO])
+SBAGLIATO ❌: [[LINK_PROGRAMMA]]([LINK_PROGRAMMA])
 
-GIUSTO ✅: Iscrizione online: https://tinyurl.com/santiago26
-GIUSTO ✅: Programma completo: https://tinyurl.com/cammino26
-GIUSTO ✅: Modulo iscrizione: https://tinyurl.com/prematri
+GIUSTO ✅: Iscrizione online: https://[LINK_PELLEGRINAGGIO]
+GIUSTO ✅: Programma completo: https://[LINK_PROGRAMMA]
+GIUSTO ✅: Modulo iscrizione: https://[LINK_ISCRIZIONE]
 
 📌 REGOLA: MAI ripetere l'URL sia dentro [] che dentro ()
 
 ESEMPI CORRETTI PER RIFERIMENTO:
-• Iscrizione: https://tinyurl.com/santiago26 
+• Iscrizione: https://[LINK_PELLEGRINAGGIO] 
 • Clicca qui: https://example.com
 • Maggiori info: https://link.it
 
@@ -761,10 +756,10 @@ ${directives}
    → Dopo una virgola, la frase CONTINUA in minuscolo!
 
 2. **FORMATO LINK CORRETTO**
-   ✅ GIUSTO: Iscrizione online: https://tinyurl.com/santiago26
-   ✅ GIUSTO: Programma completo: https://tinyurl.com/cammino26
-   ❌ SBAGLIATO: [tinyurl.com/santiago26](https://tinyurl.com/santiago26)
-   ❌ SBAGLIATO: [https://tinyurl.com/santiago26](https://tinyurl.com/santiago26)
+   ✅ GIUSTO: Iscrizione online: https://[LINK_PELLEGRINAGGIO]
+   ✅ GIUSTO: Programma completo: https://[LINK_PROGRAMMA]
+   ❌ SBAGLIATO: [[LINK_PELLEGRINAGGIO]](https://[LINK_PELLEGRINAGGIO])
+   ❌ SBAGLIATO: [https://[LINK_PELLEGRINAGGIO]](https://[LINK_PELLEGRINAGGIO])
 
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -802,9 +797,7 @@ ${directives}
 ❌ Quando 1-2 info bastano
 
 Esempio NON formattato (corretto così):
-"La catechesi inizia domenica 21 settembre alle ore 10:00 in Aula Magna."
-
-═══════════════════════════════════════════════════════════════════════════`;
+"La catechesi inizia domenica 21 settembre alle ore 10:00 in Aula Magna."`;
   }
   
   // ========================================================================
@@ -983,25 +976,25 @@ Buonasera, siamo lieti di fornirle le informazioni sul pellegrinaggio.
 **📍 Percorso:** Tui (Portogallo) → Santiago (Spagna)
 
 **🔗 Iscrizioni e Info:**
-• Iscrizione online: https://tinyurl.com/santiago26
-• Programma dettagliato: https://tinyurl.com/cammino26
+• Iscrizione online: https://[LINK_PELLEGRINAGGIO]
+• Programma dettagliato: https://[LINK_PROGRAMMA]
 
 **📞 Contatti:**
-• Email: tua@parrocchia.com
-• Tel: 06 12345678
+• Email: [EMAIL]
+• Tel: [TELEFONO]
 
 Restiamo a disposizione per qualsiasi chiarimento.
 
 Cordiali saluti,
-Segreteria Parrocchia [NOME]
+Segreteria Parrocchia [NOME PARROCCHIA]
 \`\`\`
 
 ❌ VERSIONE SBAGLIATA (DA EVITARE):
 \`\`\`markdown
 Buonasera, Siamo lieti di fornirle... ← ERRORE: maiuscola dopo virgola
 
-• Iscrizione: [tinyurl.com/santiago26](https://tinyurl.com/santiago26) ← ERRORE: URL ripetuto
-• Programma: [https://tinyurl.com/cammino26](https://tinyurl.com/cammino26) ← ERRORE: URL ripetuto
+• Iscrizione: [[LINK_PELLEGRINAGGIO]](https://[LINK_PELLEGRINAGGIO]) ← ERRORE: URL ripetuto
+• Programma: [https://[LINK_PROGRAMMA]](https://[LINK_PROGRAMMA]) ← ERRORE: URL ripetuto
 
 Restiamo A Disposizione... ← ERRORE: maiuscole casuali
 \`\`\`
@@ -1026,7 +1019,7 @@ Buongiorno, ecco gli orari delle Sante Messe.
 ⏰ 9:30 | 11:00 | 12:15 | 13:15 | 17:30 | 19:00
 
 Cordiali saluti,
-Segreteria Parrocchia [NOME]
+Segreteria Parrocchia [NOME PARROCCHIA]
 \`\`\`
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -1053,7 +1046,7 @@ Segreteria Parrocchia [NOME]
    ${salutation}
    [Concise and relevant body - ✅ USE FORMATTING IF APPROPRIATE]
    ${closing}
-   Parish Secretariat of [NAME]`;
+   Parish Secretariat of [NOME PARROCCHIA]`;
       contentSection = `2. **Content:**
    • Answer ONLY what is asked
    • Use ONLY information from the knowledge base
@@ -1073,7 +1066,7 @@ Segreteria Parrocchia [NOME]
    ${salutation}
    [Cuerpo conciso y pertinente - ✅ USA FORMATO SI ES APROPIADO]
    ${closing}
-   Secretaría Parroquia [NOMBRE]`;
+   Secretaría Parroquia [NOME PARROCCHIA]`;
       contentSection = `2. **Contenido:**
    • Responde SOLO lo que se pregunta
    • Usa SOLO información de la base de conocimientos
@@ -1093,7 +1086,7 @@ Segreteria Parrocchia [NOME]
    ${salutation}
    [Corpo conciso e pertinente - ✅ USA FORMATTAZIONE SE APPROPRIATO]
    ${closing}
-   Segreteria Parrocchia [NOME]`;
+   Segreteria Parrocchia [NOME PARROCCHIA]`;
       contentSection = `2. **Contenuto:**
    • Rispondi SOLO a ciò che è chiesto
    • Usa SOLO info dalla knowledge base
@@ -1155,14 +1148,14 @@ ALLORA:
 Esempio di risposta CORRETTA per persona divorziata:
 "Comprendiamo la delicatezza della sua situazione. Per poter valutare insieme 
 il suo caso specifico, le consigliamo di parlare direttamente con un sacerdote.
-Può contattarci per fissare un appuntamento: Tel. 06 12345678.
+Può contattarci per fissare un appuntamento: Tel. [TELEFONO].
 Restiamo a disposizione."
 
 Esempio SBAGLIATO (da evitare):
 "Per il matrimonio servono: certificato di battesimo, corso prematrimoniale..."
 → Queste info NON vanno date se c'è un impedimento potenziale!
 
-// [CONFIGURAZIONE] Sostituire [NOME] e riferimenti con i dati reali della propria parrocchia
+═══════════════════════════════════════════════════════════════════════════`;
   }
   
   // ========================================================================
@@ -1210,7 +1203,69 @@ Prima di generare la risposta, verifica mentalmente:
   estimateTokens(text) {
     return Math.round(text.length / 4);
   }
+  
+  // ========================================================================
+  // BUG-5 FIX: SEMANTIC KB TRUNCATION
+  // ========================================================================
+  
+  /**
+   * Truncate KB semantically by paragraphs to preserve context
+   * Instead of cutting mid-sentence, keeps complete paragraphs until budget is reached
+   * @param {string} kbContent - Original KB content
+   * @param {number} maxTokens - Maximum tokens allowed for entire prompt
+   * @returns {string} - Truncated KB
+   */
+  _truncateKbSemantically(kbContent, maxTokens) {
+    // Budget: ~50% of max tokens for KB (in chars, approx 4 chars/token)
+    const budgetChars = maxTokens * 4 * 0.5;
+    
+    // If already within budget, return as-is
+    if (kbContent.length <= budgetChars) {
+      return kbContent;
+    }
+    
+    // Split into paragraphs (double newline or section markers)
+    const paragraphs = kbContent.split(/\n{2,}|(?=═{3,})|(?=─{3,})/);
+    
+    let result = [];
+    let currentLength = 0;
+    const truncationMarker = '\n\n... [SEZIONI OMESSE PER LIMITI LUNGHEZZA - INFO PRINCIPALI PRESERVATE] ...\n\n';
+    const markerLength = truncationMarker.length;
+    
+    // Add paragraphs until we hit ~80% of budget (leave room for marker)
+    const targetLength = budgetChars * 0.8;
+    
+    for (const para of paragraphs) {
+      const trimmedPara = para.trim();
+      if (!trimmedPara) continue;
+      
+      // Check if adding this paragraph would exceed budget
+      if (currentLength + trimmedPara.length + markerLength > targetLength) {
+        // Check if we have at least some content
+        if (result.length > 0) {
+          break;
+        }
+        // If first paragraph is too long, take a portion of it
+        result.push(trimmedPara.substring(0, Math.floor(targetLength * 0.7)));
+        break;
+      }
+      
+      result.push(trimmedPara);
+      currentLength += trimmedPara.length + 2; // +2 for rejoining with \n\n
+    }
+    
+    // Construct truncated KB
+    const truncatedContent = result.join('\n\n');
+    
+    // Log truncation stats
+    const originalParagraphs = paragraphs.filter(p => p.trim()).length;
+    const keptParagraphs = result.length;
+    console.log(`📦 KB Truncated: ${keptParagraphs}/${originalParagraphs} paragraphs (${truncatedContent.length}/${kbContent.length} chars)`);
+    
+    return truncatedContent + truncationMarker;
+  }
 }
+
 
 // Funzione factory
 function createPromptEngine() {

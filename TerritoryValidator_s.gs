@@ -5,30 +5,9 @@
 class TerritoryValidator {
   constructor() {
     // Database territorio con vie e numeri civici accettati
-    this.territory = {
-      // ESEMPI DI CONFIGURAZIONE - Sostituire con le vie reali della parrocchia
-      'via roma': {tutti: true},
-      'piazza italia': {tutti: true},
-      'corso garibaldi': {dispari: [1, 50], pari: [2, 48]},
-      'via dante alighieri': {tutti: [10, 100]},
-      // Aggiungere qui le altre vie...
-      /*
-      FORMATO CONFIGURAZIONE:
-      'nome via': rule
-
-      TIPI DI REGOLE:
-      1. Tutta la via è nel territorio:
-         {tutti: true}
-      
-      2. Range specifico (tutti i numeri in quel range):
-         {tutti: [min, max]}  (max può essere null per "in poi")
-
-      3. Numeri pari/dispari differenziati:
-         {
-           dispari: [min, max],
-           pari: [min, max]
-         }
-      */
+    // SANITIZZATO PER GITHUB
+    this.territory = { 
+        /* DATI SENSIBILI RIMOSSI */ 
     };
   }
   
