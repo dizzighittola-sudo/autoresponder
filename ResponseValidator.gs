@@ -1,0 +1,550 @@
+// ====================================================================
+// RESPONSE VALIDATOR - Validazione risposte AI
+// Controlla qualità e sicurezza delle risposte generate
+// ====================================================================
+
+/**
+ * ResponseValidator - Validatore risposte AI
+ * 
+ * CONTROLLI CRITICI:
+ * ✅ Lunghezza (troppo corta/lunga = UX negativa)
+ * ✅ Consistenza lingua (critico per multilingua)
+ * ✅ Frasi vietate (indicatori allucinazione)
+ * ✅ Placeholder (risposta incompleta)
+ * ✅ Firma obbligatoria (identità brand)
+ * ✅ Dati allucinati (email, telefoni, orari non in KB)
+ * ✅ Maiuscola dopo virgola (errore grammaticale)
+ * 
+ * FUNZIONALITÀ:
+ * ✅ Rilevamento placeholder intelligente (ellissi vs placeholder)
+ * ✅ Validazione telefono con soglia 8+ cifre
+ * ✅ Normalizzazione orari (9.30 → 09:30)
+ */
+class ResponseValidator {
+  constructor() {
+    console.log('🔍 Inizializzazione ResponseValidator...');
+    
+    // Ottieni config - fallback a default se CONFIG non definito
+    const strictMode = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_STRICT_MODE : false;
+    const minScore = typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_MIN_SCORE : 0.6;
+    
+    // Soglia minima accettabile
+    this.MIN_VALID_SCORE = strictMode ? 0.8 : minScore;
+    this.STRICT_MODE_SCORE = 0.8;
+    
+    // Soglie lunghezza
+    this.MIN_LENGTH_CHARS = 25;
+    this.OPTIMAL_MIN_LENGTH = 100;
+    this.WARNING_MAX_LENGTH = 3000;
+    
+    // Frasi vietate (indicatori di incertezza/allucinazione)
+    this.forbiddenPhrases = [
+      'non ho abbastanza informazioni',
+      'non posso rispondere',
+      'mi dispiace ma non',
+      'scusa ma non',
+      'purtroppo non posso',
+      'non sono sicuro',
+      'non sono sicura',
+      'potrebbe essere',
+      'probabilmente',
+      'forse',
+      'suppongo',
+      'immagino'
+    ];
+    
+    // Marcatori lingua (costante condivisa se disponibile, altrimenti locale)
+    this.languageMarkers = typeof LANGUAGE_MARKERS !== 'undefined' ? LANGUAGE_MARKERS : {
+      'it': ['grazie', 'cordiali', 'saluti', 'gentile', 'parrocchia', 'messa', 'vorrei', 'quando'],
+      'en': ['thank', 'regards', 'dear', 'parish', 'mass', 'church', 'would', 'could'],
+      'es': ['gracias', 'saludos', 'estimado', 'parroquia', 'misa', 'iglesia', 'querría']
+    };
+    
+    // Placeholder
+    this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
+    
+    // Pattern firma (case-insensitive) - supporta Multilingua
+    this.signaturePatterns = [
+      /segreteria\s+parrocchia\s+sant['\u2018\u2019]?eugenio/i,         // IT
+      /parish\s+secretariat\s+(of\s+)?sant['\u2018\u2019]?eugenio/i,    // EN
+      /secretar[ií]a\s+parroquial/i                                     // ES
+    ];
+    
+    console.log('✓ ResponseValidator inizializzato');
+    console.log(`   Soglia minima validità: ${this.MIN_VALID_SCORE}`);
+  }
+  
+  /**
+   * Valida risposta in modo completo
+   * ✅ 7 controlli di sicurezza
+   * @param {string} salutationMode - 'full'|'soft'|'none_or_continuity' per controlli contestuali
+   */
+  validateResponse(response, detectedLanguage, knowledgeBase, emailContent, emailSubject, salutationMode = 'full') {
+    const errors = [];
+    const warnings = [];
+    const details = {};
+    let score = 1.0;
+    
+    console.log(`🔍 Validating response (${response.length} chars, lang=${detectedLanguage})...`);
+    
+    // === CHECK 1: Length (CRITICAL for UX) ===
+    const lengthResult = this._checkLength(response);
+    errors.push(...lengthResult.errors);
+    warnings.push(...lengthResult.warnings);
+    details.length = lengthResult;
+    score *= lengthResult.score;
+    
+    // === CHECK 2: Language Consistency (CRITICAL for multilingual) ===
+    const langResult = this._checkLanguage(response, detectedLanguage);
+    errors.push(...langResult.errors);
+    warnings.push(...langResult.warnings);
+    details.language = langResult;
+    score *= langResult.score;
+    
+    // === CHECK 3: Signature (CRITICAL for brand identity, optional in follow-ups) ===
+    const sigResult = this._checkSignature(response, salutationMode);
+    errors.push(...sigResult.errors);
+    warnings.push(...sigResult.warnings);
+    details.signature = sigResult;
+    score *= sigResult.score;
+    
+    // === CHECK 4: Forbidden Content (CRITICAL) ===
+    const contentResult = this._checkForbiddenContent(response);
+    errors.push(...contentResult.errors);
+    details.content = contentResult;
+    score *= contentResult.score;
+    
+    // === CHECK 5: Hallucinations (CRITICAL) ===
+    const hallucResult = this._checkHallucinations(response, knowledgeBase);
+    errors.push(...hallucResult.errors);
+    warnings.push(...hallucResult.warnings);
+    details.hallucinations = hallucResult;
+    score *= hallucResult.score;
+    
+    // === CHECK 6: Capital After Comma (Grammar - CRITICAL for Italian) ===
+    const capResult = this._checkCapitalAfterComma(response, detectedLanguage);
+    errors.push(...capResult.errors);
+    warnings.push(...capResult.warnings);
+    details.capitalAfterComma = capResult;
+    score *= capResult.score;
+    
+    // === DETERMINE VALIDITY ===
+    const isValid = errors.length === 0 && score >= this.MIN_VALID_SCORE;
+    
+    // === LOG RESULTS ===
+    if (errors.length > 0) {
+      console.warn(`❌ Validation FAILED: ${errors.length} error(s)`);
+      errors.forEach((err, i) => console.warn(`   ${i + 1}. ${err}`));
+    }
+    
+    if (warnings.length > 0) {
+      console.log(`⚠️  ${warnings.length} warning(s)`);
+      warnings.slice(0, 3).forEach((warn, i) => console.log(`   ${i + 1}. ${warn}`));
+      if (warnings.length > 3) {
+        console.log(`   ... and ${warnings.length - 3} more`);
+      }
+    }
+    
+    if (isValid) {
+      console.log(`✓ Validation PASSED (score: ${score.toFixed(2)})`);
+    } else {
+      console.warn(`✗ Validation FAILED (score: ${score.toFixed(2)}, threshold: ${this.MIN_VALID_SCORE})`);
+    }
+    
+    return {
+      isValid: isValid,
+      score: score,
+      errors: errors,
+      warnings: warnings,
+      details: details,
+      metadata: {
+        responseLength: response.length,
+        expectedLanguage: detectedLanguage,
+        threshold: this.MIN_VALID_SCORE
+      }
+    };
+  }
+  
+  // ========================================================================
+  // CONTROLLI DI VALIDAZIONE (Metodi Privati)
+  // ========================================================================
+  
+  /**
+   * Check 1: Validazione lunghezza
+   */
+  _checkLength(response) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    const length = response.trim().length;
+    
+    if (length < this.MIN_LENGTH_CHARS) {
+      errors.push(`Response too short (${length} chars, min ${this.MIN_LENGTH_CHARS})`);
+      score = 0.0;
+    } else if (length < this.OPTIMAL_MIN_LENGTH) {
+      warnings.push(`Response quite short (${length} chars)`);
+      score *= 0.85;
+    } else if (length > this.WARNING_MAX_LENGTH) {
+      warnings.push(`Response very long (${length} chars, may be verbose)`);
+      score *= 0.95;
+    }
+    
+    return { score, errors, warnings, length };
+  }
+  
+  /**
+   * Check 2: Consistenza lingua
+   */
+  _checkLanguage(response, expectedLanguage) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    const responseLower = response.toLowerCase();
+    
+    // Rileva lingua attuale usando marcatori
+    const markerScores = {};
+    for (const lang in this.languageMarkers) {
+      markerScores[lang] = this.languageMarkers[lang].reduce((count, marker) => {
+        return count + (responseLower.includes(marker) ? 1 : 0);
+      }, 0);
+    }
+    
+    // Scegli lingua con punteggio più alto
+    let detectedLang = expectedLanguage;
+    let maxScore = 0;
+    for (const lang in markerScores) {
+      if (markerScores[lang] > maxScore) {
+        maxScore = markerScores[lang];
+        detectedLang = lang;
+      }
+    }
+    
+    // Verifica corrispondenza
+    if (detectedLang !== expectedLanguage) {
+      if (markerScores[detectedLang] >= 3 && markerScores[expectedLanguage] < 2) {
+        errors.push(
+          `Language mismatch: expected ${expectedLanguage.toUpperCase()}, ` +
+          `detected ${detectedLang.toUpperCase()}`
+        );
+        score *= 0.30;
+      } else {
+        warnings.push('Possible language inconsistency');
+        score *= 0.85;
+      }
+    }
+    
+    // Verifica lingue miste
+    const highScoringLangs = Object.keys(markerScores).filter(
+      lang => markerScores[lang] >= 3
+    );
+    
+    if (highScoringLangs.length > 1) {
+      warnings.push(`Possible mixed languages: ${highScoringLangs.join(', ')}`);
+      score *= 0.85;
+    }
+    
+    return { score, errors, warnings, detectedLang, markerScores };
+  }
+  
+  /**
+   * Check 3: Firma (obbligatoria su primo contatto, opzionale su follow-up)
+   * @param {string} salutationMode - 'full'|'soft'|'none_or_continuity'
+   */
+  _checkSignature(response, salutationMode = 'full') {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    // NEI FOLLOW-UP RAVVICINATI LA FIRMA È OPZIONALE (non vietata, ma non richiesta)
+    if (salutationMode === 'none_or_continuity') {
+      // Skip check: Gemini può includerla o meno, entrambi sono validi
+      return { score, errors, warnings };
+    }
+    
+    // Per primo contatto ('full') e riprese dopo pausa ('soft'): firma attesa
+    // FIX BUG: Supporta signature multilingua
+    const hasValidSignature = this.signaturePatterns.some(pattern => pattern.test(response));
+    
+    if (!hasValidSignature) {
+      warnings.push("Missing valid signature (e.g. 'Segreteria Parrocchia Sant'Eugenio')");
+      score = 0.95;
+    }
+    
+    return { score, errors, warnings };
+  }
+  
+  /**
+   * Check 4: Contenuto vietato e placeholder
+   * ✅ Rilevamento placeholder intelligente
+   */
+  _checkForbiddenContent(response) {
+    const errors = [];
+    let score = 1.0;
+    
+    const responseLower = response.toLowerCase();
+    
+    // Controlla frasi vietate (indicatori incertezza)
+    const foundForbidden = this.forbiddenPhrases.filter(
+      phrase => responseLower.includes(phrase)
+    );
+    
+    if (foundForbidden.length > 0) {
+      errors.push(`Contiene frasi di incertezza: ${foundForbidden.slice(0, 2).join(', ')}`);
+      score *= 0.50;
+    }
+    
+    // Rilevamento placeholder intelligente
+    const foundPlaceholders = [];
+    for (const p of this.placeholders) {
+      // Per '...', verifica se usato come placeholder (non ellissi nel testo)
+      if (p === '...') {
+        // Cerca pattern come [...] o "..." a fine frase
+        if (/\[\.\.\.]/g.test(response) || /\.\.\.\s*$/g.test(response)) {
+          foundPlaceholders.push(p);
+        }
+      } else if (responseLower.includes(p.toLowerCase())) {
+        foundPlaceholders.push(p);
+      }
+    }
+    
+    if (foundPlaceholders.length > 0) {
+      errors.push(`Contains placeholders: ${foundPlaceholders.join(', ')}`);
+      score = 0.0;
+    }
+    
+    // Verifica perdita NO_REPLY
+    if (response.includes('NO_REPLY') && response.trim().length > 20) {
+      errors.push("Contains 'NO_REPLY' instruction (should have been filtered)");
+      score = 0.0;
+    }
+    
+    return { score, errors, foundForbidden, foundPlaceholders };
+  }
+  
+  /**
+   * Check 5: Allucinazioni (dati inventati non in KB)
+   * ✅ Telefono 8+ cifre, normalizzazione orari
+   */
+  _checkHallucinations(response, knowledgeBase) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    const hallucinations = {};
+    const safeKnowledgeBase = typeof knowledgeBase === 'string' ? knowledgeBase : '';
+    
+    // Helper normalizzazione orari
+    // FIX Bug #5: Sostituisce solo pattern orari validi, evita URL come page.19.html (richiede 2+ caratteri prima/dopo)
+    const normalizeTime = (t) => {
+      // ✅ Stronger exclusion pattern: 2+ lettere prima E dopo
+      if (/[a-z]{2,}\.\d{1,2}\.[a-z]{2,}/i.test(t)) return t;
+      
+      // Oppure: verifica se contesto è file/URL (estensione file)
+      if (/\/([\w-]+\.\d{1,2}\.\w+)$/i.test(t)) return t;
+
+      t = t.replace(/\b(\d{1,2})\.([0-5]\d)\b/g, (match, h, m) => {
+        const hour = parseInt(h, 10);
+        // Solo orari validi (0-23), altrimenti lascia invariato
+        if (hour >= 0 && hour <= 23) return `${h}:${m}`;
+        return match;
+      });
+      const parts = t.split(':');
+      if (parts.length === 2) {
+        try {
+          const h = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          if (!isNaN(h) && !isNaN(m)) {
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          }
+        } catch (e) {
+          return t;
+        }
+      }
+      return t;
+    };
+    
+    // Helper normalizzazione telefono
+    const normalizePhone = (p) => p.replace(/\D/g, '');
+    
+    // === Controllo 1: Orari ===
+    // OPT-2: Improved pattern to avoid filename false positives (e.g., page.19.html)
+    // Requires digit NOT preceded by letter+dot and NOT followed by dot+letter
+    const timePattern = /(?<![a-z]\.)\b\d{1,2}[:.]\d{2}\b(?!\.[a-z])/gi;
+    const responseTimesRaw = response.match(timePattern) || [];
+    const kbTimesRaw = safeKnowledgeBase.match(timePattern) || [];
+    
+    const responseTimes = new Set(responseTimesRaw.map(normalizeTime));
+    const kbTimes = new Set(kbTimesRaw.map(normalizeTime));
+    const inventedTimes = [...responseTimes].filter(t => !kbTimes.has(t));
+    
+    if (inventedTimes.length > 0) {
+      warnings.push(`Times not in KB: ${inventedTimes.join(', ')}`);
+      score *= 0.85;
+      hallucinations.times = inventedTimes;
+    }
+    
+    // === Controllo 2: Indirizzi Email ===
+    // FIX BUG-6: Require local-part to start with alphanumeric (prevent .@domain.com)
+    const emailPattern = /\b[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9-]+\.[A-Za-z]{2,}\b/gi;
+    const responseEmails = new Set(
+      (response.match(emailPattern) || []).map(e => e.toLowerCase())
+    );
+    const kbEmails = new Set(
+      (safeKnowledgeBase.match(emailPattern) || []).map(e => e.toLowerCase())
+    );
+    const inventedEmails = [...responseEmails].filter(e => !kbEmails.has(e));
+    
+    if (inventedEmails.length > 0) {
+      errors.push(`Email addresses not in KB: ${inventedEmails.join(', ')}`);
+      score *= 0.50;
+      hallucinations.emails = inventedEmails;
+    }
+    
+    // === Controllo 3: Numeri di Telefono ===
+    // FIX: Relax phone pattern to accept international codes and 9-digit numbers (green numbers), and +39
+    const phonePattern = /\b(?:\+?\d{1,3}[-.\s]?)?(?:0\d|3\d{2}|8\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
+    const responsePhonesRaw = response.match(phonePattern) || [];
+    const kbPhonesRaw = safeKnowledgeBase.match(phonePattern) || [];
+    
+    // 8+ cifre minimo per evitare falsi positivi
+    const responsePhones = new Set(
+      responsePhonesRaw.map(normalizePhone).filter(p => p.length >= 8)
+    );
+    const kbPhones = new Set(
+      kbPhonesRaw.map(normalizePhone).filter(p => p.length >= 8)
+    );
+    const inventedPhones = [...responsePhones].filter(p => !kbPhones.has(p));
+    
+    if (inventedPhones.length > 0) {
+      errors.push(`Phone numbers not in KB: ${inventedPhones.join(', ')}`);
+      score *= 0.50;
+      hallucinations.phones = inventedPhones;
+    }
+    
+    return { score, errors, warnings, hallucinations };
+  }
+  
+  /**
+   * Check 6: Maiuscola dopo virgola
+   * ✅ Lista maiuscole vietate (per italiano)
+   * ⚠️ Regole strict solo per italiano - inglese ha regole diverse
+   */
+  _checkCapitalAfterComma(response, expectedLanguage = 'it') {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    
+    // Parole italiane che NON devono essere maiuscole dopo una virgola
+    const italianForbiddenCaps = [
+      // Verbs (most common violations)
+      'Siamo', 'Restiamo', 'Sono', 'È', "E'", 'Era', 'Sarà', 
+      'Ho', 'Hai', 'Ha', 'Abbiamo', 'Avete', 'Hanno', 
+      'Vorrei', 'Vorremmo', 'Volevamo', 'Desideriamo', 'Informiamo',
+      
+      // Articles
+      'Il', 'Lo', 'La', 'I', 'Gli', 'Le', 
+      'Un', 'Uno', 'Una', "Un'",
+      
+      // Prepositions
+      'Per', 'Con', 'In', 'Su', 'Tra', 'Fra', 'Da', 'Di', 'A',
+      
+      // Conjunctions and particles
+      'Ma', 'Se', 'Che', 'Non', 'Sì', 'No',
+      
+      // Pronouns
+      'Vi', 'Ti', 'Mi', 'Ci', 'Si', 'Li',
+      
+      // Other common words
+      'Ecco', 'Gentile', 'Caro', 'Cara', 'Spettabile'
+    ];
+    
+    // Parole inglesi - In inglese, la maiuscola dopo virgola è spesso accettabile
+    // (es. "Hello, We are happy to..." è comune nella corrispondenza formale)
+    // Quindi usiamo una lista molto limitata solo per errori ovvi
+    const englishForbiddenCaps = [
+      // Only articles and prepositions that are clearly wrong
+      'The', 'An', 'For', 'With', 'On', 'At', 'If', 'Or', 'And', 'But'
+    ];
+    
+    // Parole spagnole
+    const spanishForbiddenCaps = [
+      'Estamos', 'Somos', 'Estaremos', 'Seremos',
+      'El', 'Los', 'Las', 'Una',
+      'Por', 'En', 'De',
+      'Pero', 'Que'
+    ];
+    
+    // Seleziona la lista corretta in base alla lingua
+    let forbiddenCaps;
+    // ✅ WARNING ONLY: non blocca l'invio, solo segnalazione
+    const isStrictMode = false;
+    
+    if (expectedLanguage === 'it') {
+      forbiddenCaps = italianForbiddenCaps;
+    } else if (expectedLanguage === 'en') {
+      forbiddenCaps = englishForbiddenCaps;
+    } else if (expectedLanguage === 'es') {
+      forbiddenCaps = spanishForbiddenCaps;
+    } else {
+      forbiddenCaps = italianForbiddenCaps; // Default to Italian
+    }
+    
+    // Regex per trovare ", Parola" - virgola seguita da spazio/i e lettera maiuscola
+    const pattern = /,\s+([A-ZÀÈÉÌÒÙ][a-zàèéìòù]*)/g;
+    let match;
+    const violations = [];
+    
+    while ((match = pattern.exec(response)) !== null) {
+      const word = match[1];
+      if (forbiddenCaps.includes(word)) {
+        violations.push(word);
+        
+        if (isStrictMode) {
+          errors.push(
+            `Grammar error: Capital '${word}' after comma. Should be lowercase: '${word.toLowerCase()}'`
+          );
+        } else {
+          // Per inglese: solo warning, potrebbe essere stilisticamente accettabile
+          warnings.push(
+            `Possible grammar issue: '${word}' capitalized after comma`
+          );
+        }
+      }
+    }
+    
+    if (violations.length > 0) {
+      if (isStrictMode) {
+        score *= Math.max(0.5, 1.0 - (violations.length * 0.15));
+      } else {
+        score *= Math.max(0.9, 1.0 - (violations.length * 0.05)); // Penalità più leggera per inglese
+      }
+    }
+    
+    return { score, errors, warnings, violations };
+  }
+  
+  // ========================================================================
+  // METODI UTILITÀ
+  // ========================================================================
+  
+  /**
+   * Ottieni statistiche configurazione validatore
+   */
+  getValidationStats() {
+    return {
+      minValidScore: this.MIN_VALID_SCORE,
+      minLength: this.MIN_LENGTH_CHARS,
+      maxLengthWarning: this.WARNING_MAX_LENGTH,
+      forbiddenPhrasesCount: this.forbiddenPhrases.length,
+      supportedLanguages: Object.keys(this.languageMarkers),
+      placeholdersCount: this.placeholders.length,
+      version: '2.1'
+    };
+  }
+}
+
+// Funzione factory per compatibilità
+function createResponseValidator() {
+  return new ResponseValidator();
+}
