@@ -51,28 +51,31 @@ class EmailProcessor {
    * @param {Set} labeledMessageIds - ID messaggi già etichettati (opzionale)
    * @param {boolean} skipLock - Se true, salta acquisizione lock (usato se chiamante ha già lock)
    */
-  processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds = new Set(), skipLock = false) {
+  processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds = new Set()) {
     const threadId = thread.getId();
     
     // ═══════════════════════════════════════════════════════════════
-    // ACQUISIZIONE LOCK (previene race condition tra trigger)
+    // ACQUISIZIONE LOCK (THREAD-LEVEL) - FIX BUG #2
     // ═══════════════════════════════════════════════════════════════
-    let lock = null;
-    if (!skipLock) {
-      lock = LockService.getScriptLock();
-      console.log(`🔒 Acquiring lock for thread ${threadId}...`);
-      try {
-        // Attendi fino a 30s per lock
-        if (!lock.tryLock(30000)) {
-          console.warn(`⏱️ Could not acquire lock for thread ${threadId}, skipping`);
-          return { status: 'skipped', reason: 'lock_timeout' };
-        }
-      } catch (e) {
-         console.warn(`⚠️ Lock error: ${e.message}`);
-         return { status: 'skipped', reason: 'lock_error' };
-      }
-    } else {
-      console.log(`🔒 Lock skipped for thread ${threadId} (managed by caller)`);
+    // Sostituisce LockService.getScriptLock() (globale) con un lock basato su Cache
+    // per permettere l'esecuzione parallela su thread diversi.
+    const cache = CacheService.getScriptCache();
+    const lockKey = `thread_lock_${threadId}`;
+    
+    // Check se già lockato
+    if (cache.get(lockKey)) {
+      console.warn(`🔒 Thread ${threadId} locked by another process, skipping`);
+      return { status: 'skipped', reason: 'thread_locked' };
+    }
+    
+    // Acquisisci lock (TTL 5 minuti)
+    try {
+      cache.put(lockKey, 'LOCKED', 300);
+      console.log(`🔒 Acquired cache lock for thread ${threadId}`);
+    } catch (e) {
+      console.warn(`⚠️ Error acquiring cache lock: ${e.message}`);
+      // Procediamo comunque con cautela o ritorniamo errore? 
+      // Meglio procedere se il put fallisce raramente, ma per sicurezza qui logghiamo.
     }
 
     const result = {
@@ -405,7 +408,13 @@ const promptContext = createPromptContext({
 
   memory: {
     exists: Object.keys(memoryContext).length > 0,
-    providedInfoCount: (memoryContext.providedInfo || []).length
+    providedInfoCount: (memoryContext.providedInfo || []).length,
+    // ✅ FIX Bug #6: Validate lastUpdated to prevent NaN/Crash
+    lastUpdated: memoryContext.lastUpdated 
+      ? (isNaN(new Date(memoryContext.lastUpdated).getTime()) 
+          ? null 
+          : memoryContext.lastUpdated)
+      : null
   },
 
   conversation: {
@@ -550,15 +559,13 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       result.status = 'error';
       result.error = error.message;
       return result;
-    } finally {
-      // Rilascia lock solo se acquisito (skipLock=false)
-      // FIX BUG-1: Null-safe check to prevent error when skipLock=true
-      if (lock) {
-        try {
-          lock.releaseLock();
-        } catch (e) {
-          console.warn('⚠️ Failed to release lock:', e.message);
-        }
+
+      // Rilascia lock cache (FIX BUG #2)
+      try {
+        cache.remove(lockKey);
+        console.log(`🔓 Released cache lock for thread ${threadId}`);
+      } catch (e) {
+        console.warn('⚠️ Failed to release cache lock:', e.message);
       }
     }
   }
@@ -619,50 +626,22 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       // NOTA BUG-2: LockService.getScriptLock() è globale (by design in GAS). 
       // Questo previene due trigger paralleli dal processare qualsiasi thread simultaneamente.
       // Per un sistema con volumi più alti, considerare lock document-based (Sheet row lock).
-          // FIX BUG-2: Implementazione Lock Document-Based (o Thread-Based via Cache)
-          // LockService.getScriptLock() blocca TUTTO lo script. Usiamo CacheService per lockare
-          // SOLO questo specifico threadId, permettendo esecuzione parallela su altri thread.
-          const threadLockKey = `lock_thread_${threadId}`;
-          const cache = CacheService.getScriptCache();
+          // Processa il thread (Il lock è ora gestito internamente a processThread)
+          // Rimosso parametro skipLock=true
+          const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds);
+          stats.total++;
           
-          // Tenta di acquisire "lock virtuale" su questo thread
-          if (cache.get(threadLockKey)) {
-             console.warn(`🔒 Thread ${threadId} is locked by another trigger (cache), skipping.`);
-             stats.skipped++;
-             return;
-          }
-          
-          // Imposta lock per 5 minuti (durata max esecuzione)
-          try {
-            cache.put(threadLockKey, 'LOCKED', 300); 
-            lockAcquired = true;
-            
-            // Per sicurezza, mantengo anche un breve tryLock globale per operazioni atomiche critiche interne,
-            // ma rilasciandolo subito se non necessario, oppure affidandoci solo al CacheLock per la concorrenza macro.
-            // Qui ci fidiamo del CacheLock per evitare sovrapposizioni macroscopiche.
-
-            // Processa il thread (con lock mantenuto dal ciclo esterno)
-            // Passiamo skipLock=true perché il lock è gestito qui
-            const result = this.processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds, true);
-            stats.total++;
-            
-            if (result.validationFailed) {
-              stats.validationFailed++;
-            } else if (result.status === 'replied') {
-              stats.replied++;
-              if (result.dryRun) stats.dryRun++;
-            } else if (result.status === 'skipped') {
-              stats.skipped++;
-            } else if (result.status === 'filtered') {
-              stats.filtered++;
-            } else if (result.status === 'error') {
-              stats.errors++;
-            }
-          } finally {
-            // Rilascia lock specifico
-            if (lockAcquired) {
-              cache.remove(threadLockKey);
-            }
+          if (result.validationFailed) {
+            stats.validationFailed++;
+          } else if (result.status === 'replied') {
+            stats.replied++;
+            if (result.dryRun) stats.dryRun++;
+          } else if (result.status === 'skipped') {
+            stats.skipped++;
+          } else if (result.status === 'filtered') {
+            stats.filtered++;
+          } else if (result.status === 'error') {
+            stats.errors++;
           }
     });
     

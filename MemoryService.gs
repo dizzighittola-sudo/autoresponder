@@ -115,86 +115,89 @@ class MemoryService {
   /**
    * Aggiorna memoria per un thread (merge con esistente)
    */
+  /**
+   * Aggiorna memoria per un thread (merge con esistente)
+   * ✅ FIX Bug #1: Transazionale con retry e fresh read per evitare Race Conditions
+   */
   updateMemory(threadId, newData) {
     if (!this._initialized || !threadId) {
       return;
     }
     
-    // ✅ FIX Bug 16 + BUG-1: Robust update with retry mechanism, version checking,
-    // AND fresh data re-merge on each retry to prevent stale writes
     const MAX_RETRIES = 3;
     const lock = LockService.getScriptLock();
     
-    // Store original newData fields (excluding internal fields like _expectedVersion)
-    const originalNewData = {};
+    // Filtra campi interni
+    const dataToUpdate = {};
     for (const key in newData) {
       if (!key.startsWith('_')) {
-        originalNewData[key] = newData[key];
+        dataToUpdate[key] = newData[key];
       }
     }
     
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      let lockAcquired = false;
       try {
-        lock.waitLock(10000); // Increased wait time
+        // Tenta lock per 10s
+        lockAcquired = lock.tryLock(10000);
+        if (!lockAcquired) {
+          throw new Error('Lock timeout');
+        }
         
-        // ✅ BUG-1 FIX: Re-read fresh data on EACH attempt (not just first)
-        const existingRow = this._findRowByThreadId(threadId);
+        // ✅ CRITICAL: Rileggi dati FRESCHI dallo Sheet (non usare cache o vecchie letture)
+        const existingRow = this._findRowByThreadId(threadId); // Lettura diretta
         const now = new Date().toISOString();
         
         if (existingRow) {
-           // ✅ Always get fresh data from sheet (critical for retry after VERSION_MISMATCH)
            const existingData = this._rowToObject(existingRow.values);
            const currentVersion = existingData.version || 0;
 
-           // ✅ OPTIMISTIC LOCKING CHECK (only if caller provided expected version)
+           // ✅ OPTIMISTIC LOCKING CHECK
            if (newData._expectedVersion !== undefined && newData._expectedVersion !== currentVersion) {
-              console.warn(`🔒 Optimistic Lock Mismatch for thread ${threadId}: expected ${newData._expectedVersion}, got ${currentVersion}`);
-              // Update expected version for next retry
-              newData._expectedVersion = currentVersion;
+              console.warn(`🔒 Version mismatch thread ${threadId}: expected ${newData._expectedVersion}, got ${currentVersion}`);
+              newData._expectedVersion = currentVersion; // Aggiorna per prossimo retry
               throw new Error('VERSION_MISMATCH');
            }
            
-           // ✅ BUG-1 FIX: Merge originalNewData with FRESH existingData
-           const mergedData = Object.assign({}, existingData, originalNewData);
+           // Merge: esistente + nuovi dati
+           const mergedData = Object.assign({}, existingData, dataToUpdate);
            mergedData.lastUpdated = now;
            mergedData.messageCount = (existingData.messageCount || 0) + 1;
-           mergedData.version = currentVersion + 1; // Increment version
+           mergedData.version = currentVersion + 1; // Incrementa versione
            
            this._updateRow(existingRow.rowIndex, mergedData);
            console.log(`🧠 Memory updated for thread ${threadId} (v${mergedData.version}, Attempt ${attempt+1})`);
         } else {
-           const insertData = Object.assign({}, originalNewData);
+           // Nuova riga
+           const insertData = Object.assign({}, dataToUpdate);
            insertData.threadId = threadId;
            insertData.lastUpdated = now;
            insertData.messageCount = 1;
-           insertData.version = 1; // Init version
+           insertData.version = 1; 
            this._appendRow(insertData);
            console.log(`🧠 Memory created for thread ${threadId} (v1)`);
         }
         
-        // Invalida cache DOPO scrittura sicura
+        // Invalida cache locale (per coerenza immediata)
         this._invalidateCache(`memory_${threadId}`);
         
-        return; // Success
+        return; // Successo
         
       } catch (error) {
         if (error.message === 'VERSION_MISMATCH') {
-            // BUG-1 FIX: Log and continue - fresh data will be re-read on next iteration
-            console.warn(`⚠️ Version mismatch, will re-read fresh data on retry... (Attempt ${attempt+1})`);
+            console.warn(`⚠️ Concurrency conflict, retrying... (Attempt ${attempt+1})`);
         } else {
-             console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
+            console.warn(`Memory update failed (Attempt ${attempt+1}): ${error.message}`);
         }
         
         if (attempt === MAX_RETRIES - 1) {
            console.error(`❌ Final Memory Update Failure: ${error.message}`);
         }
-        Utilities.sleep(Math.pow(2, attempt) * 200); // Exponential backoff
+        // Backoff esponenziale: 200ms, 400ms, 800ms
+        Utilities.sleep(Math.pow(2, attempt) * 200);
       } finally {
-        // FIX: Only release if acquired (waitLock succeeded)
-        try {
+        if (lockAcquired) {
           lock.releaseLock();
-        } catch (e) {
-          // Ignore - lock may not have been acquired
         }
       }
     }

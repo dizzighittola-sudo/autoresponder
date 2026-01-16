@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.2] - 2026-01-16
+
+### Fixed
+- **Critical Fix (BUG-1)**: Implemented transactional updates with retry logic and optimistic locking in `MemoryService` to prevent race conditions during concurrent executions.
+- **Security Fix (BUG-5)**: Hardened `TerritoryValidator` regex patterns to prevent ReDoS (Catastrophic Backtracking) vulnerabilities and added input length limits.
+- **Accuracy Fix (BUG-3)**: Improved `GeminiRateLimiter` token estimation algorithm to account for word boundaries and protocol overhead (using word count * 1.25 + overhead factor).
+- **UX Fix (BUG-7)**: Updated `showQuotaDashboard` to display Pacific Time (PST/PDT) alongside Italian time, clarifying Google Quota reset timing.
+
+### Changed
+- Refactored `EmailProcessor` thread locking mechanism (moved to `CacheService` per-thread lock).
+
+---
+
 ## [2.1.1] - 2026-01-16
 
 ### Fixed

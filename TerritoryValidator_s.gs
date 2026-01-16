@@ -17,15 +17,16 @@ class TerritoryValidator {
   }
   
   extractAddressFromText(text) {
-    // Pattern per rilevare indirizzi - FIX Bug 6: Aggiunto apostrofo al pattern
-    // Pattern per rilevare indirizzi - FIX Bug 6 + Bug 18:
-    // Limit repetition {0,10} on word matches to prevent catastrophic backtracking (ReDoS)
+    // ✅ FIX Bug #5: ReDoS Prevention
+    // 1. Guardrail: Limit input length to prevent processing extremely long malicious strings
+    if (text && text.length > 5000) {
+      text = text.substring(0, 5000);
+    }
+    
+    // 2. Pattern ottimizzati per sicurezza
     const patterns = [
-      // Pattern 1: "via Rossi 10" (Limited recursion key: use {0,10} instead of *)
-      /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,10}[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
-      
-      // Pattern 2: "abito in... via Rossi 10"
-      /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,10}[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
+      /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,6}?[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
+      /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,6}?[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
     ];
     
     const addresses = [];
@@ -33,12 +34,10 @@ class TerritoryValidator {
     for (const pattern of patterns) {
       let match;
       try {
-        // Usa exec in loop per ottenere TUTTE le corrispondenze, non solo la prima
         while ((match = pattern.exec(text)) !== null) {
           const street = match[1].trim();
           const civic = parseInt(match[2]);
           
-          // Evita duplicati (stessa via + numero civico)
           const isDuplicate = addresses.some(addr => 
             addr.street.toLowerCase() === street.toLowerCase() && addr.civic === civic
           );

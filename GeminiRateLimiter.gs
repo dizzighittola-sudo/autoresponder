@@ -526,7 +526,9 @@ class GeminiRateLimiter {
     const stats = {
       date: this._getItalianDate(),
       italianTime: Utilities.formatDate(new Date(), 'Europe/Rome', 'HH:mm'),
+      pacificTime: Utilities.formatDate(new Date(), 'America/Los_Angeles', 'HH:mm') + ' (PST/PDT)', // ✅ FIX Bug #7: Timezone info
       nextReset: this._getNextResetTime(),
+      nextResetPacific: '00:00 Pacific Time', // Reset Google è sempre mezzanotte Pacific
       models: {}
     };
     
@@ -590,6 +592,30 @@ class GeminiRateLimiter {
     }
     resetTime.setHours(9, 0, 0, 0);
     return resetTime.toISOString(); // e.g., "2024-05-20T09:00:00.000Z"
+  }
+  
+  /**
+   * Stima il numero di token per un testo
+   * ✅ FIX Bug #3: Stima migliorata (words + overhead) invece di chars/4
+   */
+  _estimateTokens(text) {
+    if (!text) return 0;
+    
+    // 1. Conta parole (approx token boundary)
+    const wordCount = text.split(/\s+/).length;
+    
+    // 2. Formula migliorata:
+    //    - Parole italiane medie: ~1.2-1.3 token
+    //    - Overhead JSON/System: +10%
+    const baseTokens = Math.ceil(wordCount * 1.25);
+    const overhead = Math.ceil(baseTokens * 0.1);
+    
+    // 3. Fallback su char count per testi densi (codice, base64)
+    //    Gemini approx: 1 token ~= 4 chars (inglese) o 3 chars (altre lingue)
+    //    Usiamo divisore 3.5 per cautela
+    const charEstimate = Math.ceil(text.length / 3.5); 
+    
+    return Math.max(baseTokens + overhead, charEstimate, 1);
   }
 }
 
