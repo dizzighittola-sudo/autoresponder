@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.1.3] - 2026-01-16
+
+### Fixed
+- **Critical Fix (Locking)**: Added `try...finally` block in `EmailProcessor` to guarantee lock release in all scenarios (success/error), preventing potential deadlocks.
+- **Security Fix (TOCTOU)**: Implemented "Double-Check" pattern in lock acquisition to mitigate Time-of-Check to Time-of-Use race conditions.
+- **Performance Fix**: Removed global `LockService` in `MemoryService`, replacing it with granular `CacheService` locks (`memory_lock_${threadId}`) to enable parallel thread processing.
+- **Logic Fix (Bug #4)**: Updated `Classifier` to accept emails with empty bodies if the subject is meaningful (e.g., "Re: Orari messe"), preventing false negatives.
+
+### Added
+- **Testing**: Added unit tests for concurrency logic stubs and classifier empty body edge cases.
+
+---
+
 
 ## [2.1.2] - 2026-01-16
 
