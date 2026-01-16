@@ -21,7 +21,8 @@ class GmailService {
     // Cache etichette per evitare chiamate API ripetute con TTL
     this._labelCache = new Map(); // Map<labelName, {label: GmailLabel, ts: number}>
     // IMHO-2: 1 hour reduces API calls without risk of stale data (labels change rarely)
-    this._cacheTTL = 60 * 60 * 1000; // TTL 1 ora per etichette in cache
+    this._cacheTTL = (typeof CONFIG !== 'undefined' && CONFIG.GMAIL_LABEL_CACHE_TTL) ? CONFIG.GMAIL_LABEL_CACHE_TTL : 3600000;
+
 
     console.log('✓ GmailService inizializzato con cache etichette (TTL 1h)');
   }
@@ -270,7 +271,7 @@ class GmailService {
   /**
    * Costruisce cronologia conversazione da messaggi thread
    */
-  buildConversationHistory(messages, maxMessages = 10, ourEmail = '') {
+  buildConversationHistory(messages, maxMessages = (typeof CONFIG !== 'undefined' && CONFIG.MAX_HISTORY_MESSAGES) ? CONFIG.MAX_HISTORY_MESSAGES : 10, ourEmail = '') {
     // Fallback: ottieni nostra email se non fornita
     if (!ourEmail) {
       ourEmail = Session.getActiveUser().getEmail();

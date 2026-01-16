@@ -27,6 +27,8 @@ const CONFIG = {
   ERROR_LABEL_NAME: 'IA-Error',
   VALIDATION_ERROR_LABEL: 'IA_VALIDATION_ERROR',
   MAX_EMAILS_PER_RUN: 10,
+  GMAIL_LABEL_CACHE_TTL: 3600000, // 1 Hour (ms)
+  MAX_HISTORY_MESSAGES: 10,       // Max messaggi in cronologia (thread context)
   
   // === Knowledge Base ===
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),

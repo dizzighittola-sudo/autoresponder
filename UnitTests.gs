@@ -312,6 +312,18 @@ function testBugFixes() {
       console.warn("Bug #12 Test: _rowToObject not accessible");
     }
   }
+
+  // === NEW CONFIGURATION TESTS (Residual Polish) ===
+  if (typeof CONFIG !== 'undefined') {
+      assertEqual(CONFIG.CACHE_LOCK_TTL, 300, "CONFIG: CACHE_LOCK_TTL should be 300");
+      assertEqual(CONFIG.CACHE_RACE_SLEEP_MS, 100, "CONFIG: CACHE_RACE_SLEEP_MS should be 100");
+      // New Gmail Refactor Assertions
+      assertEqual(CONFIG.GMAIL_LABEL_CACHE_TTL, 3600000, "CONFIG: GMAIL_LABEL_CACHE_TTL should be 3600000");
+      assertEqual(CONFIG.MAX_HISTORY_MESSAGES, 10, "CONFIG: MAX_HISTORY_MESSAGES should be 10");
+  } else {
+      TEST_RESULTS.failed++;
+      TEST_RESULTS.errors.push("FAIL: CONFIG object missing");
+  }
   
   // Bug #14: Confidence Threshold (updated: 0.74 triggers regex, 0.75+ goes to Gemini)
   if (typeof RequestTypeClassifier !== 'undefined') {
