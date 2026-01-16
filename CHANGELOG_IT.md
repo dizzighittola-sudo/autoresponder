@@ -16,6 +16,11 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/s
 ### Aggiunti
 - **Testing**: Aggiunti unit test per la logica di concorrenza e casi limite del classificatore.
 
+### Modificati
+- **Refactor (Config)**: Centralizzata la configurazione Gmail (`GMAIL_LABEL_CACHE_TTL`, `MAX_HISTORY_MESSAGES`) in `Main.gs`, rimuovendo valori "hardcoded".
+- **Polish (Etichette)**: Rinominate le etichette di sistema secondo preferenza utente (`IA-Error` -> `Errore`, `IA_VALIDATION_ERROR` -> `Verifica`).
+- **Polish (Concorrenza)**: Spostati i parametri di Lock TTL e Race Sleep in `CONFIG` su `Main.gs` per maggiore configurabilità.
+
 ---
 
 ## [2.1.2] - 16-01-2026

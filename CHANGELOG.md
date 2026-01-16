@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Testing**: Added unit tests for concurrency logic stubs and classifier empty body edge cases.
 
+### Changed
+- **Refactor (Config)**: Centralized Gmail configuration (`GMAIL_LABEL_CACHE_TTL`, `MAX_HISTORY_MESSAGES`) in `Main.gs`, removing hardcoded values from `GmailService`.
+- **Polish (Labels)**: Renamed system labels to user preference (`IA-Error` -> `Errore`, `IA_VALIDATION_ERROR` -> `Verifica`) in `Main.gs`.
+- **Polish (Concurrency)**: Moved Cache Lock TTL and Race Sleep Duration to `CONFIG` in `Main.gs` for better tunability.
+
 ---
 
 
