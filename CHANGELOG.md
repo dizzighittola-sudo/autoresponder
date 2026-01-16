@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.1.6] - 2026-01-16
+
+### Cleaned
+- **Code Quality**: Removed duplicated JSDoc comments in `Main.gs` to improve readability and reduce noise.
+
+---
 ## [2.1.5] - 2026-01-16
 
 ### Changed

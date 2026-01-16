@@ -5,6 +5,13 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.1.6] - 16-01-2026
+
+### Pulizia (Cleaned)
+- **Codice**: Rimossi commenti duplicati in `Main.gs` per migliorare la leggibilità.
+
+---
+
 ## [2.1.5] - 16-01-2026
 
 ### Modifiche (Changed)

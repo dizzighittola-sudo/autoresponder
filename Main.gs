@@ -260,9 +260,7 @@ const SUSPENSION_HOURS = {
 /**
  * Calcola la Domenica di Pasqua per un dato anno (Occidentale/Gregoriano)
  */
-/**
- * Calcola la Domenica di Pasqua per un dato anno (Occidentale/Gregoriano)
- */
+
 function calculateEaster(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
