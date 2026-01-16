@@ -886,9 +886,9 @@ Output JSON atteso:
         console.warn('⚠️ Response truncated due to MAX_TOKENS limit');
       }
       
-      // FIX Bug D: Safe access to parts array
+      // FIX Bug D: Safe access to parts array (Robust extraction)
       const parts = candidate.content?.parts || [];
-      const generatedText = parts[0]?.text || '';
+      const generatedText = parts.map(p => p.text || '').join('').trim();
       
       if (!generatedText || generatedText.trim().length === 0) {
         console.error('❌ Gemini returned empty response');

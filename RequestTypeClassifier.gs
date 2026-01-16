@@ -169,14 +169,15 @@ class RequestTypeClassifier {
       console.log(`   🤖 Hybrid Classifier: Using Gemini result (${requestType.toUpperCase()}, conf=${externalHint.confidence})`);
     } else {
       // ⚠️ Fallback a Regex
-      if (pastoralScore >= 3 && pastoralScore > technicalScore) {
+      // ✅ FIX Bug: Prioritize Doctrine over Pastoral/Mixed to prevent squashing
+      if (doctrineScore >= 3) {
+        requestType = 'doctrinal'; 
+      } else if (pastoralScore >= 3 && pastoralScore > technicalScore) {
         requestType = 'pastoral';
       } else if (technicalScore >= 2 && pastoralScore <= 1) {
         requestType = 'technical';
       } else if (pastoralScore >= 2 && technicalScore >= 2) {
         requestType = 'mixed';
-      } else if (doctrineScore >= 3) {
-        requestType = 'doctrinal'; 
       } else {
         requestType = 'technical'; // Default
       }

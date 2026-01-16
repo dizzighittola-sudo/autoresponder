@@ -5,6 +5,17 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.2.1] - 17-01-2026
+
+### Correzioni Critiche (Logic Bugs)
+- **EmailProcessor**: Corretta firma di `processThread` per accettare parametro `skipLock`. Aggiunti controlli di sicurezza sull'accesso a `CONFIG`.
+- **GmailService**: Risolto crash critico nella gestione errori (`sendHtmlReply` fallback) quando manca la configurazione.
+- **GmailService**: Risolto bypass di sicurezza SSRF in `markdownToHtml` (decodifica URL prima del check IP).
+- **RequestTypeClassifier**: Corretta inversione di priorità: le email "Dottrinali" ora prevalgono su quelle "Pastorali" se il punteggio è alto.
+- **MemoryService**: Corretta pulizia memoria (`cleanOldEntries`) per rimuovere anche le date corrotte/invalide.
+- **GeminiService**: Uniformata l'estrazione robusta del testo anche nel meccanismo di fallback.
+
+---
 ## [2.2.0] - 17-01-2026
 
 ### Sicurezza & Hardening

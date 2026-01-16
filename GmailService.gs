@@ -418,7 +418,8 @@ class GmailService {
         console.log(`✓ Plain text reply sent to ${messageDetails.senderEmail} (fallback)`);
       } catch (fallbackError) {
         console.error(`❌ CRITICAL: Fallback reply failed: ${fallbackError.message}`);
-        const errorLabel = CONFIG.ERROR_LABEL_NAME;
+        // ✅ FIX Bug: Safe CONFIG access
+        const errorLabel = (typeof CONFIG !== 'undefined' && CONFIG.ERROR_LABEL_NAME) ? CONFIG.ERROR_LABEL_NAME : 'Errore';
         if (mailEntity && typeof mailEntity.getMessages === 'function') {
           this.addLabelToThread(mailEntity, errorLabel);
         } else if (mailEntity && typeof mailEntity.getId === 'function') {
@@ -626,34 +627,35 @@ function markdownToHtml(text) {
   // ✅ FIX Bug 19: Header Injection Prevention (during mail send phase)
   // But also in markdown conversion, we ensure no hidden control characters
   
-  // ✅ FIX Bug 20: SSRF & Internal IP Protection
-  // Blacklist internal IPs and localhost
-  const INTERNAL_IP_PATTERN = /^(https?:\/\/)?(localhost|127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)/i;
+    // ✅ FIX Bug #8: Decode URL and remove control chars BEFORE validation
+    // Prevents bypasses like JAVA%53CRIPT:alert(1) or java\u0009script:
+    let decodedUrl = escapedUrl;
+    try {
+      decodedUrl = decodeURIComponent(escapedUrl);
+    } catch (e) {
+      // Invalid encoding - use as-is
+    }
+    decodedUrl = decodedUrl.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control chars
   
-  if (INTERNAL_IP_PATTERN.test(escapedUrl)) {
-    console.warn(`🛑 Blocked internal IP/SSRF attempt: ${escapedUrl}`);
-    return escapedText;
-  }
-
-  // ✅ FIX Bug #8: Decode URL and remove control chars BEFORE validation
-  // Prevents bypasses like JAVA%53CRIPT:alert(1) or java\u0009script:
-  let decodedUrl = escapedUrl;
-  try {
-    decodedUrl = decodeURIComponent(escapedUrl);
-  } catch (e) {
-    // Invalid encoding - use as-is
-  }
-  decodedUrl = decodedUrl.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control chars
-
-  // ✅ VALIDATE URL protocol (only http/https/mailto)
-  // Se protocollo sospetto (javascript:, vbscript:, data:), ritorna solo testo
-  const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(decodedUrl);
-  const isSafeProtocol = /^\s*(https?|mailto):/i.test(decodedUrl);
-
-  if (isDangerous || !isSafeProtocol) {
-    console.warn(`⚠️ Blocked suspicious URL: ${escapedUrl}`);
-    return escapedText; // Return just text, no link
-  }
+    // ✅ FIX Bug 20: SSRF & Internal IP Protection
+    // Blacklist internal IPs and localhost
+    // ✅ FIX: Check decodeed URL to prevent %6Cocalhost bypass
+    const INTERNAL_IP_PATTERN = /^(https?:\/\/)?(localhost|127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)/i;
+    
+    if (INTERNAL_IP_PATTERN.test(decodedUrl)) {
+      console.warn(`🛑 Blocked internal IP/SSRF attempt: ${escapedUrl}`);
+      return escapedText;
+    }
+  
+    // ✅ VALIDATE URL protocol (only http/https/mailto)
+    // Se protocollo sospetto (javascript:, vbscript:, data:), ritorna solo testo
+    const isDangerous = /^\s*(javascript|vbscript|data|file):/i.test(decodedUrl);
+    const isSafeProtocol = /^\s*(https?|mailto):/i.test(decodedUrl);
+  
+    if (isDangerous || !isSafeProtocol) {
+      console.warn(`⚠️ Blocked suspicious URL: ${escapedUrl}`);
+      return escapedText; // Return just text, no link
+    }
     
     return `<a href="${escapedUrl}" style="color:#351c75;">${escapedText}</a>`;
   });

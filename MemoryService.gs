@@ -518,7 +518,8 @@ class MemoryService {
       // Vai all'indietro per evitare problemi di shifting indici
       for (let i = data.length - 1; i >= 1; i--) {
         const lastUpdated = new Date(data[i][5]);
-        if (lastUpdated < cutoffDate) {
+        // ✅ FIX Bug: Handle Invalid Date entries
+        if (!(lastUpdated instanceof Date) || isNaN(lastUpdated.getTime()) || lastUpdated < cutoffDate) {
           this._sheet.deleteRow(i + 1);
           deletedCount++;
         }

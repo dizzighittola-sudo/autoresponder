@@ -51,43 +51,53 @@ class EmailProcessor {
    * @param {Set} labeledMessageIds - ID messaggi già etichettati (opzionale)
    * @param {boolean} skipLock - Se true, salta acquisizione lock (usato se chiamante ha già lock)
    */
-  processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds = new Set()) {
+  processThread(thread, knowledgeBase, doctrineBase, labeledMessageIds = new Set(), skipLock = false) {
     const threadId = thread.getId();
     
     // ═══════════════════════════════════════════════════════════════
     // ACQUISIZIONE LOCK (THREAD-LEVEL) - FIX BUG #2 + CRITICAL #1 (TOCTOU)
     // ═══════════════════════════════════════════════════════════════
-    // Usa CacheService con pattern "Double-Check" per mitigare race condition
-    const cache = CacheService.getScriptCache();
-    const lockKey = `thread_lock_${threadId}`;
-    const lockValue = Date.now().toString(); // Identificativo unico per questo processo
     
-    // 1. Check preliminare (fast fail)
-    const existingLock = cache.get(lockKey);
-    if (existingLock) {
-      // Controllo opzionale TTL manuale se necessario, ma fidiamoci della cache expiration
-      console.warn(`🔒 Thread ${threadId} locked by another process, skipping`);
-      return { status: 'skipped', reason: 'thread_locked' };
-    }
-    
-    // 2. Put lock (tentativo acquisizione)
-    try {
-      cache.put(lockKey, lockValue, CONFIG.CACHE_LOCK_TTL); 
+    // ✅ FIX Bug: Skip lock if requested (double-lock prevention)
+    if (skipLock) {
+      console.log(`🔒 Skipped lock acquisition for thread ${threadId} (caller already holds lock)`);
+    } else {
+      // Usa CacheService con pattern "Double-Check" per mitigare race condition
+      const cache = CacheService.getScriptCache();
+      const lockKey = `thread_lock_${threadId}`;
+      const lockValue = Date.now().toString(); // Identificativo unico per questo processo
       
-      // 3. Piccolo sleep per lasciare emergere race conditions
-      Utilities.sleep(CONFIG.CACHE_RACE_SLEEP_MS);
-      
-      // 4. Double-Check: verifico se il mio valore è ancora lì
-      const checkValue = cache.get(lockKey);
-      if (checkValue !== lockValue) {
-        console.warn(`🔒 Race detected for thread ${threadId}: expected ${lockValue}, got ${checkValue}`);
-        return { status: 'skipped', reason: 'thread_locked_race' };
+      // 1. Check preliminare (fast fail)
+      const existingLock = cache.get(lockKey);
+      if (existingLock) {
+        // Controllo opzionale TTL manuale se necessario, ma fidiamoci della cache expiration
+        console.warn(`🔒 Thread ${threadId} locked by another process, skipping`);
+        return { status: 'skipped', reason: 'thread_locked' };
       }
       
-      console.log(`🔒 Acquired cache lock for thread ${threadId}`);
-    } catch (e) {
-      console.warn(`⚠️ Error acquiring cache lock: ${e.message}`);
-      return { status: 'error', error: 'Lock acquisition failed' };
+      // 2. Put lock (tentativo acquisizione)
+      try {
+        // ✅ FIX Bug: Safe CONFIG access
+        const ttl = (typeof CONFIG !== 'undefined' && CONFIG.CACHE_LOCK_TTL) ? CONFIG.CACHE_LOCK_TTL : 10000;
+        cache.put(lockKey, lockValue, ttl); 
+        
+        // 3. Piccolo sleep per lasciare emergere race conditions
+        // ✅ FIX Bug: Safe CONFIG access
+        const raceSleep = (typeof CONFIG !== 'undefined' && CONFIG.CACHE_RACE_SLEEP_MS) ? CONFIG.CACHE_RACE_SLEEP_MS : 50;
+        Utilities.sleep(raceSleep);
+        
+        // 4. Double-Check: verifico se il mio valore è ancora lì
+        const checkValue = cache.get(lockKey);
+        if (checkValue !== lockValue) {
+          console.warn(`🔒 Race detected for thread ${threadId}: expected ${lockValue}, got ${checkValue}`);
+          return { status: 'skipped', reason: 'thread_locked_race' };
+        }
+        
+        console.log(`🔒 Acquired cache lock for thread ${threadId}`);
+      } catch (e) {
+        console.warn(`⚠️ Error acquiring cache lock: ${e.message}`);
+        return { status: 'error', error: 'Lock acquisition failed' };
+      }
     }
 
 

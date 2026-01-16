@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.2.1] - 2026-01-17
+
+### Critical Logic Fixes
+- **EmailProcessor**: Fixed signature mismatch in `processThread` to correctly accept `skipLock`. Added guards for `CONFIG` access to prevent crashes.
+- **GmailService**: Fixed catastrophic crash in error handling loop (`sendHtmlReply` fallback) when `CONFIG` is missing.
+- **GmailService**: Fixed SSRF vulnerability in `markdownToHtml` by decoding URLs before IP blacklist check.
+- **RequestTypeClassifier**: Fixed priority inversion where "Doctrinal" emails were incorrectly classified as "Pastoral" due to order of operations.
+- **MemoryService**: Fixed `cleanOldEntries` to correctly handle and remove corrupt data entries (Invalid Date).
+- **GeminiService**: Standardized robust text extraction in fallback generation path.
+
+---
 ## [2.2.0] - 2026-01-17
 
 ### Security & Hardening
