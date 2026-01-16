@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.2.0] - 2026-01-17
+
+### Security & Hardening
+- **PromptContext**: Implemented aggressive logging for invalid inputs to trace data corruption sources.
+- **MemoryService**: Added strict ISO-8601 timestamp validation to prevent corrupt dates from persisting in Google Sheets.
+
+### Cleanup
+- **Codebase**: Removed legacy developer notes ("TODO", "NOTA") and dead code from `GeminiService` and `PromptEngine` to improve maintainability.
+
+---
 ## [2.1.8] - 2026-01-17
 
 ### Fixed

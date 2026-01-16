@@ -905,9 +905,6 @@ Output JSON atteso:
   // METODI UTILITÀ
   // ========================================================================
   
-  // NOTA: isOnlyAcknowledgement() rimossa - usare Classifier._isUltraSimpleAcknowledgment()
-  // NOTA: extractMainReply() rimossa - usare GmailService.extractMainReply()
-  
   /**
    * Testa connessione API Gemini
    */

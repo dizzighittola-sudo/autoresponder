@@ -170,6 +170,11 @@ class MemoryService {
            mergedData.messageCount = (existingData.messageCount || 0) + 1;
            mergedData.version = currentVersion + 1; // Incrementa versione
            
+           if (isNaN(new Date(mergedData.lastUpdated).getTime())) {
+               console.error(`🚨 CRITICAL: Attempting to write INVALID lastUpdated to Memory! Resetting to NOW. Bad Value: ${mergedData.lastUpdated}`);
+               mergedData.lastUpdated = now;
+           }
+           
            this._updateRow(existingRow.rowIndex, mergedData);
            console.log(`🧠 Memory updated for thread ${threadId} (v${mergedData.version}, Attempt ${attempt+1})`);
         } else {
@@ -179,6 +184,15 @@ class MemoryService {
            insertData.lastUpdated = now;
            insertData.messageCount = 1;
            insertData.version = 1; 
+           insertData.messageCount = 1;
+           insertData.version = 1; 
+           
+           // Safety Check
+           if (isNaN(new Date(insertData.lastUpdated).getTime())) {
+                console.error(`🚨 CRITICAL: Invalid lastUpdated on INSERT. Resetting.`);
+                insertData.lastUpdated = now;
+           }
+
            this._appendRow(insertData);
            console.log(`🧠 Memory created for thread ${threadId} (v1)`);
         }

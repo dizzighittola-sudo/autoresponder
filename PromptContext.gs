@@ -5,9 +5,12 @@
 
 class PromptContext {
   constructor(input) {
-    // FIX Bug 10: Input validation
+    // FIX Bug 10: Input validation (AGGRESSIVE LOGGING)
     if (!input || typeof input !== 'object') {
-      console.warn('⚠️ PromptContext received invalid input, using empty object');
+      const safeInput = input ? String(input).substring(0, 100) : 'null/undefined';
+      console.error(`🚨 CRITICAL: PromptContext received INVALID input (Type: ${typeof input}). Snippet: [${safeInput}]`);
+      // Stack trace trick to identify caller
+      try { throw new Error(); } catch(e) { console.error(`   Caller Trace: ${e.stack.split('\n')[2].trim()}`); }
       input = {}; // Fallback per prevenire crash
     }
     

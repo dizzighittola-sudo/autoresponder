@@ -5,6 +5,16 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.2.0] - 17-01-2026
+
+### Sicurezza & Hardening
+- **PromptContext**: Implementato logging aggressivo per input non validi, per tracciare l'origine di dati corrotti.
+- **MemoryService**: Aggiunta validazione rigorosa dei timestamp ISO-8601 per prevenire la scrittura di date corrotte su Google Sheets.
+
+### Pulizia
+- **Codebase**: Rimossi commenti sviluppatore legacy ("TODO", "NOTA") e codice morto da `GeminiService` e `PromptEngine` per migliorare la manutenibilità.
+
+---
 ## [2.1.8] - 17-01-2026
 
 ### Risolti (Bug Fixes)
