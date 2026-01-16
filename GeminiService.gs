@@ -206,9 +206,9 @@ Output JSON atteso:
     
     // Default result in case of parsing or safety issues
     const defaultResult = {
-      shouldRespond: false,
+      shouldRespond: true, // ✅ FIX: Fail open (default to true) to avoid missing legitimate emails
       language: 'it', // Default to Italian
-      reason: 'quick_check_failed',
+      reason: 'quick_check_failed_fallback',
       classification: {
         category: 'TECHNICAL',
         topic: 'unknown',

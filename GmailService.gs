@@ -535,7 +535,8 @@ class GmailService {
   _sanitizeHeaders(text) {
     if (!text) return '';
     return text
-      .replace(/\n(To|Cc|Bcc|From|Subject|Reply-To):/gi, '\n[$1]:')
+      // ✅ FIX Bug 22: Match start of string OR newline to prevent bypass
+      .replace(/(^|\n)(To|Cc|Bcc|From|Subject|Reply-To):/gi, '$1[$2]:')
       .replace(/\r\n|\r/g, '\n');
   }
 

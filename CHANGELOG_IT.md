@@ -5,6 +5,15 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.1.4] - 16-01-2026
+
+### Risolti (Bug Fixes)
+- **Sicurezza (Inject)**: Rafforzata regex in `GmailService` per prevenire header injection dalla prima riga.
+- **Affidabilità (Fallback)**: Aggiornato `GeminiService` Quick Check su "fail open" (rispondi: true) in caso di errore API, prevenendo perdita email.
+- **Configurazione (Label)**: Sostituita etichetta 'verifica' hardcoded in `EmailProcessor` con configurazione dinamica per rispettare preferenze utente.
+
+---
+
 ## [2.1.3] - 16-01-2026
 
 ### Risolti (Bug Fixes)

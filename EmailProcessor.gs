@@ -72,10 +72,10 @@ class EmailProcessor {
     
     // 2. Put lock (tentativo acquisizione)
     try {
-      cache.put(lockKey, lockValue, 300); // 5 min TTL
+      cache.put(lockKey, lockValue, CONFIG.CACHE_LOCK_TTL); 
       
       // 3. Piccolo sleep per lasciare emergere race conditions
-      Utilities.sleep(50);
+      Utilities.sleep(CONFIG.CACHE_RACE_SLEEP_MS);
       
       // 4. Double-Check: verifico se il mio valore è ancora lì
       const checkValue = cache.get(lockKey);
@@ -527,8 +527,8 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         
         // ✅ Se ci sono WARNING (ma validazione passata), aggiungi etichetta "verifica"
         if (validation.warnings && validation.warnings.length > 0) {
-          console.log(`   ⚠️ Validation PASSED with ${validation.warnings.length} warning(s) - adding 'verifica' label`);
-          this.gmailService.addLabelToThread(thread, 'verifica');
+          console.log(`   ⚠️ Validation PASSED with ${validation.warnings.length} warning(s) - adding '${this.config.validationErrorLabel}' label`);
+          this.gmailService.addLabelToThread(thread, this.config.validationErrorLabel);
         }
         
         console.log(`   ✓ Validation PASSED (score: ${validation.score.toFixed(2)})`);

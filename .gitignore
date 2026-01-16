@@ -20,3 +20,6 @@ PromptEngine.gs
 
 # Backup folder (contains real data)
 BACKUP/
+
+# Editor rules (local preference)
+.cursorrules

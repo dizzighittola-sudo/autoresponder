@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.1.4] - 2026-01-16
+
+### Fixed
+- **Security Fix (Inject)**: Strengthened `GmailService` regex to prevent header injection attacks starting at the first line.
+- **Reliability Fix (Fallback)**: Updated `GeminiService` Quick Check to "fail open" (respond: true) on API errors, preventing silent email loss.
+- **Config Fix (Label)**: Replaced hardcoded 'verifica' label in `EmailProcessor` with `CONFIG.VALIDATION_ERROR_LABEL` to respect user settings.
+
+---
 ## [2.1.3] - 2026-01-16
 
 ### Fixed
