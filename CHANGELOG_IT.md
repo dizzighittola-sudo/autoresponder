@@ -5,6 +5,14 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.1.5] - 16-01-2026
+
+### Modifiche (Changed)
+- **UX**: Aggiornate etichette di default a 'Errore' e 'Verifica' come richiesto.
+- **Etichettatura Granulare**: I warning di validazione (es. bassa confidenza) vengono ora applicati al **singolo messaggio** invece che all'intero thread, facilitando la revisione.
+
+---
+
 ## [2.1.4] - 16-01-2026
 
 ### Risolti (Bug Fixes)

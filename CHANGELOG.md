@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.1.5] - 2026-01-16
+
+### Changed
+- **UX Improvement**: Updated default labels to 'Errore' and 'Verifica' to match user preferences.
+- **Granular Labeling**: Validation warnings (e.g., low confidence) are now applied to the specific **message** instead of the entire thread, facilitating easier review.
+
+---
 ## [2.1.4] - 2026-01-16
 
 ### Fixed
