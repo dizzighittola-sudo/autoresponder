@@ -101,7 +101,24 @@ class EmailClassifier {
     const mainContent = this._extractMainContent(body);
     console.log(`      Main content: ${mainContent.length} chars`);
 
-    // Se il body è vuoto o solo "Re:", usa il subject per i filtri rapidi
+    // ✅ FIX Bug #4: Body vuoto + subject generico (es. "Re: Orari messe") → passa a Gemini
+    // Se il body è vuoto (o quasi) E siamo in una reply:
+    if ((!mainContent || !mainContent.trim()) && isReply) {
+      const subjectClean = subject.replace(/^re:\s*/i, '').trim();
+      // Se il subject è conciso (< 50 chars) ma non brevissimo (< 3 chars), probabilmente è la domanda stessa
+      if (subjectClean.length > 3 && subjectClean.length < 50) {
+        console.log('      ✓ Empty body but generic reasonable subject -> Passing to Gemini');
+        return {
+          shouldReply: true,
+          reason: 'empty_body_generic_subject',
+          category: null,
+          subIntents: {},
+          confidence: 0.8
+        };
+      }
+    }
+
+    // Se il body è vuoto e NON soddisfa criterio sopra, usa subject per filtri rapidi
     const contentForQuickChecks = this._isTrivialReplyBody(mainContent) ? subject : mainContent;
     
     // FILTRO 1: Acknowledgment ultra-semplice

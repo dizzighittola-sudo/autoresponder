@@ -55,28 +55,45 @@ class EmailProcessor {
     const threadId = thread.getId();
     
     // ═══════════════════════════════════════════════════════════════
-    // ACQUISIZIONE LOCK (THREAD-LEVEL) - FIX BUG #2
+    // ACQUISIZIONE LOCK (THREAD-LEVEL) - FIX BUG #2 + CRITICAL #1 (TOCTOU)
     // ═══════════════════════════════════════════════════════════════
-    // Sostituisce LockService.getScriptLock() (globale) con un lock basato su Cache
-    // per permettere l'esecuzione parallela su thread diversi.
+    // Usa CacheService con pattern "Double-Check" per mitigare race condition
     const cache = CacheService.getScriptCache();
     const lockKey = `thread_lock_${threadId}`;
+    const lockValue = Date.now().toString(); // Identificativo unico per questo processo
     
-    // Check se già lockato
-    if (cache.get(lockKey)) {
+    // 1. Check preliminare (fast fail)
+    const existingLock = cache.get(lockKey);
+    if (existingLock) {
+      // Controllo opzionale TTL manuale se necessario, ma fidiamoci della cache expiration
       console.warn(`🔒 Thread ${threadId} locked by another process, skipping`);
       return { status: 'skipped', reason: 'thread_locked' };
     }
     
-    // Acquisisci lock (TTL 5 minuti)
+    // 2. Put lock (tentativo acquisizione)
     try {
-      cache.put(lockKey, 'LOCKED', 300);
+      cache.put(lockKey, lockValue, 300); // 5 min TTL
+      
+      // 3. Piccolo sleep per lasciare emergere race conditions
+      Utilities.sleep(50);
+      
+      // 4. Double-Check: verifico se il mio valore è ancora lì
+      const checkValue = cache.get(lockKey);
+      if (checkValue !== lockValue) {
+        console.warn(`🔒 Race detected for thread ${threadId}: expected ${lockValue}, got ${checkValue}`);
+        return { status: 'skipped', reason: 'thread_locked_race' };
+      }
+      
       console.log(`🔒 Acquired cache lock for thread ${threadId}`);
     } catch (e) {
       console.warn(`⚠️ Error acquiring cache lock: ${e.message}`);
-      // Procediamo comunque con cautela o ritorniamo errore? 
-      // Meglio procedere se il put fallisce raramente, ma per sicurezza qui logghiamo.
+      return { status: 'error', error: 'Lock acquisition failed' };
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // INIZIO BLOCCO PROTETTO (TRY...FINALLY)
+    // ═══════════════════════════════════════════════════════════════
+    try {
 
     const result = {
       status: 'unknown',
@@ -560,11 +577,13 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       result.error = error.message;
       return result;
 
-      // Rilascia lock cache (FIX BUG #2)
+    } finally {
+      // ✅ ESEGUE SEMPRE: Rilascia lock cache (FIX CRITICAL BUG)
       try {
         cache.remove(lockKey);
         console.log(`🔓 Released cache lock for thread ${threadId}`);
       } catch (e) {
+        // Logga errore ma non farlo risalire (per evitare di mascherare l'errore originale)
         console.warn('⚠️ Failed to release cache lock:', e.message);
       }
     }

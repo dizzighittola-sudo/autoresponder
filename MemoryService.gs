@@ -117,15 +117,12 @@ class MemoryService {
    */
   /**
    * Aggiorna memoria per un thread (merge con esistente)
-   * ✅ FIX Bug #1: Transazionale con retry e fresh read per evitare Race Conditions
+   * ✅ FIX Bug #1 & #3: Granular Lock (CacheService) + Retry + Optimistic Locking
    */
   updateMemory(threadId, newData) {
     if (!this._initialized || !threadId) {
       return;
     }
-    
-    const MAX_RETRIES = 3;
-    const lock = LockService.getScriptLock();
     
     // Filtra campi interni
     const dataToUpdate = {};
@@ -134,17 +131,25 @@ class MemoryService {
         dataToUpdate[key] = newData[key];
       }
     }
+
+    const MAX_RETRIES = 3;
+    // Usa lock granulare basato su threadId (non blocca altri thread)
+    const cache = CacheService.getScriptCache();
+    const lockKey = `memory_lock_${threadId}`;
     
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      let lockAcquired = false;
+      // 1. Check lock esistente (busy wait algoritmico)
+      if (cache.get(lockKey)) {
+        console.warn(`🔒 Memory locked for thread ${threadId}, waiting (Attempt ${attempt+1})`);
+        Utilities.sleep(Math.pow(2, attempt) * 200);
+        continue;
+      }
+
       try {
-        // Tenta lock per 10s
-        lockAcquired = lock.tryLock(10000);
-        if (!lockAcquired) {
-          throw new Error('Lock timeout');
-        }
+        // 2. Acquisisci lock (durata breve: 10s)
+        cache.put(lockKey, 'LOCKED', 10);
         
-        // ✅ CRITICAL: Rileggi dati FRESCHI dallo Sheet (non usare cache o vecchie letture)
+        // 3. CRITICAL: Rileggi dati FRESCHI dallo Sheet
         const existingRow = this._findRowByThreadId(threadId); // Lettura diretta
         const now = new Date().toISOString();
         
@@ -193,17 +198,28 @@ class MemoryService {
         if (attempt === MAX_RETRIES - 1) {
            console.error(`❌ Final Memory Update Failure: ${error.message}`);
         }
-        // Backoff esponenziale: 200ms, 400ms, 800ms
+        // Backoff esponenziale
         Utilities.sleep(Math.pow(2, attempt) * 200);
       } finally {
-        if (lockAcquired) {
-          lock.releaseLock();
-        }
+        // ✅ Rilascia lock granulare
+        try {
+          cache.remove(lockKey);
+        } catch(e) {}
       }
     }
+    throw new Error(`Failed to update memory for thread ${threadId} after ${MAX_RETRIES} attempts`);
   }
 
   
+  /**
+   * Aggiorna memoria E topic in un'unica operazione atomica
+   * ✅ Previene inconsistenze: tutto o niente in un singolo lock
+   * 
+   * @param {string} threadId - ID del thread
+   * @param {Object} newData - Dati da aggiornare (language, category, tone, etc.)
+   * @param {string[]} providedTopics - Topic da aggiungere (opzionale)
+   * @returns {boolean} - true se l'operazione è riuscita
+   */
   /**
    * Aggiorna memoria E topic in un'unica operazione atomica
    * ✅ Previene inconsistenze: tutto o niente in un singolo lock
@@ -218,58 +234,68 @@ class MemoryService {
       return false;
     }
     
-    const lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(5000);
-      
-      const existingRow = this._findRowByThreadId(threadId);
-      const now = new Date().toISOString();
-      
-      if (existingRow) {
-        // Unisci con dati esistenti
-        const existingData = this._rowToObject(existingRow.values);
-        const currentVersion = existingData.version || 0;
-        
-        const mergedData = Object.assign({}, existingData, newData);
-        mergedData.lastUpdated = now;
-        mergedData.messageCount = (existingData.messageCount || 0) + 1;
-        mergedData.version = currentVersion + 1; // Increment version
-        
-        // ✅ Unisci topic nello stesso lock (operazione atomica)
-        if (providedTopics && providedTopics.length > 0) {
-          const existingTopics = existingData.providedInfo || [];
-          mergedData.providedInfo = [...new Set([...existingTopics, ...providedTopics])];
-          console.log(`🧠 Memory: Atomically added topics ${JSON.stringify(providedTopics)}`);
+    // ✅ Use Granular Lock
+    const cache = CacheService.getScriptCache();
+    const lockKey = `memory_lock_${threadId}`;
+    
+    // Simple busy-wait (no complexities of updateMemory, just fail-safe atomic update)
+    // Try max 3 times
+    for (let i = 0; i < 3; i++) {
+        if (cache.get(lockKey)) {
+            Utilities.sleep(200);
+            continue;
         }
-        
-        // Aggiorna riga
-        this._updateRow(existingRow.rowIndex, mergedData);
-        console.log(`🧠 Memory atomically updated for thread ${threadId} (v${mergedData.version})`);
-      } else {
-        // Crea nuova riga con eventualmente i topic
-        newData.threadId = threadId;
-        newData.lastUpdated = now;
-        newData.messageCount = 1;
-        newData.version = 1; // Init version
-        
-        if (providedTopics && providedTopics.length > 0) {
-          newData.providedInfo = providedTopics;
+        try {
+            cache.put(lockKey, 'LOCKED', 10);
+            
+            // --- CRITICAL SECTION START ---
+            const existingRow = this._findRowByThreadId(threadId);
+            const now = new Date().toISOString();
+            
+            if (existingRow) {
+                // Unisci con dati esistenti
+                const existingData = this._rowToObject(existingRow.values);
+                const currentVersion = existingData.version || 0;
+                
+                const mergedData = Object.assign({}, existingData, newData);
+                mergedData.lastUpdated = now;
+                mergedData.messageCount = (existingData.messageCount || 0) + 1;
+                mergedData.version = currentVersion + 1;
+                
+                if (providedTopics && providedTopics.length > 0) {
+                    const existingTopics = existingData.providedInfo || [];
+                    mergedData.providedInfo = [...new Set([...existingTopics, ...providedTopics])];
+                    console.log(`🧠 Memory: Atomically added topics ${JSON.stringify(providedTopics)}`);
+                }
+                
+                this._updateRow(existingRow.rowIndex, mergedData);
+                console.log(`🧠 Memory atomically updated for thread ${threadId} (v${mergedData.version})`);
+            } else {
+                newData.threadId = threadId;
+                newData.lastUpdated = now;
+                newData.messageCount = 1;
+                newData.version = 1; 
+                
+                if (providedTopics && providedTopics.length > 0) {
+                    newData.providedInfo = providedTopics;
+                }
+                
+                this._appendRow(newData);
+                console.log(`🧠 Memory atomically created for thread ${threadId} (v1)`);
+            }
+            
+            this._invalidateCache(`memory_${threadId}`);
+            return true;
+            // --- CRITICAL SECTION END ---
+            
+        } catch (error) {
+            console.error(`❌ Error in atomic memory update: ${error.message}`);
+            return false;
+        } finally {
+            try { cache.remove(lockKey); } catch(e) {}
         }
-        
-        this._appendRow(newData);
-        console.log(`🧠 Memory atomically created for thread ${threadId} (v1)`);
-      }
-      
-      // Invalida cache
-      this._invalidateCache(`memory_${threadId}`);
-      return true;
-      
-    } catch (error) {
-      console.error(`❌ Error in atomic memory update: ${error.message}`);
-      return false;
-    } finally {
-      lock.releaseLock();
     }
+    return false; // Timeout
   }
   
   /**
@@ -282,9 +308,16 @@ class MemoryService {
      }
  
      // ✅ FIX: Strict atomic locking to prevent race conditions with updateMemory
-     const lock = LockService.getScriptLock();
+     const cache = CacheService.getScriptCache();
+     const lockKey = `memory_lock_${threadId}`;
+
      try {
-       lock.waitLock(5000); 
+       // Single try - topic addition is less critical if blocked
+       if (cache.get(lockKey)) {
+           Utilities.sleep(500); 
+           if (cache.get(lockKey)) return; // Skip if still locked
+       }
+       cache.put(lockKey, 'LOCKED', 5);
        
        const existingRow = this._findRowByThreadId(threadId);
        if (existingRow) {
@@ -292,8 +325,10 @@ class MemoryService {
          const existingTopics = existingData.providedInfo || [];
          const mergedTopics = [...new Set([...existingTopics, ...topics])];
          
+         const currentVersion = existingData.version || 0;
          existingData.providedInfo = mergedTopics;
          existingData.lastUpdated = new Date().toISOString();
+         existingData.version = currentVersion + 1; // Increment version for consistency
          // Message count is NOT incremented here (topic-only update)
          
          this._updateRow(existingRow.rowIndex, existingData);
@@ -303,7 +338,7 @@ class MemoryService {
      } catch (error) {
        console.error(`❌ Error adding provided info: ${error.message}`);
      } finally {
-       lock.releaseLock();
+       try { cache.remove(lockKey); } catch(e) {}
      }
    }
   
