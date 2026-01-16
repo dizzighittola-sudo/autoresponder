@@ -90,10 +90,7 @@ class EmailProcessor {
       return { status: 'error', error: 'Lock acquisition failed' };
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // INIZIO BLOCCO PROTETTO (TRY...FINALLY)
-    // ═══════════════════════════════════════════════════════════════
-    try {
+
 
     const result = {
       status: 'unknown',
