@@ -62,9 +62,20 @@ class GeminiService {
    */
   _estimateTokens(text) {
     if (!text) return 0;
-    const asciiCount = (text.match(/[\x00-\x7F]/g) || []).length;
-    const nonAsciiCount = text.length - asciiCount;
-    return Math.ceil(asciiCount / 4 + nonAsciiCount);
+    
+    // 1. Conta parole (approx token boundary)
+    const wordCount = text.split(/\s+/).length;
+    
+    // 2. Formula migliorata (allineata con GeminiRateLimiter):
+    //    - Parole italiane medie: ~1.25 token
+    //    - Overhead JSON/System: +10%
+    const baseTokens = Math.ceil(wordCount * 1.25);
+    const overhead = Math.ceil(baseTokens * 0.1);
+    
+    // 3. Fallback su char count per testi densi
+    const charEstimate = Math.ceil(text.length / 3.5); 
+    
+    return Math.max(baseTokens + overhead, charEstimate, 1);
   }
   
   /**
