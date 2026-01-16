@@ -63,9 +63,12 @@ class ResponseValidator {
     // Placeholder
     this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
     
-    // Pattern firma (case-insensitive) - include varianti di apostrofo:
-    // ' (U+0027 ASCII), ' (U+2018 left single quote), ' (U+2019 right single quote)
-    this.signaturePattern = /segreteria\s+parrocchia/i;
+    // Pattern firma (case-insensitive) - supporta Multilingua
+    this.signaturePatterns = [
+      /segreteria\s+parrocchia/i,                                        // IT (Sanitizzato)
+      /parish\s+secretariat/i,                                           // EN (Sanitizzato)
+      /secretar[ií]a\s+parroquial/i                                     // ES (Sanitizzato)
+    ];
     
     console.log('✓ ResponseValidator inizializzato');
     console.log(`   Soglia minima validità: ${this.MIN_VALID_SCORE}`);
@@ -261,8 +264,11 @@ class ResponseValidator {
     }
     
     // Per primo contatto ('full') e riprese dopo pausa ('soft'): firma attesa
-    if (!this.signaturePattern.test(response)) {
-      warnings.push("Missing signature 'Segreteria Parrocchia [NOME]'");
+    // FIX BUG: Supporta signature multilingua
+    const hasValidSignature = this.signaturePatterns.some(pattern => pattern.test(response));
+    
+    if (!hasValidSignature) {
+      warnings.push("Missing valid signature (e.g. 'Segreteria Parrocchia [NOME]')");
       score = 0.95;
     }
     
