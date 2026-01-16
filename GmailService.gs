@@ -20,6 +20,7 @@ class GmailService {
     
     // Cache etichette per evitare chiamate API ripetute con TTL
     this._labelCache = new Map(); // Map<labelName, {label: GmailLabel, ts: number}>
+    // IMHO-2: 1 hour reduces API calls without risk of stale data (labels change rarely)
     this._cacheTTL = 60 * 60 * 1000; // TTL 1 ora per etichette in cache
 
     console.log('✓ GmailService inizializzato con cache etichette (TTL 1h)');

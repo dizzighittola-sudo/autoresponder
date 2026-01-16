@@ -10,6 +10,15 @@ class PromptContext {
       console.warn('⚠️ PromptContext received invalid input, using empty object');
       input = {}; // Fallback per prevenire crash
     }
+    
+    // FIX Bug 6: Sanitize invalid lastUpdated if present in memory
+    // (PromptContext receives raw input, we must ensure dates are valid before usage)
+    if (input.memory && input.memory.lastUpdated) {
+      if (isNaN(new Date(input.memory.lastUpdated).getTime())) {
+        console.warn(`⚠️ PromptContext detected invalid lastUpdated in memory, resetting to null`);
+        input.memory.lastUpdated = null;
+      }
+    }
     this.input = input;
     this.concerns = this._computeConcerns();
     this.profile = this._computeProfile();

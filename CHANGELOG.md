@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.1] - 2026-01-16
+
+### Fixed
+- **Critical Fix (BUG-2)**: Implemented Thread-Based Lock (via CacheService) in `EmailProcessor` to fix global blocking issue, allowing parallel processing of different threads.
+- **Stability Fix (BUG-6)**: Added validation for invalid/null `lastUpdated` timestamps in `PromptContext` to prevent runtime crashes.
+- **Documentation (IMP-2)**: Added clarification for Cache TTL rationale in `GmailService`.
+
+---
+
 ## [2.1.0] - 2025-01-13
 
 ### Added
