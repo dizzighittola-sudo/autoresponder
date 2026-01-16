@@ -316,8 +316,8 @@ function testBugFixes() {
 
   // === NEW CONFIGURATION TESTS (Residual Polish) ===
   if (typeof CONFIG !== 'undefined') {
-      assertEqual(CONFIG.CACHE_LOCK_TTL, 300, "CONFIG: CACHE_LOCK_TTL should be 300");
-      assertEqual(CONFIG.CACHE_RACE_SLEEP_MS, 100, "CONFIG: CACHE_RACE_SLEEP_MS should be 100");
+      assertEqual(CONFIG.CACHE_LOCK_TTL, 10000, "CONFIG: CACHE_LOCK_TTL should be 10000");
+      assertEqual(CONFIG.CACHE_RACE_SLEEP_MS, 50, "CONFIG: CACHE_RACE_SLEEP_MS should be 50");
       // New Gmail Refactor Assertions
       assertEqual(CONFIG.GMAIL_LABEL_CACHE_TTL, 3600000, "CONFIG: GMAIL_LABEL_CACHE_TTL should be 3600000");
       assertEqual(CONFIG.MAX_HISTORY_MESSAGES, 10, "CONFIG: MAX_HISTORY_MESSAGES should be 10");
@@ -401,7 +401,7 @@ function testBugFixes() {
   if (typeof EmailClassifier !== 'undefined') {
       const classifier = new EmailClassifier();
       // Empty body but meaningful reply subject
-      const result = classifier.classifyEmail("Re: Orari messe", ""); // Body vuoto
+      const result = classifier.classifyEmail("Re: Orari messe", "", true); // Body vuoto, isReply=true
       if (result.shouldReply && result.reason === 'empty_body_generic_subject') {
           TEST_RESULTS.passed++;
       } else {
