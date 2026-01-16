@@ -5,6 +5,13 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.1.8] - 17-01-2026
+
+### Risolti (Bug Fixes)
+- **Config**: Aggiunti parametri `CACHE_LOCK_TTL` e `CACHE_RACE_SLEEP_MS` mancanti in `Main.gs`, prevenendo potenziali errori di runtime nel processore email.
+
+---
+
 ## [2.1.7] - 17-01-2026
 
 ### Risolti (Bug Fixes)

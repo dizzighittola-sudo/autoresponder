@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.1.8] - 2026-01-17
+
+### Fixed
+- **Config**: Added missing `CACHE_LOCK_TTL` and `CACHE_RACE_SLEEP_MS` to `Main.gs` configuration, preventing potential runtime errors in `EmailProcessor`.
+
+---
 ## [2.1.7] - 2026-01-17
 
 ### Fixed

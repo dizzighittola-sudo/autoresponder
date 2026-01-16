@@ -30,6 +30,10 @@ const CONFIG = {
   GMAIL_LABEL_CACHE_TTL: 3600000, // 1 Hour (ms)
   MAX_HISTORY_MESSAGES: 10,       // Max messaggi in cronologia (thread context)
   
+  // === Cache / Locking ===
+  CACHE_LOCK_TTL: 10000,          // 10s (durata lock)
+  CACHE_RACE_SLEEP_MS: 50,        // 50ms (attesa anti-race)
+  
   // === Knowledge Base ===
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
   KB_SHEET_NAME: 'Istruzioni',
