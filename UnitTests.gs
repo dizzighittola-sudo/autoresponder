@@ -484,16 +484,16 @@ function testBugFixes_v214() {
      // We define a mock GmailService that tracks calls
      const mockGmail = {
        addLabelToThread: function(t, l) { this.lastLabel = l; },
-       lastLabel: null
+       addLabelToMessage: function(m, l) { this.lastMessageLabel = l; }, // Mock per message-level labeling
+       lastLabel: null,
+       lastMessageLabel: null
      };
      
      // Instantiate EmailProcessor with mock (Dependency Injection pattern)
-     // Since EmailProcessor uses internal `new GmailService()` if not provided ONE SPECIFIC WAY, 
-     // we assume the constructor allows injection (it does: options.gmailService)
      if (typeof EmailProcessor !== 'undefined') {
          const processor = new EmailProcessor({ gmailService: mockGmail });
-         // We can't trigger the exact validation fail path easily without complex setup.
-         // But we can verify accessing the property works
+         
+         // Verify label name loaded from Config
          assertEqual(processor.config.validationErrorLabel, testLabel, "EmailProcessor should load label from CONFIG");
      }
   }

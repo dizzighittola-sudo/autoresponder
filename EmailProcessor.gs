@@ -34,8 +34,8 @@ class EmailProcessor {
       dryRun: typeof CONFIG !== 'undefined' ? CONFIG.DRY_RUN : false,
       maxEmailsPerRun: typeof CONFIG !== 'undefined' ? CONFIG.MAX_EMAILS_PER_RUN : 10,
       labelName: typeof CONFIG !== 'undefined' ? CONFIG.LABEL_NAME : 'IA',
-      errorLabelName: typeof CONFIG !== 'undefined' ? CONFIG.ERROR_LABEL_NAME : 'IA-Error',
-      validationErrorLabel: typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_ERROR_LABEL : 'IA_VALIDATION_ERROR'
+      errorLabelName: typeof CONFIG !== 'undefined' ? CONFIG.ERROR_LABEL_NAME : 'Errore',
+      validationErrorLabel: typeof CONFIG !== 'undefined' ? CONFIG.VALIDATION_ERROR_LABEL : 'Verifica'
     };
     
     console.log('✓ EmailProcessor inizializzato');
@@ -271,13 +271,14 @@ class EmailProcessor {
         messageDetails.subject
       );
       
+      const knowledgeSections = [];
       let enrichedKnowledgeBase = knowledgeBase;
       
       // 5.1: SPECIAL MASS RULE INJECTION (Prioritary)
       const specialMassRule = getSpecialMassTimeRule(new Date());
       if (specialMassRule) {
         console.log('   🚨 Special Mass Rule Injected into Prompt');
-        enrichedKnowledgeBase = specialMassRule + '\n\n' + enrichedKnowledgeBase;
+        knowledgeSections.push(specialMassRule);
       }
 
       if (territoryResult.addressFound) {
@@ -296,8 +297,7 @@ Dettaglio: ${v.reason}
 ⚠️ Usa ESATTAMENTE queste informazioni verificate programmaticamente.
 ════════════════════════════════════════════════════════════════════════
 `;
-        // FIX: Use enrichedKnowledgeBase to preserve previous enrichments (e.g., specialMassRule)
-        enrichedKnowledgeBase = territoryContext + '\n\n' + enrichedKnowledgeBase;
+        knowledgeSections.push(territoryContext);
       }
       
       // ═══════════════════════════════════════════════════════════════
@@ -317,7 +317,7 @@ Dettaglio: ${v.reason}
 ${GLOBAL_CACHE.aiCoreLite}
 ════════════════════════════════════════════════════════════════════════
 `;
-        enrichedKnowledgeBase = liteSection + '\n\n' + enrichedKnowledgeBase;
+        knowledgeSections.push(liteSection);
         console.log('   ✓ AI_CORE_LITE injected (pastoral/doctrinal question)');
       }
       
@@ -330,7 +330,7 @@ ${GLOBAL_CACHE.aiCoreLite}
 ${GLOBAL_CACHE.aiCore}
 ════════════════════════════════════════════════════════════════════════
 `;
-        enrichedKnowledgeBase = coreSection + '\n\n' + enrichedKnowledgeBase;
+        knowledgeSections.push(coreSection);
         console.log('   ✓ AI_CORE injected (needsDiscernment=true)');
       }
       
@@ -343,9 +343,12 @@ ${GLOBAL_CACHE.aiCore}
 ${GLOBAL_CACHE.doctrineBase}
 ════════════════════════════════════════════════════════════════════════
 `;
-        enrichedKnowledgeBase = doctrineSection + '\n\n' + enrichedKnowledgeBase;
+        knowledgeSections.push(doctrineSection);
         console.log('   ✓ Doctrine Base injected (needsDoctrine=true)');
       }
+
+      knowledgeSections.push(knowledgeBase);
+      enrichedKnowledgeBase = knowledgeSections.filter(Boolean).join('\n\n');
       
       // ═══════════════════════════════════════════════════════════════
       // STEP 6: BUILD CONVERSATION HISTORY
@@ -527,8 +530,14 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
         
         // ✅ Se ci sono WARNING (ma validazione passata), aggiungi etichetta "verifica"
         if (validation.warnings && validation.warnings.length > 0) {
-          console.log(`   ⚠️ Validation PASSED with ${validation.warnings.length} warning(s) - adding '${this.config.validationErrorLabel}' label`);
-          this.gmailService.addLabelToThread(thread, this.config.validationErrorLabel);
+          console.log(
+            `   ⚠️ Validation PASSED with ${validation.warnings.length} warning(s) - adding '${this.config.validationErrorLabel}' label`
+          );
+          if (candidate && typeof candidate.getId === 'function') {
+            this.gmailService.addLabelToMessage(candidate.getId(), this.config.validationErrorLabel);
+          } else {
+            this.gmailService.addLabelToThread(thread, this.config.validationErrorLabel);
+          }
         }
         
         console.log(`   ✓ Validation PASSED (score: ${validation.score.toFixed(2)})`);

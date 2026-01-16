@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.1.7] - 2026-01-17
+
+### Fixed
+- **Logic Fix (RAG)**: Optimized `EmailProcessor` context ordering to ensure specific rules (Special Mass, Territory) take precedence over generic doctrine.
+- **Refactor (Gemini)**: Consolidated fallback logic in `GeminiService` to eliminate legacy code duplication ("Split-Brain") and ensure consistent Rate Limiting.
+
+---
 ## [2.1.6] - 2026-01-16
 
 ### Cleaned

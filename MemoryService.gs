@@ -147,7 +147,7 @@ class MemoryService {
 
       try {
         // 2. Acquisisci lock (durata breve: 10s)
-        cache.put(lockKey, 'LOCKED', 10);
+        cache.put(lockKey, 'LOCKED', CONFIG.MEMORY_LOCK_TTL);
         
         // 3. CRITICAL: Rileggi dati FRESCHI dallo Sheet
         const existingRow = this._findRowByThreadId(threadId); // Lettura diretta
@@ -246,7 +246,7 @@ class MemoryService {
             continue;
         }
         try {
-            cache.put(lockKey, 'LOCKED', 10);
+            cache.put(lockKey, 'LOCKED', CONFIG.MEMORY_LOCK_TTL);
             
             // --- CRITICAL SECTION START ---
             const existingRow = this._findRowByThreadId(threadId);
@@ -317,7 +317,7 @@ class MemoryService {
            Utilities.sleep(500); 
            if (cache.get(lockKey)) return; // Skip if still locked
        }
-       cache.put(lockKey, 'LOCKED', 5);
+       cache.put(lockKey, 'LOCKED', CONFIG.MEMORY_LOCK_TTL);
        
        const existingRow = this._findRowByThreadId(threadId);
        if (existingRow) {

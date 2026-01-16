@@ -5,6 +5,14 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.1.7] - 17-01-2026
+
+### Risolti (Bug Fixes)
+- **Logica (RAG)**: Ottimizzato l'ordine del contesto in `EmailProcessor` per garantire che le regole specifiche (Orari Speciali, Territorio) abbiano priorità sulla dottrina generica.
+- **Refactor (Gemini)**: Consolidata la logica di fallback in `GeminiService` eliminando duplicazioni legacy ("Split-Brain") e garantendo l'uso coerente del Rate Limiter.
+
+---
+
 ## [2.1.6] - 16-01-2026
 
 ### Pulizia (Cleaned)
