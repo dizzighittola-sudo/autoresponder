@@ -5,6 +5,13 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.6] - 17-01-2026
+
+### Aggiunto
+- **Logica "Valvola di Sicurezza"**: Implementata degradazione graziosa in `Main.gs`. Il sistema ora dimezza automaticamente `MAX_EMAILS_PER_RUN` se l'utilizzo della quota giornaliera Gemini supera l'80%, prevenendo l'esaurimento totale.
+- **Badge Documentazione**: Aggiunti badge di Licenza, Google Apps Script, Gemini AI e Stato Produzione a `README.md` e `README_IT.md`.
+
+---
 ## [2.3.5] - 17-01-2026
 
 ### Aggiunto

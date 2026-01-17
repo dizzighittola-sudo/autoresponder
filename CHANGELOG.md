@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.3.6] - 2026-01-17
+### Added
+- **Safety Valve Logic**: Implemented graceful degradation in `Main.gs`. The system now automatically halves the `MAX_EMAILS_PER_RUN` if Gemini daily quota usage exceeds 80%, preventing total exhaustion.
+- **Documentation Badges**: Added License, Google Apps Script, Gemini AI, and Production Status badges to `README.md` and `README_IT.md`.
+
+---
 ## [2.3.5] - 2026-01-17
 ### Added
 - **Politeness Tuning (Active Acknowledgment)**: Updated the Quick Check prompt in `GeminiService.gs` to ensure the bot acknowledges emails providing useful info (availability, docs, etc.), even without direct questions.
@@ -35,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Inbox Saturation (CRITICAL)**: Fixed a bug where the bot became "blocked" when multiple unread messages were already labeled. Optimized search query to `in:inbox is:unread -label:IA`.
 - **Misleading Summary**: Corrected reporting bug where all skipped threads were erroneously labeled as "self-sent".
+
+---
+## [2.3.2] - 2026-01-17
+### Added
+- **Active Listening Logic**: The `PromptEngine` now recognizes information already provided by the user (e.g., reasons for inability or proposed dates) instead of mechanically requesting them again.
+- **Manual Unlock Utility**: Added `clearStaleLocks(threadId)` in `Main.gs` to remove orphaned locks from cache.
+
+### Fixed
+- **Multi-Turn Regression**: Restored the ability to respond to user follow-ups (removed `-from:me` from the initial search).
+- **Lock Stability**: Fixed variable scoping and set lock TTL to 30 seconds to prevent indefinitely blocked threads.
 
 ## [2.3.1] - 2026-01-14
 
