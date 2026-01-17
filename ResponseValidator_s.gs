@@ -63,6 +63,29 @@ class ResponseValidator {
     // Placeholder
     this.placeholders = ['XXX', 'TODO', '<insert>', 'placeholder', 'tbd', 'TBD', '...'];
     
+    // Pattern di ragionamento esposto (thinking leak) - CRITICAL
+    this.thinkingPatterns = [
+      'rivedendo la knowledge base',
+      'rivedendo la kb',
+      'la kb dice',
+      'la knowledge base',
+      'devo usare solo',
+      'devo correggere',
+      'correggo la sezione',
+      'meglio dire',
+      'in realtà',
+      'pensandoci bene',
+      '(nota:',
+      'nota:',
+      'n.b.:',
+      'nb:',
+      'come da istruzioni',
+      'secondo le linee guida',
+      'le date del 202', // Pattern generico per commenti su date
+      'sono passate',
+      'non sono ancora presenti'
+    ];
+    
     // Pattern firma (case-insensitive) - supporta Multilingua
     this.signaturePatterns = [
       /segreteria\s+parrocchia\s+\[NOME\]/i,         // IT
@@ -127,6 +150,13 @@ class ResponseValidator {
     warnings.push(...capResult.warnings);
     details.capitalAfterComma = capResult;
     score *= capResult.score;
+    
+    // === CHECK 7: Exposed Reasoning/Thinking (CRITICAL - Gemini 2.5 issue) ===
+    const reasoningResult = this._checkExposedReasoning(response);
+    errors.push(...reasoningResult.errors);
+    warnings.push(...reasoningResult.warnings);
+    details.exposedReasoning = reasoningResult;
+    score *= reasoningResult.score;
     
     // === DETERMINE VALIDITY ===
     const isValid = errors.length === 0 && score >= this.MIN_VALID_SCORE;
@@ -522,6 +552,38 @@ class ResponseValidator {
     }
     
     return { score, errors, warnings, violations };
+  }
+  
+  /**
+   * Check 7: Ragionamento esposto (Thinking Leak)
+   * ✅ Rileva quando l'IA espone il suo processo di pensiero nella risposta
+   * BUG FIX: Gemini 2.5 può "pensare ad alta voce" - questo va bloccato
+   */
+  _checkExposedReasoning(response) {
+    const errors = [];
+    const warnings = [];
+    let score = 1.0;
+    const foundPatterns = [];
+    
+    const responseLower = response.toLowerCase();
+    
+    // Cerca pattern di thinking/reasoning esposto
+    for (const pattern of this.thinkingPatterns) {
+      if (responseLower.includes(pattern.toLowerCase())) {
+        foundPatterns.push(pattern);
+      }
+    }
+    
+    // Se trovati pattern critici, blocca la risposta
+    if (foundPatterns.length > 0) {
+      errors.push(
+        `THINKING LEAK DETECTED: Response contains exposed reasoning ("${foundPatterns[0]}..."). ` +
+        `The AI must NOT show its thought process to users.`
+      );
+      score = 0.0; // Blocco totale - questa risposta NON deve essere inviata
+    }
+    
+    return { score, errors, warnings, foundPatterns };
   }
   
   // ========================================================================
