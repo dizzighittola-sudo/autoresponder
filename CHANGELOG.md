@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.3.0] - 2026-01-17
+
+### Added
+- **Dynamic Vacation Period**: System now reads secretary vacation dates from Sheet (row 6: A6="Ferie segretario", B6=start, C6=end).
+- **`isInVacationPeriod()`**: New function replaces hardcoded Ferragosto logic with configurable dates.
+- **GLOBAL_CACHE.vacationPeriod**: Stores vacation start/end dates loaded from Sheet.
+
+### Removed
+- **`isFerragostoFixedPeriod()`**: Replaced by dynamic `isInVacationPeriod()`.
+- **`getFerragostoPeriodInfo()`**: Dead code removed.
+
+### Changed
+- Vacation period no longer hardcoded to Aug 15-31; now fully configurable via Sheet.
+
+---
 ## [2.2.2] - 2026-01-17
 
 ### Added

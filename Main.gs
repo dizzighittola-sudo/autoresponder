@@ -127,6 +127,7 @@ var GLOBAL_CACHE = {
   ignoreDomains: CONFIG.IGNORE_DOMAINS,
   ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
   replacements: {},
+  vacationPeriod: { start: null, end: null }, // ✅ Ferie segretario da Sheet
   loaded: false
 };
 
@@ -199,6 +200,21 @@ function loadResources() {
         GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
         GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData);
         console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
+        
+        // ✅ Leggi periodo ferie segretario da riga 6 (A6:C6)
+        try {
+          const ferieRow = kbSheet.getRange('A6:C6').getValues()[0];
+          if (ferieRow[0] && String(ferieRow[0]).toLowerCase().includes('ferie') && ferieRow[1] && ferieRow[2]) {
+            const startDate = new Date(ferieRow[1]);
+            const endDate = new Date(ferieRow[2]);
+            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+              GLOBAL_CACHE.vacationPeriod = { start: startDate, end: endDate };
+              console.log(`✓ Vacation period loaded: ${startDate.toLocaleDateString('it-IT')} - ${endDate.toLocaleDateString('it-IT')}`);
+            }
+          }
+        } catch (ferieErr) {
+          console.warn(`⚠️ Could not load vacation period: ${ferieErr.message}`);
+        }
       } else {
         console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
       }
@@ -327,18 +343,29 @@ function calculateEaster(year) {
 }
 
 /**
- * Verifica se una data è nel periodo vacanze di Ferragosto
- * Regola: Periodo fisso dal 15 al 31 Agosto (inclusi)
+ * Verifica se una data è nel periodo ferie segretario (configurato da Sheet)
+ * Legge le date da GLOBAL_CACHE.vacationPeriod (caricato da riga 6 di Istruzioni)
+ * @param {Date} date - Data da verificare
+ * @returns {boolean} - true se siamo nel periodo ferie
  */
-function isFerragostoFixedPeriod(date) {
-  // FIX Bug #27: Validate date parameter
+function isInVacationPeriod(date = new Date()) {
+  // Validate date parameter
   if (!(date instanceof Date) || isNaN(date.getTime())) {
-    console.warn('⚠️ Invalid date passed to isFerragostoFixedPeriod');
+    console.warn('⚠️ Invalid date passed to isInVacationPeriod');
     return false;
   }
-  const month = date.getMonth() + 1; // 1-12
-  const day = date.getDate();
-  return month === 8 && day >= 15 && day <= 31;
+  
+  const vp = GLOBAL_CACHE.vacationPeriod;
+  if (!vp || !vp.start || !vp.end) {
+    return false; // Nessun periodo ferie configurato
+  }
+  
+  // Normalizza a mezzanotte per confronto corretto
+  const checkDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const start = new Date(vp.start.getFullYear(), vp.start.getMonth(), vp.start.getDate());
+  const end = new Date(vp.end.getFullYear(), vp.end.getMonth(), vp.end.getDate());
+  
+  return checkDate >= start && checkDate <= end;
 }
 
 /**
@@ -399,9 +426,9 @@ function isInSuspensionTime(checkDate = new Date()) {
     return false;
   }
 
-  // C. Periodo Ferragosto (Fisso: 15-31 Agosto)
-  if (isFerragostoFixedPeriod(now)) {
-    console.log('📅 Periodo Ferragosto (Sistema Attivo)');
+  // C. Periodo Ferie Segretario (Dinamico da Sheet)
+  if (isInVacationPeriod(now)) {
+    console.log('📅 Periodo Ferie Segretario (Sistema Attivo)');
     return false;
   }
 
@@ -496,14 +523,6 @@ Unico orario valido per OGGI: ore 19:00.
   return null;
 }
 
-/**
- * Ritorna una stringa che descrive il periodo vacanze di Ferragosto.
- * Periodo fisso: 15-31 Agosto.
- */
-function getFerragostoPeriodInfo(date = new Date()) {
-  const year = date.getFullYear();
-  return `Periodo Ferragosto: 15 ago - 31 ago ${year}`;
-}
 
 
 
