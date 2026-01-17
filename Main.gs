@@ -607,19 +607,20 @@ function main() {
     return;
   }
   
-  // Crea ed esegui processore
-  try {
-    const processor = new EmailProcessor();
-    const stats = processor.processUnreadEmails(
-      GLOBAL_CACHE.knowledgeBase,
-      GLOBAL_CACHE.doctrineBase
-    );
-    
-    console.log('\n✓ Elaborazione completata');
-    console.log(`   Processate: ${stats.total}, Risposte: ${stats.replied}, Filtrate: ${stats.filtered}`);
-    
-  } catch (error) {
-    console.error(`❌ Errore fatale: ${error.message}`);
+    // Crea ed esegui processore
+    try {
+      const processor = new EmailProcessor();
+      const stats = processor.processUnreadEmails(
+        GLOBAL_CACHE.knowledgeBase,
+        GLOBAL_CACHE.doctrineBase
+      );
+      
+      console.log('\n✓ Elaborazione completata');
+      console.log(`   Processate: ${stats.total}, Risposte: ${stats.replied}, Filtrate: ${stats.filtered}`);
+      
+    } catch (error) {
+      console.error(`❌ Errore fatale: ${error.message}`);
+    }
   } finally {
     // Rilascia sempre il lock globale
     try {
