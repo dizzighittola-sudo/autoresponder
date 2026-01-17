@@ -278,7 +278,16 @@ class MemoryService {
                 
                 if (providedTopics && providedTopics.length > 0) {
                     const existingTopics = existingData.providedInfo || [];
-                    mergedData.providedInfo = [...new Set([...existingTopics, ...providedTopics])];
+                    let mergedTopics = [...new Set([...existingTopics, ...providedTopics])];
+                    
+                    // ✅ FIX: Limita providedInfo per evitare memory bloat
+                    const maxTopics = (typeof CONFIG !== 'undefined' && CONFIG.MAX_PROVIDED_TOPICS) || 50;
+                    if (mergedTopics.length > maxTopics) {
+                      console.log(`🧠 Memory: Trimming providedInfo from ${mergedTopics.length} to ${maxTopics} topics`);
+                      mergedTopics = mergedTopics.slice(-maxTopics);
+                    }
+                    
+                    mergedData.providedInfo = mergedTopics;
                     console.log(`🧠 Memory: Atomically added topics ${JSON.stringify(providedTopics)}`);
                 }
                 
@@ -337,7 +346,14 @@ class MemoryService {
        if (existingRow) {
          const existingData = this._rowToObject(existingRow.values);
          const existingTopics = existingData.providedInfo || [];
-         const mergedTopics = [...new Set([...existingTopics, ...topics])];
+         let mergedTopics = [...new Set([...existingTopics, ...topics])];
+         
+         // ✅ FIX: Limita providedInfo per evitare memory bloat
+         const maxTopics = (typeof CONFIG !== 'undefined' && CONFIG.MAX_PROVIDED_TOPICS) || 50;
+         if (mergedTopics.length > maxTopics) {
+           console.log(`🧠 Memory: Trimming providedInfo from ${mergedTopics.length} to ${maxTopics} topics`);
+           mergedTopics = mergedTopics.slice(-maxTopics);
+         }
          
          const currentVersion = existingData.version || 0;
          existingData.providedInfo = mergedTopics;

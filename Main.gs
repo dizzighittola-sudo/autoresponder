@@ -42,6 +42,12 @@ const CONFIG = {
   DOCTRINE_SHEET: 'Dottrina',
   REPLACEMENTS_SHEET_NAME: 'Sostituzioni',
   MEMORY_SHEET_NAME: 'ConversationMemory',
+  MAX_PROVIDED_TOPICS: 50,             // ✅ Limite massimo topic in memoria (evita bloat)
+  MEMORY_LOCK_TTL: 10,                 // Lock TTL in secondi per MemoryService
+  
+  // === Sheets API Retry ===
+  SHEETS_RETRY_MAX: 3,                 // ✅ Tentativi massimi per operazioni Sheets
+  SHEETS_RETRY_BACKOFF_MS: 1000,       // ✅ Backoff iniziale (raddoppia ad ogni retry)
   
   // === Modalità ===
   DRY_RUN: false,  // Cambia a true per test senza invio email
@@ -128,6 +134,40 @@ var GLOBAL_CACHE = {
 // CARICAMENTO RISORSE
 // ====================================================================
 
+/**
+ * ✅ Helper: Esegue operazione Sheets con retry automatico
+ * Gestisce errori transienti (503, timeout) con exponential backoff
+ * @param {Function} fn - Funzione che esegue operazione Sheets
+ * @param {string} context - Descrizione per logging
+ * @returns {*} Risultato della funzione
+ */
+function withSheetsRetry(fn, context = 'Sheets operation') {
+  const maxRetries = CONFIG.SHEETS_RETRY_MAX || 3;
+  const baseBackoff = CONFIG.SHEETS_RETRY_BACKOFF_MS || 1000;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return fn();
+    } catch (error) {
+      const isRetryable = error.message.includes('503') || 
+                          error.message.includes('500') ||
+                          error.message.includes('timeout') ||
+                          error.message.includes('Timeout') ||
+                          error.message.includes('Service invoked too many times');
+      
+      if (isRetryable && attempt < maxRetries - 1) {
+        const waitMs = baseBackoff * Math.pow(2, attempt);
+        console.warn(`⚠️ ${context} failed (Attempt ${attempt + 1}/${maxRetries}): ${error.message}. Retrying in ${waitMs}ms...`);
+        Utilities.sleep(waitMs);
+        continue;
+      }
+      
+      // Non retryable o ultimo tentativo
+      throw error;
+    }
+  }
+}
+
 function loadResources() {
   // FIX Bug 4: Previene race condition reali tra esecuzioni parallele
   const lock = LockService.getScriptLock();
@@ -148,68 +188,71 @@ function loadResources() {
     GLOBAL_CACHE.loading = true;
     console.log('📦 Loading resources...');
     
-    const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    
-    // Carica Knowledge Base (Istruzioni)
-    const kbSheet = spreadsheet.getSheetByName(CONFIG.KB_SHEET_NAME);
-    if (kbSheet) {
-      const kbData = kbSheet.getDataRange().getValues();
-      GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
-      GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData); // ✅ Structured
-      console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
-    } else {
-      console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
-    }
-    
-    // Carica AI_CORE_LITE (principi pastorali base)
-    const liteSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_LITE_SHEET);
-    if (liteSheet) {
-      const liteData = liteSheet.getDataRange().getValues();
-      GLOBAL_CACHE.aiCoreLite = liteData.map(row => row.join(' | ')).join('\n');
-      GLOBAL_CACHE.aiCoreLiteStructured = _parseSheetToStructured(liteData); // ✅ Structured
-      console.log(`✓ AI_CORE_LITE loaded: ${GLOBAL_CACHE.aiCoreLite.length} chars`);
-    } else {
-      console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_LITE_SHEET}' not found`);
-    }
-    
-    // Carica AI_CORE (principi pastorali estesi per discernimento)
-    const coreSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_SHEET);
-    if (coreSheet) {
-      const coreData = coreSheet.getDataRange().getValues();
-      GLOBAL_CACHE.aiCore = coreData.map(row => row.join(' | ')).join('\n');
-      GLOBAL_CACHE.aiCoreStructured = _parseSheetToStructured(coreData); // ✅ Structured
-      console.log(`✓ AI_CORE loaded: ${GLOBAL_CACHE.aiCore.length} chars`);
-    } else {
-      console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_SHEET}' not found`);
-    }
-    
-    // Carica Dottrina (base dottrinale completa)
-    const doctrineSheet = spreadsheet.getSheetByName(CONFIG.DOCTRINE_SHEET);
-    if (doctrineSheet) {
-      const doctrineData = doctrineSheet.getDataRange().getValues();
-      GLOBAL_CACHE.doctrineBase = doctrineData.map(row => row.join(' | ')).join('\n');
-      GLOBAL_CACHE.doctrineStructured = _parseSheetToStructured(doctrineData); // ✅ Structured
-      console.log(`✓ Doctrine Base loaded: ${GLOBAL_CACHE.doctrineBase.length} chars (${GLOBAL_CACHE.doctrineStructured.length} rows)`);
-    } else {
-      console.warn(`⚠️ Sheet '${CONFIG.DOCTRINE_SHEET}' not found`);
-    }
-    
-    // Carica Sostituzioni
-    try {
-      const replSheet = spreadsheet.getSheetByName(CONFIG.REPLACEMENTS_SHEET_NAME);
-      if (replSheet) {
-        const replData = replSheet.getDataRange().getValues();
-        for (let i = 1; i < replData.length; i++) {
-          const [badText, goodText] = replData[i];
-          if (badText && goodText) {
-            GLOBAL_CACHE.replacements[String(badText).trim()] = String(goodText).trim();
-          }
-        }
-        console.log(`✓ Replacements loaded: ${Object.keys(GLOBAL_CACHE.replacements).length}`);
+    // ✅ Wrap main sheet operations with retry
+    withSheetsRetry(() => {
+      const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+      
+      // Carica Knowledge Base (Istruzioni)
+      const kbSheet = spreadsheet.getSheetByName(CONFIG.KB_SHEET_NAME);
+      if (kbSheet) {
+        const kbData = kbSheet.getDataRange().getValues();
+        GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
+        GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData);
+        console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
+      } else {
+        console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
       }
-    } catch (replError) {
-      console.warn(`⚠️ Could not load replacements: ${replError.message}`);
-    }
+      
+      // Carica AI_CORE_LITE (principi pastorali base)
+      const liteSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_LITE_SHEET);
+      if (liteSheet) {
+        const liteData = liteSheet.getDataRange().getValues();
+        GLOBAL_CACHE.aiCoreLite = liteData.map(row => row.join(' | ')).join('\n');
+        GLOBAL_CACHE.aiCoreLiteStructured = _parseSheetToStructured(liteData);
+        console.log(`✓ AI_CORE_LITE loaded: ${GLOBAL_CACHE.aiCoreLite.length} chars`);
+      } else {
+        console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_LITE_SHEET}' not found`);
+      }
+      
+      // Carica AI_CORE (principi pastorali estesi per discernimento)
+      const coreSheet = spreadsheet.getSheetByName(CONFIG.AI_CORE_SHEET);
+      if (coreSheet) {
+        const coreData = coreSheet.getDataRange().getValues();
+        GLOBAL_CACHE.aiCore = coreData.map(row => row.join(' | ')).join('\n');
+        GLOBAL_CACHE.aiCoreStructured = _parseSheetToStructured(coreData);
+        console.log(`✓ AI_CORE loaded: ${GLOBAL_CACHE.aiCore.length} chars`);
+      } else {
+        console.warn(`⚠️ Sheet '${CONFIG.AI_CORE_SHEET}' not found`);
+      }
+      
+      // Carica Dottrina (base dottrinale completa)
+      const doctrineSheet = spreadsheet.getSheetByName(CONFIG.DOCTRINE_SHEET);
+      if (doctrineSheet) {
+        const doctrineData = doctrineSheet.getDataRange().getValues();
+        GLOBAL_CACHE.doctrineBase = doctrineData.map(row => row.join(' | ')).join('\n');
+        GLOBAL_CACHE.doctrineStructured = _parseSheetToStructured(doctrineData);
+        console.log(`✓ Doctrine Base loaded: ${GLOBAL_CACHE.doctrineBase.length} chars (${GLOBAL_CACHE.doctrineStructured.length} rows)`);
+      } else {
+        console.warn(`⚠️ Sheet '${CONFIG.DOCTRINE_SHEET}' not found`);
+      }
+      
+      // Carica Sostituzioni
+      try {
+        const replSheet = spreadsheet.getSheetByName(CONFIG.REPLACEMENTS_SHEET_NAME);
+        if (replSheet) {
+          const replData = replSheet.getDataRange().getValues();
+          for (let i = 1; i < replData.length; i++) {
+            const [badText, goodText] = replData[i];
+            if (badText && goodText) {
+              GLOBAL_CACHE.replacements[String(badText).trim()] = String(goodText).trim();
+            }
+          }
+          console.log(`✓ Replacements loaded: ${Object.keys(GLOBAL_CACHE.replacements).length}`);
+        }
+      } catch (replError) {
+        console.warn(`⚠️ Could not load replacements: ${replError.message}`);
+      }
+    }, 'loadResources');
     
     GLOBAL_CACHE.loaded = true;
     GLOBAL_CACHE.loading = false;

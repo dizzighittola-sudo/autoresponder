@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.2.2] - 2026-01-17
+
+### Added
+- **Main.gs**: Added `withSheetsRetry()` helper function for automatic retry with exponential backoff on transient Sheets API errors (503, 500, timeout).
+- **Config**: Added `SHEETS_RETRY_MAX` (3) and `SHEETS_RETRY_BACKOFF_MS` (1000ms) configuration constants.
+- **Config**: Added `MAX_PROVIDED_TOPICS` (50) to limit memory growth on long conversation threads.
+
+### Fixed
+- **MemoryService**: Fixed potential memory bloat on long threads by limiting `providedInfo` to 50 topics (older topics trimmed).
+- **Main.gs**: Wrapped `loadResources()` with retry logic to handle transient Sheets API failures.
+
+---
 ## [2.2.1] - 2026-01-17
 
 ### Critical Logic Fixes
