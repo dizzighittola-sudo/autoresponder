@@ -283,7 +283,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📊 Project Status
 
-### Current Version: 2.3.7
+### Current Version: 2.3.8
 
 **Stable Features:**
 - ✅ Core email processing pipeline

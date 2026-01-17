@@ -315,7 +315,7 @@ class MemoryService {
             console.error(`❌ Error in atomic memory update: ${error.message}`);
             return false;
         } finally {
-            try { cache.remove(lockKey); } catch(e) {}
+            try { cache.remove(lockKey); } catch(e) { console.warn(`⚠️ Errore rimozione lock (Atomic): ${e.message}`); }
         }
     }
     return false; // Timeout
@@ -368,7 +368,7 @@ class MemoryService {
      } catch (error) {
        console.error(`❌ Error adding provided info: ${error.message}`);
      } finally {
-       try { cache.remove(lockKey); } catch(e) {}
+       try { cache.remove(lockKey); } catch(e) { console.warn(`⚠️ Errore rimozione lock (Topics): ${e.message}`); }
      }
    }
   

@@ -5,7 +5,15 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
-## [2.3.7] - 17-01-2026
+## [2.3.8] - 17-01-2026
+
+### Aggiunto
+- Log diagnostici (`console.warn`) in tutti i blocchi catch precedentemente vuoti per una migliore osservabilità.
+
+### Corretto
+- Vulnerabilità ReDoS nel regex dei numeri di telefono in `ResponseValidator` tramite l'uso di un pattern lineare deterministico.
+
+---
 
 ### Risolti (Bug Fixes)
 - **Caricamento Risorse Robusto (Main.gs)**: Risolta race condition nel caricamento del foglio ferie, garantendo l'inizializzazione corretta della cache (BUG #1).

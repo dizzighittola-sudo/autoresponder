@@ -142,7 +142,7 @@ class GeminiRateLimiter {
     } catch (e) {
       console.error(`❌ Error during quota initialization lock: ${e.message}`);
     } finally {
-      try { lock.releaseLock(); } catch (e) {}
+      try { lock.releaseLock(); } catch (e) { console.warn(`⚠️ Errore rilascio lock (QuotaReset): ${e.message}`); }
     }
   }
   

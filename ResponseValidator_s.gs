@@ -433,7 +433,9 @@ class ResponseValidator {
     
     // === Controllo 3: Numeri di Telefono ===
     // FIX: Relax phone pattern to accept international codes and 9-digit numbers (green numbers), and +39
-    const phonePattern = /\b(?:\+?\d{1,3}[-.\s]?)?(?:0\d|3\d{2}|8\d{2})[-.\s]?\d{2,8}(?:[-.\s]?\d{2,4})*\b/g;
+    // Pattern telefono ottimizzato (evita ReDoS)
+    const phonePattern = /\b(?:\+?\d{1,3})?[\s.-]?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,4}\b/g;
+
     const responsePhonesRaw = response.match(phonePattern) || [];
     const kbPhonesRaw = safeKnowledgeBase.match(phonePattern) || [];
     

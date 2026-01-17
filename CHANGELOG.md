@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.3.8] - 2026-01-17
+### Added
+- Diagnostic logging (`console.warn`) to all previously empty catch blocks for better observability.
+
+### Fixed
+- ReDoS vulnerability in `ResponseValidator` phone number regex by using a deterministic linear pattern.
+
+---
 ## [2.3.7] - 2026-01-17
 ### Fixed
 - **Robust Resource Loading (Main.gs)**: Fixed a race condition where the cache was marked as loaded even if the vacation sheet failed (BUG #1).

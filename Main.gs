@@ -317,7 +317,7 @@ function loadResources() {
     try {
       lock.releaseLock();
     } catch(e) {
-      // Ignora errori di rilascio lock
+      console.warn(`⚠️ Errore nel rilascio ScriptLock (loadResources): ${e.message}`);
     }
   }
 }
