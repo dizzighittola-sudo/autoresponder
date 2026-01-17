@@ -283,7 +283,7 @@ Vedi [CONTRIBUTING_IT.md](CONTRIBUTING_IT.md) per linee guida.
 
 ## 📊 Stato Progetto
 
-### Versione Attuale: 2.3.6
+### Versione Attuale: 2.3.7
 
 **Funzionalità Stabili:**
 - ✅ Pipeline elaborazione email core
