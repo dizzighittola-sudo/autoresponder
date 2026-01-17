@@ -155,7 +155,9 @@ Oggetto: ${emailSubject}
 Testo: ${emailContent.substring(0, 800)}
 
 Compiti:
-1. Decidi se richiede risposta (reply_needed).
+1. Decidi se richiede risposta (reply_needed):
+   - Rispondi TRUE se l'utente pone domande, esprime dubbi o fornisce informazioni utili/richieste (es. orari di disponibilità, allegati, conferme). È importante confermare la ricezione per cortesia ed educazione.
+   - Rispondi FALSE solo se l'email è un ringraziamento finale (es. "Grazie mille, buona giornata") che non aggiunge informazioni, oppure se è newsletter/spam.
 2. Rileva la lingua dell'email (language) - usa codice ISO 639-1 (es: "it", "en", "es", "fr", "de", "pl", "tr", "pt", etc.).
 3. Classifica la richiesta (category) in una di queste:
    - "TECHNICAL": orari, documenti, procedure, info pratiche, iscrizioni, prenotazioni, cambi camera, pagamenti, aspetti organizzativi

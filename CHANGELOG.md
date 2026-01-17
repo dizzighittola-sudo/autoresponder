@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.3.5] - 2026-01-17
+### Added
+- **Politeness Tuning (Active Acknowledgment)**: Updated the Quick Check prompt in `GeminiService.gs` to ensure the bot acknowledges emails providing useful info (availability, docs, etc.), even without direct questions.
+
+---
 ## [2.3.4] - 2026-01-17
 ### Added
 - **Thread Lock Hardening**: Implemented stale lock detection and safe release in `EmailProcessor.gs`.

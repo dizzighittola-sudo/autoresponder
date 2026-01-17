@@ -5,6 +5,12 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.5] - 17-01-2026
+
+### Aggiunto
+- **Tuning Educazione (Ascolto Attivo)**: Aggiornato il prompt del Quick Check in `GeminiService.gs` per garantire che il bot confermi la ricezione di informazioni utili (disponibilità, documenti, ecc.) anche in assenza di domande dirette.
+
+---
 ## [2.3.4] - 17-01-2026
 
 ### Aggiunto
