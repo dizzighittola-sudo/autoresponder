@@ -456,7 +456,7 @@ const MONTH = {
 ### Vacation Periods (NEW in v2.3.0)
 
 **Type:** Array of periods (read from Sheet)  
-**Location:** Sheet `Istruzioni`, rows 6-10  
+**Location:** Sheet `Controllo`, rows 6-10  
 **Loaded into:** `GLOBAL_CACHE.vacationPeriods`
 
 **Description:** Configurable vacation periods when the system always operates (staff on vacation).

@@ -8,7 +8,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/s
 ## [2.3.0] - 17-01-2026
 
 ### Aggiunti
-- **Periodi Ferie Multi-Anno**: Il sistema ora legge fino a 5 periodi ferie dalle righe 6-10 del foglio `Istruzioni` (A=etichetta "Ferie...", B=inizio, C=fine).
+- **Periodi Ferie Multi-Anno**: Il sistema ora legge fino a 5 periodi ferie dalle righe 6-10 del foglio `Controllo` (A=etichetta "Ferie...", B=inizio, C=fine).
 - **`isInVacationPeriod()`**: Nuova funzione che verifica se la data corrente ricade in uno qualsiasi dei periodi configurati.
 - **`GLOBAL_CACHE.vacationPeriods`**: Array di periodi ferie caricati dal foglio.
 

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.3.0] - 2026-01-17
 
 ### Added
-- **Multi-Period Vacation Support**: System reads up to 5 vacation periods from Sheet rows 6-10 (A=label "Ferie...", B=start, C=end).
+- **Multi-Period Vacation Support**: System reads up to 5 vacation periods from Sheet `Controllo` rows 6-10 (A=label "Ferie...", B=start, C=end).
 - **`isInVacationPeriod()`**: Checks if today falls in ANY of the configured vacation periods.
 - **`GLOBAL_CACHE.vacationPeriods`**: Array of vacation periods loaded from Sheet.
 

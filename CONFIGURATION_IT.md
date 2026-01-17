@@ -342,7 +342,7 @@ const ALWAYS_OPERATING_DAYS = [
 ### Periodi Ferie (NUOVO in v2.3.0)
 
 **Tipo:** Array di periodi (letto da Sheet)  
-**Posizione:** Foglio `Istruzioni`, righe 6-10  
+**Posizione:** Foglio `Controllo`, righe 6-10  
 **Caricato in:** `GLOBAL_CACHE.vacationPeriods`
 
 **Descrizione:** Periodi ferie configurabili quando il sistema opera sempre (segreteria in ferie).
