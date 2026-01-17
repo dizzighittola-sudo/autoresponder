@@ -5,6 +5,17 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.2] - 17-01-2026
+
+### Aggiunto
+- **Logica di "Ascolto Attivo"**: Il PromptEngine ora riconosce le informazioni già fornite dall'utente (es. motivi di impedimento o date proposte) invece di richiederle meccanicamente.
+- **Sblocco Manuale**: Aggiunta utility `clearStaleLocks(threadId)` in `Main.gs` per rimuovere lock orfani dalla cache.
+
+### Risolti (Bug Fixes)
+- **Regressione Multi-Turn**: Ripristinata la capacità di rispondere ai follow-up degli utenti (rimosso `-from:me` dalla ricerca iniziale).
+- **Stabilità Lock**: Corretto errore di scoping delle variabili e impostato TTL del lock a 30 secondi per prevenire thread bloccati a tempo indeterminato.
+
+---
 ## [2.3.1] - 17-01-2026
 
 ### Risolti (Bug Fixes)

@@ -15,7 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
-## [2.3.1] - 2026-01-17
+## [2.3.2] - 2026-01-17
+### Added
+- "Active Listening" logic in PromptEngine: AI now acknowledges info already provided (reasons, dates) instead of asking for it again.
+- Manual lock clearing utility `clearStaleLocks(threadId)` in `Main.gs`.
+
+### Fixed
+- Multi-turn regression: removed `-from:me` from search query to allow follow-ups.
+- Cache Lock bug: corrected TTL to seconds (30s) and fixed variable scoping in `finally` block.
+
+## [2.3.1] - 2026-01-14
 
 ### Fixed
 - **CRITICAL: Thinking Leak (Gemini 2.5)**: Fixed issue where AI exposed internal reasoning in email responses (e.g., "Rivedendo la knowledge base...", "Correggo la sezione..."). 
