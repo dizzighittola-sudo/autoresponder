@@ -1,6 +1,6 @@
 # 🤖 Parish Email Autoresponder
 
-[![Language](https://img.shields.io/badge/🇬🇧_English-blue?style=for-the-badge)](README.md) [![Language](https://img.shields.io/badge/🇮🇹_Italiano-red?style=for-the-badge)](README_IT.md) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![GAS](https://img.shields.io/badge/Google%20Apps%20Script-v8-green.svg) ![AI](https://img.shields.io/badge/Gemini-2.5%20Flash-orange.svg) ![Status](https://img.shields.io/badge/status-production-success.svg)
+[![Language](https://img.shields.io/badge/🇬🇧_English-blue?style=for-the-badge)](README.md) [![Language](https://img.shields.io/badge/🇮🇹_Italiano-red?style=for-the-badge)](README_IT.md) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![GAS](https://img.shields.io/badge/Google%20Apps%20Script-v8-green.svg)](https://developers.google.com/apps-script) [![AI](https://img.shields.io/badge/Gemini-2.5%20Flash-orange.svg)](https://ai.google.dev/) [![Status](https://img.shields.io/badge/status-production-success.svg)](#-project-status)
 
 > **Intelligent AI-powered email autoresponder for Catholic parish offices** — Built with Google Apps Script and Google Gemini API
 
