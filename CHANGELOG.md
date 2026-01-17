@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.3.1] - 2026-01-17
+
+### Fixed
+- **CRITICAL: Thinking Leak (Gemini 2.5)**: Fixed issue where AI exposed internal reasoning in email responses (e.g., "Rivedendo la knowledge base...", "Correggo la sezione..."). 
+  - **PromptEngine.gs**: Added ERRORE #4 to explicitly prohibit exposed reasoning in responses.
+  - **ResponseValidator.gs**: Added CHECK 7 (`_checkExposedReasoning`) to detect and block responses containing meta-commentary or self-corrections.
+
+---
 ## [2.3.0] - 2026-01-17
 
 ### Added

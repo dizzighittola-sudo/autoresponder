@@ -5,6 +5,14 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.1] - 17-01-2026
+
+### Risolti (Bug Fixes)
+- **CRITICO: Thinking Leak (Gemini 2.5)**: Corretto problema in cui l'IA esponeva il suo ragionamento interno nelle risposte email (es. "Rivedendo la knowledge base...", "Correggo la sezione...").
+  - **PromptEngine.gs**: Aggiunto ERRORE #4 per vietare esplicitamente il ragionamento esposto nelle risposte.
+  - **ResponseValidator.gs**: Aggiunto CHECK 7 (`_checkExposedReasoning`) per rilevare e bloccare risposte con meta-commenti o auto-correzioni.
+
+---
 ## [2.3.0] - 17-01-2026
 
 ### Aggiunti
