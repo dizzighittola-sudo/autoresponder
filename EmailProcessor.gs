@@ -630,7 +630,7 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     // STEP 1: Cerca thread non letti (SENZA chiamata API avanzata)
     // ═══════════════════════════════════════════════════════════════
     const threads = GmailApp.search(
-      'in:inbox is:unread -from:me',
+      'in:inbox is:unread',
       0,
       this.config.maxEmailsPerRun
     );
