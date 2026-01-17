@@ -200,10 +200,15 @@ function loadResources() {
         GLOBAL_CACHE.knowledgeBase = kbData.map(row => row.join(' | ')).join('\n');
         GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData);
         console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
-        
-        // ✅ Leggi periodi ferie segretario da righe 6-10 (multi-periodo)
-        try {
-          const ferieRows = kbSheet.getRange('A6:C10').getValues();
+      } else {
+        console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
+      }
+      
+      // ✅ Leggi periodi ferie segretario da foglio Controllo, righe 6-10
+      try {
+        const controlSheet = spreadsheet.getSheetByName('Controllo');
+        if (controlSheet) {
+          const ferieRows = controlSheet.getRange('A6:C10').getValues();
           const validPeriods = [];
           
           for (const row of ferieRows) {
@@ -227,11 +232,11 @@ function loadResources() {
               console.log(`   ${i+1}. ${p.start.toLocaleDateString('it-IT')} - ${p.end.toLocaleDateString('it-IT')}`);
             });
           }
-        } catch (ferieErr) {
-          console.warn(`⚠️ Could not load vacation periods: ${ferieErr.message}`);
+        } else {
+          console.warn('⚠️ Sheet "Controllo" not found - vacation periods not loaded');
         }
-      } else {
-        console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
+      } catch (ferieErr) {
+        console.warn(`⚠️ Could not load vacation periods: ${ferieErr.message}`);
       }
       
       // Carica AI_CORE_LITE (principi pastorali base)
@@ -359,7 +364,7 @@ function calculateEaster(year) {
 
 /**
  * Verifica se una data è in uno dei periodi ferie segretario (configurati da Sheet)
- * Legge le date da GLOBAL_CACHE.vacationPeriods (caricati da righe 6-10 di Istruzioni)
+ * Legge le date da GLOBAL_CACHE.vacationPeriods (caricati da righe 6-10 di Controllo)
  * @param {Date} date - Data da verificare
  * @returns {boolean} - true se siamo in almeno uno dei periodi ferie
  */
