@@ -5,6 +5,17 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.3] - 17-01-2026
+
+### Aggiunto
+- **Lock di Esecuzione Globale**: Implementato lock a livello di script nella funzione `main()` per impedire collisioni tra esecuzioni parallele integrali (trigger sovrapposti).
+- **Diagnostica Salti Dettagliata**: Il riepilogo log ora fornisce un dettaglio granulare dei thread saltati (Bloccati da altra istanza, Già elaborati, Interni/Self, Loop).
+
+### Risolti (Bug Fixes)
+- **Saturazione Inbox (CRITICO)**: Risolto bug in cui il bot veniva "bloccato" dalla presenza di molte email già etichettate ma non lette. Ottimizzata la query di ricerca con `-label:IA`.
+- **Riepilogo Fuorviante**: Corretto errore di logging in cui tutti i thread saltati venivano erroneamente indicati come "self-sent".
+
+---
 ## [2.3.2] - 17-01-2026
 
 ### Aggiunto

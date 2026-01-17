@@ -55,10 +55,10 @@ createTimeTrigger()
 #### 3. Query Ricerca Gmail Errata
 **Soluzione:** Il sistema filtra già le email non lette. Verifica che la query in `EmailProcessor.gs` sia corretta:
 ```javascript
-// Corretto (v2.3.2+):
-const threads = GmailApp.search('in:inbox is:unread', 0, 10);
+// Corretto (v2.3.3+):
+const searchQuery = `in:inbox is:unread -label:${this.config.labelName}`;
 ```
-- Nota: Le versioni precedenti includevano `-from:me` che bloccava le conversazioni multi-turn. Questo è stato rimosso nella v2.3.2.
+- Nota: La v2.3.3 ha ottimizzato la query per escludere le email già etichettate, prevenendo la "saturazione della inbox".
 
 ---
 
@@ -95,6 +95,14 @@ Abilita debug log, invia email test, esegui manualmente `main()` e controlla log
 clearStaleLocks("ID_DEL_THREAD")
 ```
 (O `clearStaleLocks()` senza argomenti per una pulizia generale).
+
+#### 6. Lock di Esecuzione Globale (v2.3.3+)
+
+**Sintomi:** Log mostra `⚠️ Un'altra istanza del bot è già in esecuzione. Salto questo turno.`.
+
+**Causa:** Trigger sovrapposti o esecuzione manuale durante un trigger attivo.
+
+**Soluzione:** Nessuna azione richiesta. Il prossimo trigger processerà le email non appena l'istanza corrente termina. Il lock scade automaticamente dopo pochi secondi di inattività.
 
 ---
 

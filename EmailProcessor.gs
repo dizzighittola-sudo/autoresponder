@@ -626,8 +626,10 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     // ═══════════════════════════════════════════════════════════════
     // STEP 1: Cerca thread non letti (SENZA chiamata API avanzata)
     // ═══════════════════════════════════════════════════════════════
+    // OPT: Escludi email già etichettate per evitare "Inbox saturation"
+    const searchQuery = `in:inbox is:unread -label:${this.config.labelName}`;
     const threads = GmailApp.search(
-      'in:inbox is:unread',
+      searchQuery,
       0,
       this.config.maxEmailsPerRun
     );
@@ -654,7 +656,11 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       validationFailed: 0,
       errors: 0,
       dryRun: 0,
-      skipped: 0
+      skipped: 0,
+      skipped_locked: 0,
+      skipped_processed: 0,
+      skipped_internal: 0,
+      skipped_loop: 0
     };
     
     // Processa ogni thread, passando il Set già caricato
@@ -678,6 +684,10 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
             if (result.dryRun) stats.dryRun++;
           } else if (result.status === 'skipped') {
             stats.skipped++;
+            if (result.reason === 'thread_locked' || result.reason === 'thread_locked_race') stats.skipped_locked++;
+            if (result.reason === 'already_labeled_no_new_unread') stats.skipped_processed++;
+            if (result.reason === 'no_external_unread' || result.reason === 'self_sent') stats.skipped_internal++;
+            if (result.reason === 'email_loop_detected') stats.skipped_loop++;
           } else if (result.status === 'filtered') {
             stats.filtered++;
           } else if (result.status === 'error') {
@@ -692,8 +702,17 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
     console.log(`   Totale processate: ${stats.total}`);
     console.log(`   ✓ Risposte inviate: ${stats.replied}`);
     if (stats.dryRun > 0) console.warn(`   🔴 DRY RUN: ${stats.dryRun}`);
-    if (stats.skipped > 0) console.log(`   ⊘ Skipped (self-sent): ${stats.skipped}`);
-    console.log(`   ⊘ Filtrate: ${stats.filtered}`);
+    
+    // Breakdown skip motivi
+    if (stats.skipped > 0) {
+      console.log(`   ⊘ Saltate (Totale): ${stats.skipped}`);
+      if (stats.skipped_locked > 0) console.log(`     - Blocchi (altre istanze): ${stats.skipped_locked}`);
+      if (stats.skipped_processed > 0) console.log(`     - Già elaborate: ${stats.skipped_processed}`);
+      if (stats.skipped_internal > 0) console.log(`     - Interne/Self-sent: ${stats.skipped_internal}`);
+      if (stats.skipped_loop > 0) console.warn(`     - Loop rilevati: ${stats.skipped_loop}`);
+    }
+    
+    console.log(`   ⊘ Filtrate (AI/Regole): ${stats.filtered}`);
     if (stats.validationFailed > 0) console.warn(`   ❌ Validazione fallita: ${stats.validationFailed}`);
     if (stats.errors > 0) console.error(`   ❌ Errori: ${stats.errors}`);
     console.log('='.repeat(70));

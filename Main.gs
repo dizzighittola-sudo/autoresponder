@@ -582,7 +582,15 @@ function main() {
   console.log('═'.repeat(70));
   console.log(`⏰ ${new Date().toLocaleString('it-IT')}`);
   
-  // Fail-fast su config mancante
+  // FIX: Global Lock per prevenire esecuzioni parallele (sovrapposizione trigger)
+  const executionLock = LockService.getScriptLock();
+  try {
+    if (!executionLock.tryLock(5000)) { // Tenta per 5 secondi
+      console.warn('⚠️ Un\'altra istanza del bot è già in esecuzione. Salto questo turno.');
+      return;
+    }
+    
+    // Fail-fast su config mancante
   assertCriticalConfig();
   
   // Controlla sospensione
@@ -612,6 +620,11 @@ function main() {
     
   } catch (error) {
     console.error(`❌ Errore fatale: ${error.message}`);
+  } finally {
+    // Rilascia sempre il lock globale
+    try {
+      executionLock.releaseLock();
+    } catch (e) {}
   }
 }
 

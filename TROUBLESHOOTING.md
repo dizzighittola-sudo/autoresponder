@@ -74,10 +74,10 @@ Found 0 threads with query: is:unread -from:me
 **Solution:**
 - The system automatically filters unread emails. Ensure the search query in `EmailProcessor.gs` is correct:
 ```javascript
-// Correct (v2.3.2+):
-const threads = GmailApp.search('in:inbox is:unread', 0, 10);
+// Correct (v2.3.3+):
+const searchQuery = `in:inbox is:unread -label:${this.config.labelName}`;
 ```
-- Note: Older versions included `-from:me` which broke multi-turn conversations. This was removed in v2.3.2.
+- Note: Version 2.3.3 optimized the query to exclude already labeled emails, preventing "Inbox saturation".
 
 ---
 
@@ -166,6 +166,19 @@ Or to clear ALL potential stale locks from the trace log (informational):
 ```javascript
 clearStaleLocks() // Runs general cleanup check
 ```
+
+#### 6. Global Execution Lock (v2.3.3+)
+
+**Problem:** Another instance of the bot is already running.
+
+**Log shows:**
+```
+⚠️ Another instance of the bot is already running. Skipping this turn.
+```
+
+**Cause:** Trigger overlap or manual execution while trigger is running. The system uses a 5-second wait to acquire the lock.
+
+**Solution:** No action needed. The next trigger will process the emails if the previous run has finished. If it persists, wait 30 seconds for the script lock to auto-expire.
 
 ---
 

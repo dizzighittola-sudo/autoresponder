@@ -15,14 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
-## [2.3.2] - 2026-01-17
+## [2.3.3] - 2026-01-17
 ### Added
-- "Active Listening" logic in PromptEngine: AI now acknowledges info already provided (reasons, dates) instead of asking for it again.
-- Manual lock clearing utility `clearStaleLocks(threadId)` in `Main.gs`.
+- **Global Execution Lock**: Implemented a script-level lock in `main()` to prevent whole-process parallel collisions (overlapping triggers).
+- **Detailed Skip Diagnostics**: Summary logs now provide a granular breakdown of skipped threads (Locked by instance, Already processed, Internal/Self, Loop).
 
 ### Fixed
-- Multi-turn regression: removed `-from:me` from search query to allow follow-ups.
-- Cache Lock bug: corrected TTL to seconds (30s) and fixed variable scoping in `finally` block.
+- **Inbox Saturation (CRITICAL)**: Fixed a bug where the bot became "blocked" when multiple unread messages were already labeled. Optimized search query to `in:inbox is:unread -label:IA`.
+- **Misleading Summary**: Corrected reporting bug where all skipped threads were erroneously labeled as "self-sent".
 
 ## [2.3.1] - 2026-01-14
 
