@@ -58,13 +58,18 @@ class EmailProcessor {
     // ACQUISIZIONE LOCK (THREAD-LEVEL) - FIX BUG #2 + CRITICAL #1 (TOCTOU)
     // ═══════════════════════════════════════════════════════════════
     
+    // ✅ FIX: Dichiarare variabili lock FUORI dall'if per accesso in finally
+    let lockAcquired = false;
+    let cache = null;
+    let lockKey = null;
+    
     // ✅ FIX Bug: Skip lock if requested (double-lock prevention)
     if (skipLock) {
       console.log(`🔒 Skipped lock acquisition for thread ${threadId} (caller already holds lock)`);
     } else {
       // Usa CacheService con pattern "Double-Check" per mitigare race condition
-      const cache = CacheService.getScriptCache();
-      const lockKey = `thread_lock_${threadId}`;
+      cache = CacheService.getScriptCache();
+      lockKey = `thread_lock_${threadId}`;
       const lockValue = Date.now().toString(); // Identificativo unico per questo processo
       
       // 1. Check preliminare (fast fail)
@@ -93,6 +98,7 @@ class EmailProcessor {
           return { status: 'skipped', reason: 'thread_locked_race' };
         }
         
+        lockAcquired = true;  // ✅ Segna che abbiamo acquisito il lock
         console.log(`🔒 Acquired cache lock for thread ${threadId}`);
       } catch (e) {
         console.warn(`⚠️ Error acquiring cache lock: ${e.message}`);
@@ -594,13 +600,15 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
       return result;
 
     } finally {
-      // ✅ ESEGUE SEMPRE: Rilascia lock cache (FIX CRITICAL BUG)
-      try {
-        cache.remove(lockKey);
-        console.log(`🔓 Released cache lock for thread ${threadId}`);
-      } catch (e) {
-        // Logga errore ma non farlo risalire (per evitare di mascherare l'errore originale)
-        console.warn('⚠️ Failed to release cache lock:', e.message);
+      // ✅ ESEGUE SEMPRE: Rilascia lock cache (solo se acquisito)
+      if (lockAcquired && cache && lockKey) {
+        try {
+          cache.remove(lockKey);
+          console.log(`🔓 Released cache lock for thread ${threadId}`);
+        } catch (e) {
+          // Logga errore ma non farlo risalire (per evitare di mascherare l'errore originale)
+          console.warn('⚠️ Failed to release cache lock:', e.message);
+        }
       }
     }
   }
