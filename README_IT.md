@@ -1,6 +1,6 @@
 # 🤖 Autoresponder Email Parrocchiale
 
-[![Language](https://img.shields.io/badge/🇬🇧_English-blue?style=for-the-badge)](README.md) [![Language](https://img.shields.io/badge/🇮🇹_Italiano-red?style=for-the-badge)](README_IT.md)
+[![Language](https://img.shields.io/badge/🇬🇧_English-blue?style=for-the-badge)](README.md) [![Language](https://img.shields.io/badge/🇮🇹_Italiano-red?style=for-the-badge)](README_IT.md) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![GAS](https://img.shields.io/badge/Google%20Apps%20Script-v8-green.svg) ![AI](https://img.shields.io/badge/Gemini-2.5%20Flash-orange.svg) ![Status](https://img.shields.io/badge/status-production-success.svg)
 
 > **Autoresponder email intelligente basato su AI per segreterie parrocchiali cattoliche** — Costruito con Google Apps Script e API Google Gemini
 
@@ -283,7 +283,7 @@ Vedi [CONTRIBUTING_IT.md](CONTRIBUTING_IT.md) per linee guida.
 
 ## 📊 Stato Progetto
 
-### Versione Attuale: 2.1.0
+### Versione Attuale: 2.3.6
 
 **Funzionalità Stabili:**
 - ✅ Pipeline elaborazione email core
