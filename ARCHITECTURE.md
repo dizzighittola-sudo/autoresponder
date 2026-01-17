@@ -759,7 +759,7 @@ AI: "Phone: 06 123456. By the way, mass times are..."  ← Repetitive!
 
 ## Future Architecture Improvements
 
-### Near-term (v2.2)
+### Near-term (v2.4)
 
 - [ ] Implement webhook triggers (real-time)
 - [ ] Add response caching for identical questions

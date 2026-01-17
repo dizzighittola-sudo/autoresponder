@@ -5,9 +5,14 @@
 class TerritoryValidator {
   constructor() {
     // Database territorio con vie e numeri civici accettati
-    // SANITIZZATO PER GITHUB
-    this.territory = { 
-        /* DATI SENSIBILI RIMOSSI */ 
+    // ✅ SANITIZZATO PER GITHUB: Placeholder generici
+    this.territory = {
+      'via roma': {tutti: true},
+      'corso vittorio emanuele': {dispari: [1, 100]},
+      'piazza vittorio': {tutti: true},
+      'via mazzini': {pari: [2, null]},
+      'viale delle scienze': {tutti: true}
+      // ... altri indirizzi del territorio ...
     };
   }
   
@@ -23,9 +28,12 @@ class TerritoryValidator {
       text = text.substring(0, 5000);
     }
     
-    // 2. Pattern ottimizzati per sicurezza
+    // 2. Pattern ottimizzati per sicurezza (Backtracking limitato)
     const patterns = [
+      // Pattern 1: "via Rossi 10" (Limited recursion key: use {0,6} instead of * or 10, non-greedy)
       /((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,6}?[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi,
+      
+      // Pattern 2: "abito in... via Rossi 10"
       /(?:in|abito\s+in|abito\s+al|abito\s+alle|abito\s+a|al|alle)\s+((?:via|viale|piazza|piazzale|largo|lungotevere|salita)\s+(?:[a-zA-ZàèéìòùÀÈÉÌÒÙ']+\s+){0,6}?[a-zA-ZàèéìòùÀÈÉÌÒÙ']+)\s+(?:n\.?\s*|civico\s+)?(\d+)/gi
     ];
     
@@ -34,10 +42,19 @@ class TerritoryValidator {
     for (const pattern of patterns) {
       let match;
       try {
+        // Usa exec in loop per ottenere TUTTE le corrispondenze, non solo la prima
         while ((match = pattern.exec(text)) !== null) {
           const street = match[1].trim();
-          const civic = parseInt(match[2]);
+          const civicRaw = match[2];
+          const civic = parseInt(civicRaw, 10);
           
+          // ✅ FIX BUG #4: Valida civic number
+          if (isNaN(civic) || civic <= 0) {
+            console.warn(`⚠️ Invalid civic number: ${civicRaw} for street ${street}`);
+            continue; // Salta questa match
+          }
+          
+          // Evita duplicati (stessa via + numero civico)
           const isDuplicate = addresses.some(addr => 
             addr.street.toLowerCase() === street.toLowerCase() && addr.civic === civic
           );

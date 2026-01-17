@@ -5,6 +5,16 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.7] - 17-01-2026
+
+### Risolti (Bug Fixes)
+- **Caricamento Risorse Robusto (Main.gs)**: Risolta race condition nel caricamento del foglio ferie, garantendo l'inizializzazione corretta della cache (BUG #1).
+- **Hardening Parsing Date (Main.gs)**: Implementata validazione rigorosa per le date ferie inserite nel foglio di calcolo (BUG #7).
+- **Reset Quota Atomico (GeminiRateLimiter.gs)**: Aggiunto lock a livello di script per prevenire il doppio reset delle quote giornaliere a mezzanotte (BUG #3).
+- **Coerenza Saluti (EmailProcessor.gs)**: Uniformato il comportamento per timestamp corrotti/mancanti, garantendo un approccio di "ascolto attivo" sempre coerente (ISSUE #5).
+- **Validazione Indirizzi (TerritoryValidator.gs)**: Aggiunta validazione dei numeri civici estratti per prevenire errori logici (BUG #4).
+
+---
 ## [2.3.6] - 17-01-2026
 
 ### Aggiunto

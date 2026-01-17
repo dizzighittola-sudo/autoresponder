@@ -15,7 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
-## [2.3.6] - 2026-01-17
+## [2.3.7] - 2026-01-17
+### Fixed
+- **Robust Resource Loading (Main.gs)**: Fixed a race condition where the cache was marked as loaded even if the vacation sheet failed (BUG #1).
+- **Date Parsing Hardening (Main.gs)**: Implemented strict validation for vacation dates to handle non-standard spreadsheet formats (BUG #7).
+- **Atomic Quota Reset (GeminiRateLimiter.gs)**: Added script-level locking to prevent double-resets of daily quotas at midnight (BUG #3).
+- **Salutation Consistency (EmailProcessor.gs)**: Unified behavior for invalid/missing timestamps to ensure a polite "active listening" persona (ISSUE #5).
+- **Address Validation (TerritoryValidator.gs)**: Added explicit range and type checks for civic numbers in extracted addresses (BUG #4).
 ### Added
 - **Safety Valve Logic**: Implemented graceful degradation in `Main.gs`. The system now automatically halves the `MAX_EMAILS_PER_RUN` if Gemini daily quota usage exceeds 80%, preventing total exhaustion.
 - **Documentation Badges**: Added License, Google Apps Script, Gemini AI, and Production Status badges to `README.md` and `README_IT.md`.
