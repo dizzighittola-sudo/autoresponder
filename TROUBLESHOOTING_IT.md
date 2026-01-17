@@ -53,7 +53,12 @@ createTimeTrigger()
 ```
 
 #### 3. Query Ricerca Gmail Errata
-**Soluzione:** Amplia temporaneamente la ricerca in `EmailProcessor.gs` per testare.
+**Soluzione:** Il sistema filtra già le email non lette. Verifica che la query in `EmailProcessor.gs` sia corretta:
+```javascript
+// Corretto (v2.3.2+):
+const threads = GmailApp.search('in:inbox is:unread', 0, 10);
+```
+- Nota: Le versioni precedenti includevano `-from:me` che bloccava le conversazioni multi-turn. Questo è stato rimosso nella v2.3.2.
 
 ---
 
@@ -80,7 +85,16 @@ Abilita debug log, invia email test, esegui manualmente `main()` e controlla log
 
 #### 4. Quick Check Gemini ha detto "No Reply"
 **Log mostra:** `⊘ Gemini quick check: no response needed`.
-**Cause:** Newsletter, ricevute, acknowledgment.
+**Cause:** Newsletter, ricevute, ringraziamenti.
+
+#### 5. Thread Bloccato (Lock Cache)
+**Sintomi:** Log mostra `🔒 Thread [ID] locked by another process, skipping`.
+**Causa:** Un'esecuzione precedente è crashata o andata in timeout senza rilasciare il lock.
+**Soluzione:** Esegui lo sblocco manuale dalla console Apps Script:
+```javascript
+clearStaleLocks("ID_DEL_THREAD")
+```
+(O `clearStaleLocks()` senza argomenti per una pulizia generale).
 
 ---
 

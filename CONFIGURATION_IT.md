@@ -51,6 +51,8 @@ const CONFIG = {
   MEMORY_SHEET_NAME: 'ConversationMemory',
   
   // Impostazioni Modalità
+  CACHE_LOCK_TTL: 30,
+  CACHE_RACE_SLEEP_MS: 50,
   DRY_RUN: false,
   USE_RATE_LIMITER: true,
   

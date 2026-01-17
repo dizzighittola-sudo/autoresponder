@@ -94,7 +94,7 @@ testHolidayLogic()        // Verify holiday schedule
 **Responsibilities:**
 - Orchestrates 5-step processing pipeline
 - Thread-level email processing
-- Lock management (prevents race conditions)
+- Lock management (prevents race conditions - 30s TTL in cache)
 - Error handling & labeling
 - Batch processing of unread emails
 
@@ -382,7 +382,7 @@ territory = {
 3. Load Resources (Knowledge Base)
    ↓
 4. Search Unread Emails
-   │ Query: is:unread -from:me
+   │ Query: is:unread
    │ Limit: MAX_EMAILS_PER_RUN (default: 10)
    ↓
 5. For Each Thread:

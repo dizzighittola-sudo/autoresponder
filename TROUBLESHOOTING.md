@@ -72,14 +72,12 @@ Found 0 threads with query: is:unread -from:me
 ```
 
 **Solution:**
-- Temporarily broaden search in `EmailProcessor.gs`:
+- The system automatically filters unread emails. Ensure the search query in `EmailProcessor.gs` is correct:
 ```javascript
-// Change from:
-const threads = GmailApp.search('in:inbox is:unread -from:me', 0, 10);
-
-// To (for testing):
-const threads = GmailApp.search('is:unread', 0, 10);
+// Correct (v2.3.2+):
+const threads = GmailApp.search('in:inbox is:unread', 0, 10);
 ```
+- Note: Older versions included `-from:me` which broke multi-turn conversations. This was removed in v2.3.2.
 
 ---
 
@@ -150,6 +148,24 @@ CONFIG.IGNORE_DOMAINS = []
 **Solution:**
 - Review quick check logic in `GeminiService.gs` → `shouldRespondToEmail()`
 - For persistent false negatives, adjust quick check prompt
+
+#### 5. Thread Locked by Another Process
+
+**Symptoms:**
+- Log shows: `🔒 Thread [ID] locked by another process, skipping`
+- This persists for many executions
+
+**Cause:** A previous execution crashed or reached timeout without releasing the lock. While locks expire in 30s, older versions (pre-v2.3.2) had a much longer TTL (2.7 hours).
+
+**Solution:**
+Run manual unlock in Apps Script console:
+```javascript
+clearStaleLocks("THREAD_ID_HERE")
+```
+Or to clear ALL potential stale locks from the trace log (informational):
+```javascript
+clearStaleLocks() // Runs general cleanup check
+```
 
 ---
 

@@ -50,7 +50,13 @@ const CONFIG = {
   REPLACEMENTS_SHEET_NAME: 'Sostituzioni',
   MEMORY_SHEET_NAME: 'ConversationMemory',
   
+  // Cache / Locking Settings
+  CACHE_LOCK_TTL: 30,
+  CACHE_RACE_SLEEP_MS: 50,
+  
   // Mode Settings
+  CACHE_LOCK_TTL: 30,
+  CACHE_RACE_SLEEP_MS: 50,
   DRY_RUN: false,
   USE_RATE_LIMITER: true,
   
