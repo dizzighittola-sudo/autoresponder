@@ -5,6 +5,33 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.0] - 17-01-2026
+
+### Aggiunti
+- **Periodi Ferie Multi-Anno**: Il sistema ora legge fino a 5 periodi ferie dalle righe 6-10 del foglio `Istruzioni` (A=etichetta "Ferie...", B=inizio, C=fine).
+- **`isInVacationPeriod()`**: Nuova funzione che verifica se la data corrente ricade in uno qualsiasi dei periodi configurati.
+- **`GLOBAL_CACHE.vacationPeriods`**: Array di periodi ferie caricati dal foglio.
+
+### Rimossi
+- **`isFerragostoFixedPeriod()`**: Sostituita dalla nuova funzione dinamica multi-periodo.
+- **`getFerragostoPeriodInfo()`**: Codice morto rimosso.
+
+### Modificati
+- I periodi ferie non sono più hardcoded (15-31 Agosto); ora completamente configurabili via foglio. Le righe vuote vengono saltate in sicurezza.
+
+---
+## [2.2.2] - 17-01-2026
+
+### Aggiunti
+- **`withSheetsRetry()`**: Funzione helper per retry automatico con backoff esponenziale su errori transitori Sheets API (503, 500, timeout).
+- **Config**: Aggiunti `SHEETS_RETRY_MAX` (3) e `SHEETS_RETRY_BACKOFF_MS` (1000ms).
+- **Config**: Aggiunto `MAX_PROVIDED_TOPICS` (50) per limitare la crescita della memoria su thread lunghi.
+
+### Risolti
+- **MemoryService**: Corretto potenziale memory bloat su thread lunghi limitando `providedInfo` a 50 topic.
+- **Main.gs**: `loadResources()` ora usa il wrapper retry per gestire errori Sheets transitori.
+
+---
 ## [2.2.1] - 17-01-2026
 
 ### Correzioni Critiche (Logic Bugs)

@@ -339,6 +339,51 @@ const ALWAYS_OPERATING_DAYS = [
 
 ---
 
+### Periodi Ferie (NUOVO in v2.3.0)
+
+**Tipo:** Array di periodi (letto da Sheet)  
+**Posizione:** Foglio `Istruzioni`, righe 6-10  
+**Caricato in:** `GLOBAL_CACHE.vacationPeriods`
+
+**Descrizione:** Periodi ferie configurabili quando il sistema opera sempre (segreteria in ferie).
+
+**Configurazione Foglio:**
+
+| Riga | Colonna A | Colonna B (Inizio) | Colonna C (Fine) |
+|------|-----------|-------------------|------------------|
+| 6 | Ferie segretario | 15/08/2026 | 31/08/2026 |
+| 7 | Ferie segretario | 23/12/2026 | 06/01/2027 |
+| 8 | Ferie segretario | 14/04/2027 | 21/04/2027 |
+| 9 | *(vuoto o altri dati)* | | |
+| 10 | *(vuoto o altri dati)* | | |
+
+**Regole:**
+- Colonna A deve contenere la parola "ferie" (case-insensitive)
+- Colonne B e C devono contenere date valide
+- Righe vuote vengono saltate in sicurezza
+- Supportati fino a 5 periodi (righe 6-10)
+- I periodi passati vengono automaticamente ignorati
+
+**Formati data accettati:**
+- `GG/MM/AAAA` (formato Europeo)
+- `AAAA-MM-GG` (formato ISO)
+- Oggetti Date di Google Sheets (consigliato)
+
+**Vantaggi:**
+- Configura una volta, valido per anni
+- Nessuna modifica codice necessaria per nuovi periodi
+- Supporta più periodi annuali (estate, Natale, Pasqua)
+
+**Log al caricamento:**
+```
+✓ Vacation periods loaded: 3 period(s)
+   1. 15/08/2026 - 31/08/2026
+   2. 23/12/2026 - 06/01/2027
+   3. 14/04/2027 - 21/04/2027
+```
+
+---
+
 ## Impostazioni Avanzate
 
 ### DRY_RUN

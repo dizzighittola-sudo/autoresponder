@@ -453,6 +453,51 @@ const MONTH = {
 
 ---
 
+### Vacation Periods (NEW in v2.3.0)
+
+**Type:** Array of periods (read from Sheet)  
+**Location:** Sheet `Istruzioni`, rows 6-10  
+**Loaded into:** `GLOBAL_CACHE.vacationPeriods`
+
+**Description:** Configurable vacation periods when the system always operates (staff on vacation).
+
+**Sheet Configuration:**
+
+| Row | Column A | Column B (Start) | Column C (End) |
+|-----|----------|------------------|----------------|
+| 6 | Ferie segretario | 15/08/2026 | 31/08/2026 |
+| 7 | Ferie segretario | 23/12/2026 | 06/01/2027 |
+| 8 | Ferie segretario | 14/04/2027 | 21/04/2027 |
+| 9 | *(empty or other data)* | | |
+| 10 | *(empty or other data)* | | |
+
+**Rules:**
+- Column A must contain the word "ferie" (case-insensitive)
+- Columns B and C must contain valid dates
+- Empty rows are safely skipped
+- Up to 5 periods supported (rows 6-10)
+- Past periods are automatically ignored
+
+**Date formats accepted:**
+- `DD/MM/YYYY` (European format)
+- `YYYY-MM-DD` (ISO format)
+- Google Sheets Date objects (recommended)
+
+**Benefits:**
+- Configure once, apply for years
+- No code changes needed for new vacation periods
+- Supports multiple annual periods (summer, Christmas, Easter)
+
+**Logs on load:**
+```
+✓ Vacation periods loaded: 3 period(s)
+   1. 15/08/2026 - 31/08/2026
+   2. 23/12/2026 - 06/01/2027
+   3. 14/04/2027 - 21/04/2027
+```
+
+---
+
 ## Advanced Settings
 
 ### DRY_RUN
