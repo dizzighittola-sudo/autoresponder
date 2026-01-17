@@ -127,7 +127,7 @@ var GLOBAL_CACHE = {
   ignoreDomains: CONFIG.IGNORE_DOMAINS,
   ignoreKeywords: CONFIG.IGNORE_KEYWORDS,
   replacements: {},
-  vacationPeriod: { start: null, end: null }, // ✅ Ferie segretario da Sheet
+  vacationPeriods: [], // ✅ Ferie segretario da Sheet (righe 6-10, multi-periodo)
   loaded: false
 };
 
@@ -201,19 +201,34 @@ function loadResources() {
         GLOBAL_CACHE.knowledgeStructured = _parseSheetToStructured(kbData);
         console.log(`✓ Knowledge Base loaded: ${GLOBAL_CACHE.knowledgeBase.length} chars (${GLOBAL_CACHE.knowledgeStructured.length} rows)`);
         
-        // ✅ Leggi periodo ferie segretario da riga 6 (A6:C6)
+        // ✅ Leggi periodi ferie segretario da righe 6-10 (multi-periodo)
         try {
-          const ferieRow = kbSheet.getRange('A6:C6').getValues()[0];
-          if (ferieRow[0] && String(ferieRow[0]).toLowerCase().includes('ferie') && ferieRow[1] && ferieRow[2]) {
-            const startDate = new Date(ferieRow[1]);
-            const endDate = new Date(ferieRow[2]);
+          const ferieRows = kbSheet.getRange('A6:C10').getValues();
+          const validPeriods = [];
+          
+          for (const row of ferieRows) {
+            // Salta righe vuote o senza label "ferie"
+            if (!row[0] || !String(row[0]).toLowerCase().includes('ferie')) continue;
+            if (!row[1] || !row[2]) continue; // Salta se mancano date
+            
+            const startDate = new Date(row[1]);
+            const endDate = new Date(row[2]);
+            
+            // Verifica che le date siano valide
             if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-              GLOBAL_CACHE.vacationPeriod = { start: startDate, end: endDate };
-              console.log(`✓ Vacation period loaded: ${startDate.toLocaleDateString('it-IT')} - ${endDate.toLocaleDateString('it-IT')}`);
+              validPeriods.push({ start: startDate, end: endDate });
             }
           }
+          
+          if (validPeriods.length > 0) {
+            GLOBAL_CACHE.vacationPeriods = validPeriods;
+            console.log(`✓ Vacation periods loaded: ${validPeriods.length} period(s)`);
+            validPeriods.forEach((p, i) => {
+              console.log(`   ${i+1}. ${p.start.toLocaleDateString('it-IT')} - ${p.end.toLocaleDateString('it-IT')}`);
+            });
+          }
         } catch (ferieErr) {
-          console.warn(`⚠️ Could not load vacation period: ${ferieErr.message}`);
+          console.warn(`⚠️ Could not load vacation periods: ${ferieErr.message}`);
         }
       } else {
         console.warn(`⚠️ Sheet '${CONFIG.KB_SHEET_NAME}' not found`);
@@ -343,10 +358,10 @@ function calculateEaster(year) {
 }
 
 /**
- * Verifica se una data è nel periodo ferie segretario (configurato da Sheet)
- * Legge le date da GLOBAL_CACHE.vacationPeriod (caricato da riga 6 di Istruzioni)
+ * Verifica se una data è in uno dei periodi ferie segretario (configurati da Sheet)
+ * Legge le date da GLOBAL_CACHE.vacationPeriods (caricati da righe 6-10 di Istruzioni)
  * @param {Date} date - Data da verificare
- * @returns {boolean} - true se siamo nel periodo ferie
+ * @returns {boolean} - true se siamo in almeno uno dei periodi ferie
  */
 function isInVacationPeriod(date = new Date()) {
   // Validate date parameter
@@ -355,17 +370,25 @@ function isInVacationPeriod(date = new Date()) {
     return false;
   }
   
-  const vp = GLOBAL_CACHE.vacationPeriod;
-  if (!vp || !vp.start || !vp.end) {
+  const periods = GLOBAL_CACHE.vacationPeriods;
+  if (!periods || periods.length === 0) {
     return false; // Nessun periodo ferie configurato
   }
   
   // Normalizza a mezzanotte per confronto corretto
   const checkDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const start = new Date(vp.start.getFullYear(), vp.start.getMonth(), vp.start.getDate());
-  const end = new Date(vp.end.getFullYear(), vp.end.getMonth(), vp.end.getDate());
   
-  return checkDate >= start && checkDate <= end;
+  // Controlla se la data ricade in ALMENO UNO dei periodi
+  for (const vp of periods) {
+    const start = new Date(vp.start.getFullYear(), vp.start.getMonth(), vp.start.getDate());
+    const end = new Date(vp.end.getFullYear(), vp.end.getMonth(), vp.end.getDate());
+    
+    if (checkDate >= start && checkDate <= end) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 /**
