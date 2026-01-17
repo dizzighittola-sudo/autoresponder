@@ -153,6 +153,25 @@ class GmailService {
     const body = message.getPlainBody() || this._htmlToPlainText(message.getBody());
     const messageId = message.getId();
     
+    // ✅ FIX Threading: Estrai RFC 2822 Message-ID per header In-Reply-To
+    let rfc2822MessageId = null;
+    let existingReferences = null;
+    try {
+      const rawMessage = Gmail.Users.Messages.get('me', messageId, { format: 'metadata', metadataHeaders: ['Message-ID', 'References'] });
+      if (rawMessage && rawMessage.payload && rawMessage.payload.headers) {
+        for (const header of rawMessage.payload.headers) {
+          if (header.name === 'Message-ID' || header.name === 'Message-Id') {
+            rfc2822MessageId = header.value;
+          }
+          if (header.name === 'References') {
+            existingReferences = header.value;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`⚠️ Could not extract RFC 2822 Message-ID: ${e.message}`);
+    }
+    
     // Ottieni header Reply-To
     const replyTo = message.getReplyTo();
     
@@ -172,6 +191,15 @@ class GmailService {
     const senderName = this._extractSenderName(effectiveSender);
     const senderEmail = this._extractEmailAddress(effectiveSender);
     
+    // ✅ Estrai destinatario originale (per alias detection)
+    let recipientEmail = null;
+    try {
+      recipientEmail = message.getTo();
+    } catch (e) {
+      // Fallback: usa email sessione
+      recipientEmail = Session.getActiveUser().getEmail();
+    }
+    
     return {
       id: messageId,
       subject: subject,
@@ -181,7 +209,10 @@ class GmailService {
       date: date,
       body: body,
       originalFrom: sender,
-      hasReplyTo: hasReplyTo
+      hasReplyTo: hasReplyTo,
+      rfc2822MessageId: rfc2822MessageId,       // ✅ Per In-Reply-To
+      existingReferences: existingReferences,   // ✅ Per References chain
+      recipientEmail: recipientEmail            // ✅ Per alias detection
     };
   }
   
@@ -379,6 +410,7 @@ class GmailService {
    * Invia risposta come HTML (per risposte formattate)
    * ✅ Applica safeguard di formattazione (funzionalità legacy)
    * ✅ Applica sostituzioni personalizzate dal foglio Sostituzioni
+   * ✅ FIX Threading: Usa Gmail API con header In-Reply-To e References
    * @param {GmailThread|GmailMessage|string} resource - Thread, Messaggio o ID Thread
    */
   sendHtmlReply(resource, responseText, messageDetails) {
@@ -399,19 +431,105 @@ class GmailService {
     finalResponse = this.fixPunctuation(finalResponse, messageDetails.senderName);
     finalResponse = this.ensureGreetingLineBreak(finalResponse);
 
-    // 2. Converti in HTML e invia
-    // Se è stringa, assumiamo sia Thread ID (retro-compatibilità)
-    // Se è oggetto, usiamo duck typing (sia Thread che Message hanno .reply)
+    // 2. Converti in HTML
+    const htmlBody = markdownToHtml(finalResponse);
+    
+    // 3. Prepara versione plain text (per compatibilità)
+    const plainText = this._stripHtmlTags(finalResponse);
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ FIX THREADING: Usa Gmail API per impostare header corretti
+    // ═══════════════════════════════════════════════════════════════
+    const hasThreadingInfo = messageDetails.rfc2822MessageId;
+    
+    if (hasThreadingInfo) {
+      try {
+        // Ottieni threadId
+        let threadId = null;
+        if (typeof resource === 'string') {
+          threadId = resource;
+        } else if (resource && typeof resource.getId === 'function') {
+          // È un GmailMessage o GmailThread
+          if (typeof resource.getThread === 'function') {
+            // È un GmailMessage
+            threadId = resource.getThread().getId();
+          } else {
+            // È un GmailThread
+            threadId = resource.getId();
+          }
+        }
+        
+        // Prepara subject (aggiungi Re: se non presente)
+        let replySubject = messageDetails.subject;
+        if (!replySubject.toLowerCase().startsWith('re:')) {
+          replySubject = 'Re: ' + replySubject;
+        }
+        
+        // Costruisci References header
+        let referencesHeader = messageDetails.rfc2822MessageId;
+        if (messageDetails.existingReferences) {
+          referencesHeader = messageDetails.existingReferences + ' ' + messageDetails.rfc2822MessageId;
+        }
+        
+        // Determina mittente (usa alias se disponibile)
+        const fromEmail = messageDetails.recipientEmail || Session.getActiveUser().getEmail();
+        
+        // Costruisci messaggio RFC 2822 raw
+        const boundary = 'boundary_' + Date.now();
+        const rawMessage = [
+          'MIME-Version: 1.0',
+          `From: ${fromEmail}`,
+          `To: ${messageDetails.senderEmail}`,
+          `Subject: =?UTF-8?B?${Utilities.base64Encode(replySubject, Utilities.Charset.UTF_8)}?=`,
+          `In-Reply-To: ${messageDetails.rfc2822MessageId}`,
+          `References: ${referencesHeader}`,
+          `Content-Type: multipart/alternative; boundary="${boundary}"`,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/plain; charset=UTF-8',
+          'Content-Transfer-Encoding: base64',
+          '',
+          Utilities.base64Encode(plainText, Utilities.Charset.UTF_8),
+          '',
+          `--${boundary}`,
+          'Content-Type: text/html; charset=UTF-8',
+          'Content-Transfer-Encoding: base64',
+          '',
+          Utilities.base64Encode(htmlBody, Utilities.Charset.UTF_8),
+          '',
+          `--${boundary}--`
+        ].join('\r\n');
+        
+        // Invia tramite Gmail API
+        const encodedMessage = Utilities.base64EncodeWebSafe(rawMessage);
+        
+        Gmail.Users.Messages.send({
+          raw: encodedMessage,
+          threadId: threadId
+        }, 'me');
+        
+        console.log(`✓ HTML reply sent via Gmail API to ${messageDetails.senderEmail}`);
+        console.log(`   📧 Threading headers: In-Reply-To=${messageDetails.rfc2822MessageId.substring(0, 30)}...`);
+        return;
+        
+      } catch (apiError) {
+        console.warn(`⚠️ Gmail API send failed, falling back to GmailApp: ${apiError.message}`);
+        // Fallback a metodo tradizionale
+      }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // FALLBACK: Metodo tradizionale (se Gmail API non disponibile)
+    // ═══════════════════════════════════════════════════════════════
     const mailEntity = typeof resource === 'string'
       ? GmailApp.getThreadById(resource)
       : resource;
 
     try {
-      const htmlBody = markdownToHtml(finalResponse);
       mailEntity.reply('', { htmlBody: htmlBody });
-      console.log(`✓ HTML reply sent to ${messageDetails.senderEmail}`);
+      console.log(`✓ HTML reply sent to ${messageDetails.senderEmail} (fallback method)`);
     } catch (error) {
-      console.error(`❌ Markdown conversion failed: ${error.message}`);
+      console.error(`❌ Reply failed: ${error.message}`);
       // Fallback: invia come testo plain
       try {
         mailEntity.reply(finalResponse);
@@ -429,6 +547,18 @@ class GmailService {
         }
       }
     }
+  }
+  
+  /**
+   * Rimuove tag HTML da una stringa (per versione plain text)
+   */
+  _stripHtmlTags(text) {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '$1')  // Bold
+      .replace(/\*(.+?)\*/g, '$1')       // Italic
+      .replace(/#{1,4}\s+/g, '')         // Headers
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1'); // Links
   }
 
   // ========================================================================
