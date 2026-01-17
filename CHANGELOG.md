@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced analytics and reporting
 
 ---
+## [2.3.4] - 2026-01-17
+### Added
+- **Thread Lock Hardening**: Implemented stale lock detection and safe release in `EmailProcessor.gs`.
+  - Stale locks (orphans) are now automatically detected and cleared.
+  - Locks are only released if the current cache value matches the original lock value, preventing accidental removal by concurrent processes.
+
+---
 ## [2.3.3] - 2026-01-17
 ### Added
 - **Global Execution Lock**: Implemented a script-level lock in `main()` to prevent whole-process parallel collisions (overlapping triggers).

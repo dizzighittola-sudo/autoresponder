@@ -5,6 +5,14 @@ Tutti i cambiamenti significativi al Risponditore Automatico Parrocchiale sarann
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/spec/v2.0.0.html).
 
+## [2.3.4] - 17-01-2026
+
+### Aggiunto
+- **Hardenizzazione Lock Thread**: Implementata rilevazione lock obsoleti e rilascio sicuro in `EmailProcessor.gs`.
+  - I lock rimasti orfani vengono ora rilevati e puliti automaticamente.
+  - Il rilascio del lock avviene solo se il valore in cache corrisponde a quello impostato, evitando di rimuovere lock presi in carico da altri processi.
+
+---
 ## [2.3.3] - 17-01-2026
 
 ### Aggiunto
