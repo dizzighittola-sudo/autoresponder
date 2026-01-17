@@ -58,22 +58,19 @@ class EmailProcessor {
     // ACQUISIZIONE LOCK (THREAD-LEVEL) - FIX BUG #2 + CRITICAL #1 (TOCTOU)
     // ═══════════════════════════════════════════════════════════════
     
-    // ✅ FIX: Dichiarare variabili lock FUORI dall'if per accesso in finally
-    let lockAcquired = false;
-    let cache = null;
-    let lockKey = null;
+    // ✅ FIX: Dichiarare variabili lock FUORI dall'if con VAR (scoping robusto in GAS)
+    var lockAcquired = false;
+    var scriptCache = CacheService.getScriptCache();
+    var threadLockKey = `thread_lock_${threadId}`;
     
     // ✅ FIX Bug: Skip lock if requested (double-lock prevention)
     if (skipLock) {
       console.log(`🔒 Skipped lock acquisition for thread ${threadId} (caller already holds lock)`);
     } else {
-      // Usa CacheService con pattern "Double-Check" per mitigare race condition
-      cache = CacheService.getScriptCache();
-      lockKey = `thread_lock_${threadId}`;
       const lockValue = Date.now().toString(); // Identificativo unico per questo processo
       
       // 1. Check preliminare (fast fail)
-      const existingLock = cache.get(lockKey);
+      const existingLock = scriptCache.get(threadLockKey);
       if (existingLock) {
         // Controllo opzionale TTL manuale se necessario, ma fidiamoci della cache expiration
         console.warn(`🔒 Thread ${threadId} locked by another process, skipping`);
@@ -84,7 +81,7 @@ class EmailProcessor {
       try {
         // ✅ FIX Bug: Safe CONFIG access
         const ttl = (typeof CONFIG !== 'undefined' && CONFIG.CACHE_LOCK_TTL) ? CONFIG.CACHE_LOCK_TTL : 10000;
-        cache.put(lockKey, lockValue, ttl); 
+        scriptCache.put(threadLockKey, lockValue, ttl); 
         
         // 3. Piccolo sleep per lasciare emergere race conditions
         // ✅ FIX Bug: Safe CONFIG access
@@ -92,7 +89,7 @@ class EmailProcessor {
         Utilities.sleep(raceSleep);
         
         // 4. Double-Check: verifico se il mio valore è ancora lì
-        const checkValue = cache.get(lockKey);
+        const checkValue = scriptCache.get(threadLockKey);
         if (checkValue !== lockValue) {
           console.warn(`🔒 Race detected for thread ${threadId}: expected ${lockValue}, got ${checkValue}`);
           return { status: 'skipped', reason: 'thread_locked_race' };
@@ -601,9 +598,9 @@ const prompt = this.promptEngine.buildPrompt(promptOptions);
 
     } finally {
       // ✅ ESEGUE SEMPRE: Rilascia lock cache (solo se acquisito)
-      if (lockAcquired && cache && lockKey) {
+      if (lockAcquired && scriptCache && threadLockKey) {
         try {
-          cache.remove(lockKey);
+          scriptCache.remove(threadLockKey);
           console.log(`🔓 Released cache lock for thread ${threadId}`);
         } catch (e) {
           // Logga errore ma non farlo risalire (per evitare di mascherare l'errore originale)
