@@ -395,11 +395,13 @@ YOU MUST:
 ✅ Use English greetings: "Good morning," "Good afternoon," "Good evening,"
 ✅ Use English closings: "Kind regards," "Best regards,"
 ✅ Translate any Italian information into English
+✅ ACTIVE LISTENING: Acknowledge details already provided (reasons, dates) instead of asking for them again.
 
 YOU MUST NOT:
 ❌ Use ANY Italian words (no "Buongiorno", "Cordiali saluti", etc.)
 ❌ Mix languages
 ❌ Write the greeting or closing in Italian
+❌ Ask for information the user has already written in the current email
 
 This is MANDATORY. The sender speaks English and will not understand Italian.
 ═══════════════════════════════════════════════════════════════════════════`,
@@ -414,11 +416,13 @@ DEBES:
 ✅ Usar saludos españoles: "Buenos días," "Buenas tardes,"
 ✅ Usar despedidas españolas: "Cordiales saludos," "Un saludo,"
 ✅ Traducir cualquier información italiana al español
+✅ ESCUCHA ACTIVA: Reconoce los detalles ya proporcionados (motivos, fechas) en lugar de pedirlos de nuevo.
 
 NO DEBES:
 ❌ Usar NINGUNA palabra italiana (no "Buongiorno", "Cordiali saluti", etc.)
 ❌ Mezclar idiomas
 ❌ Escribir el saludo o la despedida en italiano
+❌ Pedir información que el usuario ya ha escrito en el correo actual
 
 Esto es OBLIGATORIO. El remitente habla español y no entenderá italiano.
 ═══════════════════════════════════════════════════════════════════════════`
@@ -436,11 +440,13 @@ YOU MUST:
 ✅ Write your ENTIRE response in the SAME LANGUAGE as the incoming email
 ✅ Use appropriate greetings and closings for that language
 ✅ Translate any Italian information into the sender's language
+✅ ACTIVE LISTENING: Acknowledge information already provided (reasons, dates, preferences) instead of asking for it again.
 
 YOU MUST NOT:
 ❌ Use Italian words (no "Buongiorno", "Cordiali saluti", etc.)
 ❌ Mix languages
 ❌ Respond in Italian when the sender wrote in another language
+❌ Ask for information already provided in the incoming email
 
 This is MANDATORY. The sender may not understand Italian.
 ═══════════════════════════════════════════════════════════════════════════`;
