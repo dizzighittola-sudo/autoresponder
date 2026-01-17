@@ -316,7 +316,7 @@ function testBugFixes() {
 
   // === NEW CONFIGURATION TESTS (Residual Polish) ===
   if (typeof CONFIG !== 'undefined') {
-      assertEqual(CONFIG.CACHE_LOCK_TTL, 10000, "CONFIG: CACHE_LOCK_TTL should be 10000");
+      assertEqual(CONFIG.CACHE_LOCK_TTL, 30, "CONFIG: CACHE_LOCK_TTL should be 30 seconds");
       assertEqual(CONFIG.CACHE_RACE_SLEEP_MS, 50, "CONFIG: CACHE_RACE_SLEEP_MS should be 50");
       // New Gmail Refactor Assertions
       assertEqual(CONFIG.GMAIL_LABEL_CACHE_TTL, 3600000, "CONFIG: GMAIL_LABEL_CACHE_TTL should be 3600000");

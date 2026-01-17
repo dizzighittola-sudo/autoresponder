@@ -31,8 +31,8 @@ const CONFIG = {
   MAX_HISTORY_MESSAGES: 10,       // Max messaggi in cronologia (thread context)
   
   // === Cache / Locking ===
-  CACHE_LOCK_TTL: 10000,          // 10s (durata lock)
-  CACHE_RACE_SLEEP_MS: 50,        // 50ms (attesa anti-race)
+  CACHE_LOCK_TTL: 30,               // ✅ 30 secondi (CacheService usa SECONDI, non ms!)
+  CACHE_RACE_SLEEP_MS: 50,          // 50ms (attesa anti-race)
   
   // === Knowledge Base ===
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
@@ -770,6 +770,28 @@ function cleanupMemory() {
   const deleted = memory.cleanOldEntries(30);
   console.log(`🧹 Cleaned ${deleted} old memory entries`);
   return deleted;
+}
+
+/**
+ * Pulisce lock orfani dalla cache
+ * Utile quando un'esecuzione precedente non ha rilasciato correttamente il lock
+ * @param {string} threadId - ID del thread da sbloccare (opzionale, sblocca specifico)
+ */
+function clearStaleLocks(threadId = null) {
+  const cache = CacheService.getScriptCache();
+  
+  if (threadId) {
+    // Sblocca thread specifico
+    const lockKey = `thread_lock_${threadId}`;
+    cache.remove(lockKey);
+    console.log(`🔓 Cleared lock for thread: ${threadId}`);
+  } else {
+    // Nota: CacheService non ha un modo per listare le chiavi
+    // Quindi possiamo solo suggerire all'utente di aspettare il TTL (ora 30s)
+    console.log('⚠️ CacheService does not support listing keys.');
+    console.log('💡 Locks will auto-expire after 30 seconds.');
+    console.log('💡 To clear a specific lock, call: clearStaleLocks("threadId")');
+  }
 }
 
 /**
